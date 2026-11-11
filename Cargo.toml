@@ -1,0 +1,41 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-only"
+authors = ["Adam R Sophie <adamrsophie@gmail.com>"]
+repository = "https://github.com/adamrsophie/probgrad"
+homepage = "https://github.com/adamrsophie/probgrad"
+keywords = ["autodiff", "statistics", "bayesian", "probability", "gradient"]
+categories = ["mathematics", "science", "algorithms"]
+
+[workspace.dependencies]
+proptest = "1"
+nuts-rs = { version = "0.19", default-features = false }
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
+probgrad-core = { path = "crates/probgrad-core", version = "0.1.0" }
+probgrad-autodiff = { path = "crates/probgrad-autodiff", version = "0.1.0" }
+probgrad-linalg = { path = "crates/probgrad-linalg", version = "0.1.0" }
+probgrad-transforms = { path = "crates/probgrad-transforms", version = "0.1.0" }
+probgrad-solvers = { path = "crates/probgrad-solvers", version = "0.1.0" }
+probgrad-distributions = { path = "crates/probgrad-distributions", version = "0.1.0", default-features = false }
+libm = "0.2.16"
+rand = { version = "0.10", default-features = false }
+rand_distr = { version = "0.6", default-features = false }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+float_cmp = "allow"
+# Checks are written as `!(x > 0.0)` on purpose: the negated form rejects NaN.
+neg_cmp_op_on_partial_ord = "allow"
+many_single_char_names = "allow"
+
+[profile.bench]
+debug = true

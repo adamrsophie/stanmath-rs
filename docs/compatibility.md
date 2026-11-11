@@ -1,0 +1,175 @@
+# Compatibility with Stan Math
+
+This inventory compares probgrad with Stan Math 5.4.0 (shipped with CmdStan 2.40.0). It is updated
+with every feature. Status values:
+
+* **tested**: implemented and verified against independent references. For scalar functions and
+  distributions these are 60 to 320 digit mpmath values and, where Stan has the function, Stan
+  Math output. For linear algebra, transforms, and solvers they are closed forms, forward-mode
+  Jacobians of the generic algorithm, and finite differences (see `docs/numerical-accuracy.md`);
+  these have not yet been compared with Stan Math output;
+* **experimental**: implemented and unit tested, but not yet cross-checked against references;
+* **planned**: on the roadmap;
+* **not supported**: deliberately out of scope for now.
+
+probgrad does not claim compatibility for anything not marked **tested**.
+
+## Automatic differentiation
+
+| Stan Math | probgrad | Status |
+| --- | --- | --- |
+| `var` (reverse mode) | `Var<'t>` on an explicit `Tape` | tested |
+| `fvar<T>` (forward mode) | `Dual<T>` | tested |
+| `fvar<var>` (forward over reverse) | `Dual<Var>` | tested |
+| `fvar<fvar<T>>` | `Dual<Dual<T>>` | tested |
+| `gradient` | `grad`, `value_and_grad`, `try_*`, `GradientWorkspace` | tested |
+| `jacobian` | `jacobian` (reverse), `jacobian_forward` | tested |
+| `hessian` | `hessian` (forward over reverse), `hessian_forward` | tested |
+| `hessian_times_vector` | `hessian_vector_product` | tested |
+| `gradient_dot_vector` | `directional_derivative`, `jvp` | tested |
+| `grad_hessian` (third order) | `Dual<Dual<Var>>` by hand; no driver | experimental |
+| `finite_diff_gradient` | `finite_diff_gradient`, `check_gradient` | tested |
+| nested `start_nested` / `recover_memory_nested` | separate tapes; closures cannot capture other tapes | tested |
+| `operands_and_partials` | `Var::from_partials`, `NaryFn`, fused distribution kernels | tested |
+| custom reverse-mode functions (`reverse_pass_callback`) | `Tape::custom_op` | tested |
+| `var` over `fvar` (reverse over forward) | not provided | not supported |
+| OpenCL, TBB `reduce_sum`, `map_rect` | not provided | not supported |
+
+## Scalar functions
+
+Every function below is tested in all five modes (value, forward, reverse, forward over reverse,
+forward over forward) against mpmath.
+
+| Group | Functions | Status |
+| --- | --- | --- |
+| arithmetic | `+ - * /`, `fma`, `fmax`, `fmin`, `fdim`, `abs`, `fabs` | tested |
+| powers | `pow`, `powi`, `powf`, `sqrt`, `cbrt`, `square`, `inv`, `inv_sqrt`, `inv_square`, `hypot` | tested |
+| exponential | `exp`, `exp2`, `expm1`, `log`, `log1p`, `log1m`, `log2`, `log10` | tested |
+| trigonometric | `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2` | tested |
+| hyperbolic | `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh` | tested |
+| logistic | `inv_logit`, `logit`, `log_inv_logit`, `log1m_inv_logit`, `log1p_exp`, `log1m_exp` | tested |
+| log domain | `log_sum_exp` (2 and n arguments), `log_diff_exp`, `softmax`, `log_softmax` | tested |
+| gamma family | `lgamma`, `tgamma`, `digamma`, `trigamma`, `lbeta`, `lchoose`, `lgamma1p` | tested |
+| polygamma | `polygamma(n, x)` (`x > 0`, or negative non-integer by recurrence) | tested |
+| error functions | `erf`, `erfc`, `erfcx` | tested |
+| normal | `Phi`, `log_Phi`, `inv_Phi` | tested |
+| incomplete gamma | `gamma_p`, `gamma_q` with derivatives in both arguments | tested |
+| incomplete beta | `beta_inc` (`inc_beta` in Stan) with derivatives in all three arguments | tested |
+| other Stan functions | `Phi_approx`, `owens_t`, `log_modified_bessel_first_kind`, Bessel functions, `lambert_w`, `binary_log_loss`, `log_falling_factorial`, `log_rising_factorial`, `lmgamma`, `hypergeometric_*` | planned |
+| integer functions | `choose`, `factorial`, `bit operations` | not supported |
+
+## Distributions
+
+Log densities (`_lpdf` / `_lpmf`), log CDFs (`_lcdf`), log complementary CDFs (`_lccdf`), and
+random number generators (`_rng`) with Stan's parameterizations and argument checks. All
+arguments are vectorized. `propto` (dropping constants) is not implemented; probgrad always returns
+the full density.
+
+| Distribution | lpdf / lpmf | lcdf / lccdf | rng | Status |
+| --- | --- | --- | --- | --- |
+| `normal` | yes | yes | yes | tested |
+| `std_normal` | yes | yes | no | tested |
+| `student_t` | yes | yes | yes | tested |
+| `cauchy` | yes | yes | yes | tested |
+| `logistic` | yes | yes | yes | tested |
+| `exponential` | yes | yes | yes | tested |
+| `gamma` (shape, rate) | yes | yes | yes | tested |
+| `inv_gamma` (shape, scale) | yes | yes | yes | tested |
+| `beta` | yes | yes | yes | tested |
+| `lognormal` | yes | yes | yes | tested |
+| `uniform` | yes | yes | yes | tested |
+| `weibull` (shape, scale) | yes | yes | yes | tested |
+| `bernoulli` | yes | yes | yes | tested |
+| `bernoulli_logit` | yes | no | yes | tested |
+| `binomial` | yes | yes | yes | tested |
+| `binomial_logit` | yes | no | no | tested |
+| `poisson` | yes | yes | yes | tested |
+| `poisson_log` | yes | no | yes | tested |
+| `neg_binomial_2` (mean, dispersion) | yes | yes | yes | tested |
+| `neg_binomial_2_log` | yes | no | no | tested |
+| `categorical` | yes | not in Stan | yes | tested |
+| `categorical_logit` | yes | not in Stan | no | tested |
+| `dirichlet` | yes | not in Stan | no | tested |
+| `multi_normal` (single vector) | yes | not in Stan | no | tested |
+| `multi_normal_cholesky` (single vector) | yes | not in Stan | no | tested |
+| `lkj_corr_cholesky` | yes | not in Stan | no | tested |
+| `lkj_corr`, `multi_normal_prec`, `multi_student_t`, `wishart`, `inv_wishart`, Gaussian processes | | | | planned |
+| remaining Stan distributions (`skew_normal`, `von_mises`, `wiener`, `beta_binomial`, `ordered_logistic`, ...) | | | | planned |
+
+### Boundary conventions
+
+probgrad follows Stan's checks: the same arguments are validated, with the same requirements.
+Observations that fail a check return `Error::InvalidObservation`; parameters return
+`Error::InvalidParameter`. Where Stan returns `-inf` instead of throwing (for example
+`lognormal_lpdf(0 | ...)`, `poisson_lpmf(n > 0 | 0)`, `uniform_lpdf` outside the interval),
+probgrad does the same.
+
+Deliberate differences:
+
+* `beta_lpdf` and `weibull_lpdf` use `0 ln 0 = 0`, so for example `beta_lpdf(0 | 1, b)` is finite.
+* When a sequence argument is empty, probgrad returns zero without validating the other
+  arguments. Stan validates scalar arguments before its size-zero return, so for example
+  `normal_lpdf([] | 0, -1)` throws in Stan and returns 0 in probgrad. Matching this is planned.
+
+## Linear algebra
+
+| Stan Math | probgrad | Status |
+| --- | --- | --- |
+| `multiply` (matrix, matrix-vector) | `multiply`, `multiply_vector`, with structured adjoint | tested |
+| `cholesky_decompose` | `cholesky_decompose`, with structured adjoint | tested |
+| `mdivide_left_tri_low` | `mdivide_left_tri_low`, `mdivide_left_tri_low_transpose` | tested |
+| `mdivide_left_spd`, `inverse_spd`, `log_determinant_spd` | same names | tested |
+| `quad_form`, `multiply_lower_tri_self_transpose` | same names | tested |
+| `add`, `subtract`, scalar multiplication | `add`, `subtract`, `scale` | tested |
+| general `mdivide_left`, `inverse`, `log_determinant` (LU), eigen and singular value decompositions, matrix exponential, sparse matrices | | planned |
+
+## Constraining transforms
+
+All with `*_constrain`, `*_constrain_lp` (log Jacobian), and `*_free`.
+
+| Stan Math 5.4 | Status |
+| --- | --- |
+| `lb`, `ub`, `lub` (including infinite bounds), `offset_multiplier` | tested |
+| `ordered`, `positive_ordered` | tested |
+| `sum_to_zero` (vector), `simplex` (softmax of `sum_to_zero`) | tested |
+| `unit_vector` | tested |
+| `cholesky_factor_corr`, `cholesky_factor_cov`, `cov_matrix` | tested |
+| `corr_matrix` | planned (Stan orders its partial correlations differently from `cholesky_factor_corr`; a compatible implementation needs that order) |
+| `sum_to_zero` matrices, `stochastic_row` and `stochastic_column` matrices | planned |
+
+## Solvers
+
+| Stan Math | probgrad | Status |
+| --- | --- | --- |
+| scalar root finding (`root_finder`) | `solve_root` (bracketed safeguarded Newton), derivatives exact to the order of the scalar type | tested |
+| `algebra_solver_newton` | `solve_system` (Newton), derivatives exact to the order of the scalar type | tested |
+| `integrate_1d` | `integrate` (tanh-sinh, finite and infinite limits), derivatives with respect to parameters | tested |
+| derivatives with respect to integration limits | | planned |
+| `algebra_solver_powell`, fixed point solvers | | planned |
+| `ode_rk45`, `ode_bdf`, `ode_adams`, adjoint ODE solvers, DAE solvers | | planned |
+
+The LKJ difference above is a Stan Math gradient bug: at `eta = 1` Stan evaluates the normalizing
+constant with a special-case formula that does not depend on `eta`, so its derivative is lost.
+probgrad uses the general formula, which `tests/identities.rs` checks independently (the density
+integrates to one for `K = 2`).
+
+## Measured differences from Stan Math
+
+`crates/probgrad-distributions/tests/stan_reference.rs` compares 150 cases (values and gradients)
+with Stan Math 5.4.0 at a relative tolerance of `1e-12`. Where the two disagree, the test requires
+probgrad to be closer to a 320-digit mpmath reference. At the time of writing, 45 values or gradient
+components disagree, and all 45 are resolved in probgrad's favor. The largest:
+
+| Case | Stan relative error | probgrad relative error |
+| --- | --- | --- |
+| `lkj_corr_cholesky_lpdf(L \| 1)`, d/d eta | 2.1 (drops the normalizing constant's derivative) | 7e-16 |
+| `gamma_lccdf(50 \| 40, 1)`, d/d alpha | 1.6e-2 | below 1e-16 |
+| `logistic_lccdf(-100 \| 0, 1)`, value | 1 (returns 0) | exact |
+| `logistic_lccdf(-30 \| 0, 1)`, value | 1.7e-4 | exact |
+| `inv_gamma_lcdf(0.2 \| 3, 1)`, d/d alpha | 1.4e-4 | 1e-16 |
+| `normal_lcdf(-40 \| 0, 1)`, gradient | 7.4e-6 | 2e-16 |
+| `std_normal_lccdf(30)`, gradient | 7.7e-6 | 2e-16 |
+| `lognormal_lccdf(0.001 \| 0, 1)`, value | 3.1e-6 | 1.6e-15 |
+| `student_t_lcdf(3 \| 1e4, 0, 1)`, d/d nu | 1.1e-6 | 6e-10 |
+
+Run `cargo test -p probgrad-distributions --test stan_reference -- --nocapture` for the full list.

@@ -1,0 +1,4 @@
+stan_reference
+stan_bench
+*.o
+*.d
