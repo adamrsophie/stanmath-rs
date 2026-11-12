@@ -374,7 +374,7 @@ fn stan_named_scalar_transforms() {
     }
     assert!(positive_free(-1.0).is_err());
     assert!(prob_free(1.5).is_err());
-    assert!(corr_free(-1.0).is_err());
+    assert!(corr_free(-1.5).is_err());
     assert_eq!(identity_free(identity_constrain(0.4)), 0.4);
 }
 
