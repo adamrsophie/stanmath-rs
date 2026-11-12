@@ -161,6 +161,7 @@ fn rhs<S: Real, F: OdeSystem>(
 }
 
 /// `f(t, y, θ)` and its Jacobian `∂f/∂y`, by one forward-mode pass per state.
+#[allow(clippy::needless_range_loop)] // dense matrix loops read more clearly with indices
 fn rhs_jacobian<T: Real, F: OdeSystem>(
     f: &F,
     name: &'static str,
@@ -680,7 +681,7 @@ impl<F: DaeSystem> DaeStages<'_, F> {
         Ok(out)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, clippy::needless_range_loop)]
     fn step<T: Real>(
         &self,
         t: f64,
