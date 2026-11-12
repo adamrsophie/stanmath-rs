@@ -1,0 +1,42 @@
+[package]
+name = "stanmath-rs"
+description = "Differentiable mathematics, probability distributions, and transforms for Bayesian computation in Rust"
+readme = "../../README.md"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[features]
+default = ["rand"]
+## Random number generation (`*_rng` functions).
+rand = ["stanmath-rs-distributions/rand", "stanmath-rs-solvers/rand"]
+
+[dependencies]
+stanmath-rs-core.workspace = true
+stanmath-rs-autodiff.workspace = true
+stanmath-rs-distributions.workspace = true
+stanmath-rs-linalg.workspace = true
+stanmath-rs-transforms.workspace = true
+stanmath-rs-solvers.workspace = true
+
+[dev-dependencies]
+rand = { workspace = true, features = ["std_rng"] }
+criterion.workspace = true
+nuts-rs.workspace = true
+
+[[bench]]
+name = "stanmath_rs"
+harness = false
+
+[lints]
+workspace = true
+
+[[example]]
+name = "logistic_regression"
+required-features = ["rand"]

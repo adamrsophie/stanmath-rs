@@ -1,0 +1,115 @@
+//! Differentiable probability distributions.
+//!
+//! Function names and parameterizations follow Stan Math: `normal_lpdf(y, mu, sigma)` is the log
+//! density, `normal_lcdf` and `normal_lccdf` the log CDF and log complementary CDF, and
+//! `normal_rng` draws a value (with the default `rand` feature).
+//!
+//! # Arguments
+//!
+//! Real arguments can be scalars, slices, `&Vec`s, or array references, and may mix `f64` data
+//! with any differentiable scalar ([`Var`](stanmath_rs_autodiff::Var),
+//! [`Dual`](stanmath_rs_autodiff::Dual)). Sequence arguments must have equal lengths, scalars
+//! broadcast, and the result is the sum over elements. Integer arguments use `i64`.
+//!
+//! ```
+//! use stanmath_rs_autodiff::{grad, Real};
+//! use stanmath_rs_distributions::normal_lpdf;
+//!
+//! let y = [1.2, 0.4, 2.1];
+//! let g = grad(|p| normal_lpdf(&y[..], p[0], p[1]).unwrap(), &[1.0, 0.8]);
+//! assert_eq!(g.len(), 2);
+//! ```
+//!
+//! # Errors and boundaries
+//!
+//! Invalid parameters return [`Error::InvalidParameter`](stanmath_rs_core::Error) and observations
+//! outside the support return [`Error::InvalidObservation`](stanmath_rs_core::Error), following the
+//! checks of the corresponding Stan Math function. Where Stan returns `-inf` instead of an error
+//! (for example `lognormal_lpdf` at `y = 0`), so does stanmath-rs; each function documents its cases.
+//!
+//! # Performance
+//!
+//! Log densities are fused: the sum over all elements is recorded as one reverse-mode node whose
+//! partials are computed analytically, generically in the scalar type, so Hessians remain exact.
+
+mod cdf;
+mod cdf_plain;
+mod check;
+mod continuous;
+mod continuous_extra;
+mod discrete;
+mod discrete_extra;
+mod glm;
+mod hmm;
+mod kernel;
+mod misc_dist;
+mod multivariate;
+mod multivariate_extra;
+mod overloads;
+#[cfg(feature = "rand")]
+mod rng;
+#[cfg(feature = "rand")]
+mod rng_discrete_extra;
+#[cfg(feature = "rand")]
+mod rng_extra;
+#[cfg(feature = "rand")]
+mod rng_multivariate;
+#[cfg(feature = "rand")]
+mod rng_overloads;
+#[cfg(feature = "rand")]
+mod rng_wave2;
+mod wiener_full;
+mod yule_simon;
+
+pub use cdf::*;
+pub use cdf_plain::*;
+pub use continuous::{
+    beta_lpdf, cauchy_lpdf, exponential_lpdf, gamma_lpdf, inv_gamma_lpdf, logistic_lpdf,
+    lognormal_lpdf, normal_lpdf, std_normal_lpdf, student_t_lpdf, uniform_lpdf, weibull_lpdf,
+};
+pub use continuous_extra::{
+    beta_proportion_lccdf, beta_proportion_lcdf, beta_proportion_lpdf, chi_square_lccdf,
+    chi_square_lcdf, chi_square_lpdf, double_exponential_lccdf, double_exponential_lcdf,
+    double_exponential_lpdf, exp_mod_normal_lccdf, exp_mod_normal_lcdf, exp_mod_normal_lpdf,
+    frechet_lccdf, frechet_lcdf, frechet_lpdf, gumbel_lccdf, gumbel_lcdf, gumbel_lpdf,
+    inv_chi_square_lccdf, inv_chi_square_lcdf, inv_chi_square_lpdf, loglogistic_lccdf,
+    loglogistic_lcdf, loglogistic_lpdf, pareto_lccdf, pareto_lcdf, pareto_lpdf,
+    pareto_type_2_lccdf, pareto_type_2_lcdf, pareto_type_2_lpdf, rayleigh_lccdf, rayleigh_lcdf,
+    rayleigh_lpdf, scaled_inv_chi_square_lccdf, scaled_inv_chi_square_lcdf,
+    scaled_inv_chi_square_lpdf, skew_double_exponential_lccdf, skew_double_exponential_lcdf,
+    skew_double_exponential_lpdf, skew_normal_lccdf, skew_normal_lcdf, skew_normal_lpdf,
+    von_mises_lccdf, von_mises_lcdf, von_mises_lpdf, wiener_lpdf,
+};
+pub use discrete::{
+    bernoulli_logit_lpmf, bernoulli_lpmf, binomial_logit_lpmf, binomial_lpmf,
+    categorical_logit_lpmf, categorical_lpmf, neg_binomial_2_log_lpmf, neg_binomial_2_lpmf,
+    poisson_log_lpmf, poisson_lpmf,
+};
+pub use discrete_extra::*;
+pub use glm::*;
+pub use hmm::*;
+pub use misc_dist::{normal_sufficient_lpdf, student_t_qf};
+pub use multivariate::{
+    dirichlet_lpdf, lkj_corr_cholesky_lpdf, multi_normal_cholesky_lpdf, multi_normal_lpdf,
+};
+pub use multivariate_extra::*;
+pub use overloads::*;
+#[cfg(feature = "rand")]
+pub use rng::*;
+#[cfg(feature = "rand")]
+pub use rng_discrete_extra::*;
+#[cfg(feature = "rand")]
+pub use rng_extra::*;
+#[cfg(feature = "rand")]
+pub use rng_multivariate::*;
+#[cfg(feature = "rand")]
+pub use rng_overloads::*;
+#[cfg(feature = "rand")]
+pub use rng_wave2::*;
+pub use wiener_full::{
+    WienerArgs, WienerOut, wiener_full_lccdf_unnorm, wiener_full_lcdf_unnorm, wiener_full_lpdf,
+    wiener_full_prec_lccdf_unnorm, wiener_full_prec_lcdf_unnorm, wiener_full_prec_lpdf,
+    wiener_lccdf_unnorm, wiener_lcdf_unnorm, wiener4_lccdf_unnorm, wiener4_lcdf_unnorm,
+    wiener5_lpdf,
+};
+pub use yule_simon::{yule_simon_cdf, yule_simon_lccdf, yule_simon_lcdf, yule_simon_lpmf};

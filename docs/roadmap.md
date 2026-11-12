@@ -24,7 +24,7 @@ features), all tests, documentation tests, every example, and updated documentat
 
 ## Milestone 3: advanced differentiation and linear algebra (done, timings pending)
 
-- [x] `probgrad-linalg`: products, Cholesky, triangular solves, log determinants, quadratic forms,
+- [x] `stanmath-rs-linalg`: products, Cholesky, triangular solves, log determinants, quadratic forms,
       with structured reverse-mode adjoints through `Real::map_multi`
 - [x] Criterion benchmarks and a Stan Math timing harness
 - [ ] Record timings on an idle machine (`docs/performance.md`)
@@ -32,7 +32,7 @@ features), all tests, documentation tests, every example, and updated documentat
 
 ## Milestone 4: Bayesian model infrastructure (done)
 
-- [x] `probgrad-transforms`: bounds, offset and multiplier, ordered, positive ordered, sum to zero,
+- [x] `stanmath-rs-transforms`: bounds, offset and multiplier, ordered, positive ordered, sum to zero,
       simplex, unit vector, correlation and covariance Cholesky factors, covariance matrices
 - [x] Dirichlet, multivariate normal (covariance and Cholesky), LKJ correlation Cholesky
 - [x] Integration test with NUTS from `nuts-rs`

@@ -1,14 +1,14 @@
-# probgrad
+# stanmath-rs
 
 Differentiable mathematics for Bayesian computation in Rust: automatic differentiation, special
 functions, and probability distributions, with Stan Math as the specification and correctness
 baseline.
 
-probgrad is at version 0.1, under active development, and not yet published to crates.io. Source
-code, issues, and the changelog are on [GitHub](https://github.com/adamrsophie/probgrad).
+stanmath-rs is at version 0.1, under active development, and not yet published to crates.io. Source
+code, issues, and the changelog are on [GitHub](https://github.com/adamrsophie/stanmath-rs).
 
 ```rust
-use probgrad::prelude::*;
+use stanmath_rs::prelude::*;
 
 fn main() -> Result<()> {
     let observation = 1.3;
@@ -37,7 +37,7 @@ Until the first release, depend on the repository:
 
 ```toml
 [dependencies]
-probgrad = { git = "https://github.com/adamrsophie/probgrad" }
+stanmath-rs = { git = "https://github.com/adamrsophie/stanmath-rs" }
 ```
 
 The minimum supported Rust version is 1.85 (edition 2024).
@@ -53,4 +53,4 @@ The minimum supported Rust version is 1.85 (edition 2024).
 * [Roadmap](roadmap.md): milestones and what comes next.
 * [API reference](api.md): rustdoc for every crate.
 
-probgrad is free software under the GNU General Public License, version 3.
+stanmath-rs is free software under the GNU General Public License, version 3.

@@ -22,7 +22,7 @@ states why, and the reason is repeated below.
 
 ## Elementary functions
 
-`crates/probgrad-autodiff/tests/reference.rs`, 126 unary and 17 binary points including extreme
+`crates/stanmath-rs-autodiff/tests/reference.rs`, 126 unary and 17 binary points including extreme
 arguments (`log(1e-300)`, `log1p_exp(700)`, `log1m_exp(-1e-10)`, `tanh(10)`, `hypot(1e5, 1e-3)`).
 
 | Quantity | Tolerance |
@@ -77,7 +77,7 @@ dedicated expansion instead of `1 - P`; `lgamma1p` avoids forming `1 + a`.
 
 ## Distributions
 
-`crates/probgrad-distributions/tests/stan_reference.rs` against 320-digit mpmath:
+`crates/stanmath-rs-distributions/tests/stan_reference.rs` against 320-digit mpmath:
 
 | Group | Value | Gradient |
 | --- | --- | --- |

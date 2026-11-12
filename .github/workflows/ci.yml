@@ -46,8 +46,8 @@ jobs:
       - name: Run examples
         shell: bash
         run: |
-          for example in crates/probgrad/examples/*.rs; do
-            cargo run --release -p probgrad --example "$(basename "$example" .rs)"
+          for example in crates/stanmath-rs/examples/*.rs; do
+            cargo run --release -p stanmath-rs --example "$(basename "$example" .rs)"
           done
 
   docs:

@@ -32,10 +32,10 @@ jobs:
           cat > site/api/index.html <<'EOF'
           <!doctype html>
           <meta charset="utf-8">
-          <meta http-equiv="refresh" content="0; url=probgrad/index.html">
-          <link rel="canonical" href="probgrad/index.html">
-          <title>probgrad API reference</title>
-          <a href="probgrad/index.html">probgrad API reference</a>
+          <meta http-equiv="refresh" content="0; url=stanmath_rs/index.html">
+          <link rel="canonical" href="stanmath_rs/index.html">
+          <title>stanmath-rs API reference</title>
+          <a href="stanmath_rs/index.html">stanmath-rs API reference</a>
           EOF
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5

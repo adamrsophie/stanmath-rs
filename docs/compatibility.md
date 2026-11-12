@@ -1,6 +1,6 @@
 # Compatibility with Stan Math
 
-This inventory compares probgrad with Stan Math 5.4.0 (shipped with CmdStan 2.40.0). It is updated
+This inventory compares stanmath-rs with Stan Math 5.4.0 (shipped with CmdStan 2.40.0). It is updated
 with every feature. Status values:
 
 * **tested**: implemented and verified against independent references. For scalar functions and
@@ -12,11 +12,11 @@ with every feature. Status values:
 * **planned**: on the roadmap;
 * **not supported**: deliberately out of scope for now.
 
-probgrad does not claim compatibility for anything not marked **tested**.
+stanmath-rs does not claim compatibility for anything not marked **tested**.
 
 ## Automatic differentiation
 
-| Stan Math | probgrad | Status |
+| Stan Math | stanmath-rs | Status |
 | --- | --- | --- |
 | `var` (reverse mode) | `Var<'t>` on an explicit `Tape` | tested |
 | `fvar<T>` (forward mode) | `Dual<T>` | tested |
@@ -62,7 +62,7 @@ forward over forward) against mpmath.
 
 Log densities (`_lpdf` / `_lpmf`), log CDFs (`_lcdf`), log complementary CDFs (`_lccdf`), and
 random number generators (`_rng`) with Stan's parameterizations and argument checks. All
-arguments are vectorized. `propto` (dropping constants) is not implemented; probgrad always returns
+arguments are vectorized. `propto` (dropping constants) is not implemented; stanmath-rs always returns
 the full density.
 
 | Distribution | lpdf / lpmf | lcdf / lccdf | rng | Status |
@@ -98,22 +98,22 @@ the full density.
 
 ### Boundary conventions
 
-probgrad follows Stan's checks: the same arguments are validated, with the same requirements.
+stanmath-rs follows Stan's checks: the same arguments are validated, with the same requirements.
 Observations that fail a check return `Error::InvalidObservation`; parameters return
 `Error::InvalidParameter`. Where Stan returns `-inf` instead of throwing (for example
 `lognormal_lpdf(0 | ...)`, `poisson_lpmf(n > 0 | 0)`, `uniform_lpdf` outside the interval),
-probgrad does the same.
+stanmath-rs does the same.
 
 Deliberate differences:
 
 * `beta_lpdf` and `weibull_lpdf` use `0 ln 0 = 0`, so for example `beta_lpdf(0 | 1, b)` is finite.
-* When a sequence argument is empty, probgrad returns zero without validating the other
+* When a sequence argument is empty, stanmath-rs returns zero without validating the other
   arguments. Stan validates scalar arguments before its size-zero return, so for example
-  `normal_lpdf([] | 0, -1)` throws in Stan and returns 0 in probgrad. Matching this is planned.
+  `normal_lpdf([] | 0, -1)` throws in Stan and returns 0 in stanmath-rs. Matching this is planned.
 
 ## Linear algebra
 
-| Stan Math | probgrad | Status |
+| Stan Math | stanmath-rs | Status |
 | --- | --- | --- |
 | `multiply` (matrix, matrix-vector) | `multiply`, `multiply_vector`, with structured adjoint | tested |
 | `cholesky_decompose` | `cholesky_decompose`, with structured adjoint | tested |
@@ -139,7 +139,7 @@ All with `*_constrain`, `*_constrain_lp` (log Jacobian), and `*_free`.
 
 ## Solvers
 
-| Stan Math | probgrad | Status |
+| Stan Math | stanmath-rs | Status |
 | --- | --- | --- |
 | scalar root finding (`root_finder`) | `solve_root` (bracketed safeguarded Newton), derivatives exact to the order of the scalar type | tested |
 | `algebra_solver_newton` | `solve_system` (Newton), derivatives exact to the order of the scalar type | tested |
@@ -150,17 +150,17 @@ All with `*_constrain`, `*_constrain_lp` (log Jacobian), and `*_free`.
 
 The LKJ difference above is a Stan Math gradient bug: at `eta = 1` Stan evaluates the normalizing
 constant with a special-case formula that does not depend on `eta`, so its derivative is lost.
-probgrad uses the general formula, which `tests/identities.rs` checks independently (the density
+stanmath-rs uses the general formula, which `tests/identities.rs` checks independently (the density
 integrates to one for `K = 2`).
 
 ## Measured differences from Stan Math
 
-`crates/probgrad-distributions/tests/stan_reference.rs` compares 150 cases (values and gradients)
+`crates/stanmath-rs-distributions/tests/stan_reference.rs` compares 150 cases (values and gradients)
 with Stan Math 5.4.0 at a relative tolerance of `1e-12`. Where the two disagree, the test requires
-probgrad to be closer to a 320-digit mpmath reference. At the time of writing, 45 values or gradient
-components disagree, and all 45 are resolved in probgrad's favor. The largest:
+stanmath-rs to be closer to a 320-digit mpmath reference. At the time of writing, 45 values or gradient
+components disagree, and all 45 are resolved in stanmath-rs's favor. The largest:
 
-| Case | Stan relative error | probgrad relative error |
+| Case | Stan relative error | stanmath-rs relative error |
 | --- | --- | --- |
 | `lkj_corr_cholesky_lpdf(L \| 1)`, d/d eta | 2.1 (drops the normalizing constant's derivative) | 7e-16 |
 | `gamma_lccdf(50 \| 40, 1)`, d/d alpha | 1.6e-2 | below 1e-16 |
@@ -172,4 +172,4 @@ components disagree, and all 45 are resolved in probgrad's favor. The largest:
 | `lognormal_lccdf(0.001 \| 0, 1)`, value | 3.1e-6 | 1.6e-15 |
 | `student_t_lcdf(3 \| 1e4, 0, 1)`, d/d nu | 1.1e-6 | 6e-10 |
 
-Run `cargo test -p probgrad-distributions --test stan_reference -- --nocapture` for the full list.
+Run `cargo test -p stanmath-rs-distributions --test stan_reference -- --nocapture` for the full list.

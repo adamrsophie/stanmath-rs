@@ -1,6 +1,6 @@
 # Architecture
 
-This document records the design of probgrad and the alternatives that were considered. It is
+This document records the design of stanmath-rs and the alternatives that were considered. It is
 written for contributors who need to extend the library without redesigning it.
 
 ## Goals and priorities
@@ -18,20 +18,20 @@ expression templates, the global arena allocator) has Rust-native replacements d
 
 | Crate | Depends on | Contents |
 | --- | --- | --- |
-| `probgrad-core` | `libm` | `Error`, `Matrix<T>` container, `f64` special functions |
-| `probgrad-autodiff` | core | `Real` trait, `Dual`, `Var`/`Tape`, drivers, differentiable functions, broadcasting |
-| `probgrad-linalg` | autodiff | matrix products, Cholesky, triangular solves, log determinants |
-| `probgrad-distributions` | autodiff, linalg, `rand`, `rand_distr` | densities, CDFs, samplers |
-| `probgrad-transforms` | autodiff, linalg | constraining transforms with log Jacobians |
-| `probgrad-solvers` | autodiff | root finding, nonlinear systems, quadrature |
-| `probgrad` | all | umbrella crate, prelude, examples, benchmarks, sampler integration test |
+| `stanmath-rs-core` | `libm` | `Error`, `Matrix<T>` container, `f64` special functions |
+| `stanmath-rs-autodiff` | core | `Real` trait, `Dual`, `Var`/`Tape`, drivers, differentiable functions, broadcasting |
+| `stanmath-rs-linalg` | autodiff | matrix products, Cholesky, triangular solves, log determinants |
+| `stanmath-rs-distributions` | autodiff, linalg, `rand`, `rand_distr` | densities, CDFs, samplers |
+| `stanmath-rs-transforms` | autodiff, linalg | constraining transforms with log Jacobians |
+| `stanmath-rs-solvers` | autodiff | root finding, nonlinear systems, quadrature |
+| `stanmath-rs` | all | umbrella crate, prelude, examples, benchmarks, sampler integration test |
 
 Crates are created when their milestone starts; there are no placeholder crates.
 
 ## Dependencies
 
 Every dependency was checked for maintenance, license compatibility with GPL-3.0, and whether it
-does something probgrad should not reimplement.
+does something stanmath-rs should not reimplement.
 
 | Crate | Used for | License | Notes |
 | --- | --- | --- | --- |
@@ -51,7 +51,7 @@ Considered and not adopted:
 * **`faer`**: the strongest candidate for fast `f64` kernels inside the matrix reverse rules;
   deferred until benchmarks on an idle machine show where time goes.
 * **`statrs`**: its special functions are not differentiable in shape parameters and could not
-  feed the generic derivative rules; probgrad's own implementations are tested against mpmath.
+  feed the generic derivative rules; stanmath-rs's own implementations are tested against mpmath.
 * **Enzyme** (LLVM-level automatic differentiation): not evaluated. It requires a nightly compiler
   and a custom toolchain, which conflicts with the stable-Rust requirement.
 
@@ -180,8 +180,8 @@ design was fixed.
 ## Fused distribution kernels
 
 A log density over `n` observations written with elementary operations records several tape
-nodes per observation. Stan avoids this with `operands_and_partials`. probgrad's equivalent is the
-`Kernel` trait in `probgrad-distributions`: one function per distribution that returns the log
+nodes per observation. Stan avoids this with `operands_and_partials`. stanmath-rs's equivalent is the
+`Kernel` trait in `stanmath-rs-distributions`: one function per distribution that returns the log
 density of one element and, on request, its partial derivatives, both generic over `Real`.
 `sum_kernel` validates every element, lays the arguments out as operands (a broadcast scalar is
 one operand, a sequence is `n`), and calls `Real::map_nary` with an `NaryFn` that sums the kernel.
@@ -219,7 +219,7 @@ Two details make this exact rather than approximately right:
 ## Linear algebra
 
 `nalgebra::DMatrix<T>` requires `T: 'static`, which excludes `Var<'t>`, so matrices use
-probgrad's column-major `Matrix<T>`. A separate matrix-scalar trait would have added a second bound
+stanmath-rs's column-major `Matrix<T>`. A separate matrix-scalar trait would have added a second bound
 to every model, transform, and multivariate density, because Rust has no specialization. Instead
 `Real` has a fourth hook, `map_multi`, taking a `MultiFn`:
 
@@ -273,12 +273,12 @@ than they approach `1` in floating point.
   forward, reverse, forward over reverse, forward over forward).
 * **Stan Math.** `tools/stan-reference` compiles a generator against an installed Stan Math (path
   from the `STAN_MATH` make variable) and records values and gradients; fixtures are checked in so
-  CI does not need Stan. Where probgrad and Stan disagree, a test requires probgrad to be closer to
+  CI does not need Stan. Where stanmath-rs and Stan disagree, a test requires stanmath-rs to be closer to
   the mpmath reference.
 * **Cross-mode consistency.** Forward and reverse gradients, both Hessian modes, Jacobians, JVPs,
   VJPs, and matrix reverse rules against the generic algorithm.
 * **Identities.** CDF derivatives equal densities, densities integrate to one, transform
   Jacobians equal forward-mode log determinants.
-* **External sampler.** `crates/probgrad/tests/nuts.rs` runs NUTS from `nuts-rs` on probgrad log
+* **External sampler.** `crates/stanmath-rs/tests/nuts.rs` runs NUTS from `nuts-rs` on stanmath-rs log
   densities and checks the draws' moments.
 * **Property tests** (`proptest`) and **finite differences** as additional nets.
