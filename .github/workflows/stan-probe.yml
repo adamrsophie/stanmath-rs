@@ -20,7 +20,9 @@ jobs:
         run: git clone --depth 1 --branch v5.4.0 https://github.com/stan-dev/math.git "$RUNNER_TEMP/stan_math"
       - name: Build
         working-directory: tools/stan-reference
-        run: make -j4 STAN_MATH="$RUNNER_TEMP/stan_math/" stan_probe
+        run: |
+          make -j4 STAN_MATH="$RUNNER_TEMP/stan_math/" math-libs
+          make STAN_MATH="$RUNNER_TEMP/stan_math/" stan_probe
       - name: Run
         working-directory: tools/stan-reference
         run: |
