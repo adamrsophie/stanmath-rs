@@ -325,7 +325,7 @@ mod tests {
         for i in 0..2 {
             assert!(fd.grad_hessian[i].max_abs_diff(&r.grad_hessian[i]) < 1e-8);
         }
-        let fh = finite_diff_hessian(|v| cubic(v), &x);
+        let fh = finite_diff_hessian(cubic::<f64>, &x);
         assert!(fh.hessian.max_abs_diff(&r.hessian) < 1e-6);
     }
 
