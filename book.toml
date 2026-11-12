@@ -1,0 +1,16 @@
+[book]
+title = "probgrad"
+description = "Differentiable mathematics for Bayesian computation in Rust"
+authors = ["Adam R Sophie"]
+language = "en"
+src = "docs"
+
+[build]
+build-dir = "target/book"
+
+[output.html]
+git-repository-url = "https://github.com/adamrsophie/probgrad"
+edit-url-template = "https://github.com/adamrsophie/probgrad/edit/main/{path}"
+
+[output.html.playground]
+runnable = false

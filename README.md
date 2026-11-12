@@ -24,6 +24,8 @@ implemented and tested. ODE solvers are next, and benchmark timings still have t
 idle machine.
 See [`docs/roadmap.md`](docs/roadmap.md).
 
+Documentation, including the API reference, is at <https://adamrsophie.github.io/probgrad/>.
+
 ## What it provides
 
 * **Automatic differentiation.** Forward mode (`Dual<T>`), reverse mode (`Var` on a `Tape`), and any
