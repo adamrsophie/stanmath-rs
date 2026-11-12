@@ -28,6 +28,9 @@
 //! [`wiener_lcdf_unnorm`] and [`wiener_lccdf_unnorm`] are the four parameter versions, matching
 //! the four parameter `wiener_lpdf`.
 
+// The return types name one generic parameter per Wiener argument; aliases would only hide them.
+#![allow(clippy::type_complexity)]
+
 use core::f64::consts::PI;
 
 use stanmath_rs_autodiff::functions::{log_Phi, log_diff_exp, log_sum_exp, log1m, log1m_exp};

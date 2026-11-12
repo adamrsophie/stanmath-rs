@@ -13,6 +13,9 @@
 //! `_alpha_array` take one observation vector and an array of locations or concentrations;
 //! `_row` takes a single predictor row shared by every observation.
 
+// The return types name one generic parameter per Wiener argument; aliases would only hide them.
+#![allow(clippy::type_complexity)]
+
 use stanmath_rs_autodiff::{Arg, IntArg, Lift, Real, broadcast_len};
 use stanmath_rs_core::{Error, Matrix, Result};
 use stanmath_rs_linalg::cholesky_decompose;

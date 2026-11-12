@@ -32,7 +32,7 @@ fn dual_grad<S: Real, const N: usize>(
     grad: &mut [S; N],
     f: impl Fn([Dual<S>; N]) -> Dual<S>,
 ) {
-    for j in 0..N {
+    for (j, g) in grad.iter_mut().enumerate() {
         let xd: [Dual<S>; N] = core::array::from_fn(|k| {
             if k == j {
                 Dual::variable(x[k])
@@ -40,7 +40,7 @@ fn dual_grad<S: Real, const N: usize>(
                 Dual::constant(x[k])
             }
         });
-        grad[j] = f(xd).eps;
+        *g = f(xd).eps;
     }
 }
 
