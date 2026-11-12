@@ -258,12 +258,11 @@ fn wilkinson(a: Complex<f64>, b: Complex<f64>, c: Complex<f64>, d: Complex<f64>)
     if q.abs() == 0.0 { d } else { d - bc / q }
 }
 
+/// Two column-major `n` by `n` complex matrices.
+type ComplexPair = (Vec<Complex<f64>>, Vec<Complex<f64>>);
+
 /// Complex Schur form in `f64`: `(U, T)` with `A = U T U^H`, `U` unitary, `T` upper triangular.
-fn schur_f64(
-    function: &'static str,
-    a: &[Complex<f64>],
-    n: usize,
-) -> Result<(Vec<Complex<f64>>, Vec<Complex<f64>>)> {
+fn schur_f64(function: &'static str, a: &[Complex<f64>], n: usize) -> Result<ComplexPair> {
     let mut h = a.to_vec();
     let mut u: Vec<Complex<f64>> = (0..n * n)
         .map(|k| {

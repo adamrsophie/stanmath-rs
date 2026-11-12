@@ -311,7 +311,7 @@ pub fn make_nu<T: Real>(eta: T, k: usize) -> Result<Vec<T>> {
     Ok(nu)
 }
 
-fn split_lkj<T>(function: &'static str, x: &[T], k: usize) -> Result<(&[T], &[T])> {
+fn split_lkj<'a, T>(function: &'static str, x: &'a [T], k: usize) -> Result<(&'a [T], &'a [T])> {
     let m = k * k.saturating_sub(1) / 2;
     if x.len() != m + k {
         return Err(size_error(function, x.len(), m + k));

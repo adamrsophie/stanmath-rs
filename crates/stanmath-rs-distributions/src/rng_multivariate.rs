@@ -207,7 +207,7 @@ pub fn lkj_corr_cholesky_rng<R: Rng + ?Sized>(
     l[(0, 0)] = 1.0;
     for j in 1..k {
         // remaining = 1 - Σ_{m < i} L(j, m)^2
-        let mut remaining = 1.0;
+        let mut remaining = 1.0f64;
         for i in 0..j {
             let v = partial[(i, j)] * remaining.sqrt();
             l[(j, i)] = v;

@@ -321,7 +321,11 @@ binary!(
     Pow,
     |a, b| a.powf(b),
     |a, b, y| b * a.pow(b - 1.0),
-    if a.value() == 0.0 { S::zero() } else { a.ln() * y }
+    if a.value() == 0.0 {
+        S::zero()
+    } else {
+        a.ln() * y
+    }
 );
 binary!(
     /// `atan2(a, b)`; partials `b / (a^2 + b^2)` and `-a / (a^2 + b^2)`.
