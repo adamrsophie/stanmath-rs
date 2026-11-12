@@ -4,6 +4,9 @@
 //! unconstrained values to the free coordinates of the constrained value, computed here from a
 //! forward-mode Jacobian and an LU factorization.
 
+// Reference values keep the 17 significant digits that Stan Math printed.
+#![allow(clippy::excessive_precision)]
+
 use stanmath_rs_autodiff::{Dual64, Real, grad, jacobian_forward};
 use stanmath_rs_core::Matrix;
 use stanmath_rs_transforms::*;

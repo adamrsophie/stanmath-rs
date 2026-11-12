@@ -2,6 +2,9 @@
 //! "Stan Math probe" workflow on 2026-11-12. Each test pins one convention that the Functions
 //! Reference leaves open.
 
+// Reference values keep the 17 significant digits that Stan Math printed.
+#![allow(clippy::excessive_precision)]
+
 use stanmath_rs_core::Matrix;
 use stanmath_rs_distributions::*;
 
