@@ -1,4 +1,5 @@
 stan_reference
 stan_bench
+stan_probe
 *.o
 *.d

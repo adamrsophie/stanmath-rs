@@ -1,0 +1,32 @@
+# Builds the black-box Stan Math probes in tools/stan-reference and uploads their output.
+name: Stan Math probe
+
+on:
+  push:
+    paths:
+      - "tools/stan-reference/**"
+      - ".github/workflows/stan-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch Stan Math 5.4.0 (CmdStan 2.40)
+        run: git clone --depth 1 --branch v5.4.0 https://github.com/stan-dev/math.git "$RUNNER_TEMP/stan_math"
+      - name: Build
+        working-directory: tools/stan-reference
+        run: make -j4 STAN_MATH="$RUNNER_TEMP/stan_math/" stan_probe
+      - name: Run
+        working-directory: tools/stan-reference
+        run: |
+          ./stan_probe > stan_probe.csv
+          cat stan_probe.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stan-probe
+          path: tools/stan-reference/stan_probe.csv
