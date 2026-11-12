@@ -76,6 +76,12 @@ int main() {
   probe1("empty_theta.binomial_n_above_N", [&] { return binomial_lpmf(7, 5, none); });
   probe1("empty_y.normal_lcdf_bad_sigma", [&] { return normal_lcdf(none, 0.0, -1.0); });
   probe1("empty_y.poisson_bad_lambda", [&] { return poisson_lpmf(none_int, -1.0); });
+  probe1("empty_y.student_t_bad_nu", [&] { return student_t_lpdf(none, -1.0, 0.0, 1.0); });
+  probe1("empty_y.gamma_lccdf_bad_beta", [&] { return gamma_lccdf(none, 2.0, -1.0); });
+  probe1("empty_n.neg_binomial_2_bad_phi", [&] { return neg_binomial_2_lpmf(none_int, 1.0, -1.0); });
+  probe1("empty_y.pareto_y_below_min", [&] { return pareto_lpdf(none, 2.0, 1.5); });
+  probe1("scalar_y.pareto_y_below_min", [&] { return pareto_lpdf(1.0, 2.0, 1.5); });
+  probe1("empty_y.wiener_tau_above_y", [&] { return wiener_lpdf(none, 1.5, 2.0, 0.5, 0.3); });
 
   // normal_id_glm with a vector x.
   V y(3);
@@ -164,6 +170,15 @@ int main() {
     const Eigen::VectorXcd v = rows_dot_self(cm);
     return parts(v);
   });
+  probe("multiply.complex_matrix_vector", [&] {
+    const Eigen::VectorXcd v = multiply(cm, cb);
+    return parts(v);
+  });
+  probe("multiply.complex_row_vector_matrix", [&] {
+    const Eigen::RowVectorXcd r = ca.transpose();
+    const Eigen::VectorXcd v = multiply(r, cm).transpose();
+    return parts(v);
+  });
 
   // Order of the canonical partial correlations.
   V cpcs(6);
@@ -180,6 +195,10 @@ int main() {
   probe1("loglogistic_lpdf.y0", [&] { return loglogistic_lpdf(0.0, 1.0, 2.0); });
   probe1("loglogistic_lpdf.y_negative", [&] { return loglogistic_lpdf(-0.5, 1.0, 2.0); });
   probe1("loglogistic_cdf.interior", [&] { return loglogistic_cdf(1.3, 0.9, 2.5); });
+  probe1("rayleigh_lcdf.y0", [&] { return rayleigh_lcdf(0.0, 1.0); });
+  probe1("rayleigh_lccdf.y0", [&] { return rayleigh_lccdf(0.0, 1.0); });
+  probe1("loglogistic_cdf.y0", [&] { return loglogistic_cdf(0.0, 1.0, 2.0); });
+  probe1("loglogistic_cdf.y_negative", [&] { return loglogistic_cdf(-0.5, 1.0, 2.0); });
 
   // lkj_cov_lpdf at an interior point.
   M sigma(3, 3);
