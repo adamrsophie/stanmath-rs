@@ -26,7 +26,7 @@ pub(crate) struct Bernoulli;
 impl Kernel<1, 1> for Bernoulli {
     const NAME: &'static str = "bernoulli_lpmf";
 
-    fn check([n]: [i64; 1], [theta]: [f64; 1]) -> Result<()> {
+    fn check([n]: [Option<i64>; 1], [theta]: [Option<f64>; 1]) -> Result<()> {
         obs::binary(Self::NAME, "n", n)?;
         param::probability(Self::NAME, "theta", theta)
     }
@@ -60,7 +60,7 @@ pub(crate) struct BernoulliLogit;
 impl Kernel<1, 1> for BernoulliLogit {
     const NAME: &'static str = "bernoulli_logit_lpmf";
 
-    fn check([n]: [i64; 1], [alpha]: [f64; 1]) -> Result<()> {
+    fn check([n]: [Option<i64>; 1], [alpha]: [Option<f64>; 1]) -> Result<()> {
         obs::binary(Self::NAME, "n", n)?;
         param::not_nan(Self::NAME, "alpha", alpha)
     }
@@ -91,23 +91,26 @@ where
     sum_kernel::<BernoulliLogit, _, 1, 1>([&n], (alpha,))
 }
 
+/// `N >= 0` and `n` in `[0, N]`, each checked when present.
+fn check_trials(f: &'static str, n: Option<i64>, big_n: Option<i64>) -> Result<()> {
+    if let Some(big_n) = big_n {
+        if big_n < 0 {
+            return Err(Error::parameter(f, "N", big_n as f64, "nonnegative"));
+        }
+        if let Some(n) = n.filter(|n| !(0..=big_n).contains(n)) {
+            return Err(Error::observation(f, "n", n as f64, "in [0, N]"));
+        }
+    }
+    Ok(())
+}
+
 pub(crate) struct Binomial;
 
 impl Kernel<2, 1> for Binomial {
     const NAME: &'static str = "binomial_lpmf";
 
-    fn check([n, big_n]: [i64; 2], [theta]: [f64; 1]) -> Result<()> {
-        if big_n < 0 {
-            return Err(Error::parameter(
-                Self::NAME,
-                "N",
-                big_n as f64,
-                "nonnegative",
-            ));
-        }
-        if !(0..=big_n).contains(&n) {
-            return Err(Error::observation(Self::NAME, "n", n as f64, "in [0, N]"));
-        }
+    fn check([n, big_n]: [Option<i64>; 2], [theta]: [Option<f64>; 1]) -> Result<()> {
+        check_trials(Self::NAME, n, big_n)?;
         param::probability(Self::NAME, "theta", theta)
     }
 
@@ -145,18 +148,8 @@ pub(crate) struct BinomialLogit;
 impl Kernel<2, 1> for BinomialLogit {
     const NAME: &'static str = "binomial_logit_lpmf";
 
-    fn check([n, big_n]: [i64; 2], [alpha]: [f64; 1]) -> Result<()> {
-        if big_n < 0 {
-            return Err(Error::parameter(
-                Self::NAME,
-                "N",
-                big_n as f64,
-                "nonnegative",
-            ));
-        }
-        if !(0..=big_n).contains(&n) {
-            return Err(Error::observation(Self::NAME, "n", n as f64, "in [0, N]"));
-        }
+    fn check([n, big_n]: [Option<i64>; 2], [alpha]: [Option<f64>; 1]) -> Result<()> {
+        check_trials(Self::NAME, n, big_n)?;
         param::finite(Self::NAME, "alpha", alpha)
     }
 
@@ -184,7 +177,7 @@ pub(crate) struct Poisson;
 impl Kernel<1, 1> for Poisson {
     const NAME: &'static str = "poisson_lpmf";
 
-    fn check([n]: [i64; 1], [lambda]: [f64; 1]) -> Result<()> {
+    fn check([n]: [Option<i64>; 1], [lambda]: [Option<f64>; 1]) -> Result<()> {
         obs::count(Self::NAME, "n", n)?;
         param::nonnegative(Self::NAME, "lambda", lambda)
     }
@@ -227,7 +220,7 @@ pub(crate) struct PoissonLog;
 impl Kernel<1, 1> for PoissonLog {
     const NAME: &'static str = "poisson_log_lpmf";
 
-    fn check([n]: [i64; 1], [alpha]: [f64; 1]) -> Result<()> {
+    fn check([n]: [Option<i64>; 1], [alpha]: [Option<f64>; 1]) -> Result<()> {
         obs::count(Self::NAME, "n", n)?;
         param::not_nan(Self::NAME, "alpha", alpha)
     }
@@ -276,7 +269,7 @@ pub(crate) struct NegBinomial2;
 impl Kernel<1, 2> for NegBinomial2 {
     const NAME: &'static str = "neg_binomial_2_lpmf";
 
-    fn check([n]: [i64; 1], [mu, phi]: [f64; 2]) -> Result<()> {
+    fn check([n]: [Option<i64>; 1], [mu, phi]: [Option<f64>; 2]) -> Result<()> {
         obs::count(Self::NAME, "n", n)?;
         param::positive_finite(Self::NAME, "mu", mu)?;
         param::positive_finite(Self::NAME, "phi", phi)
@@ -316,7 +309,7 @@ pub(crate) struct NegBinomial2Log;
 impl Kernel<1, 2> for NegBinomial2Log {
     const NAME: &'static str = "neg_binomial_2_log_lpmf";
 
-    fn check([n]: [i64; 1], [eta, phi]: [f64; 2]) -> Result<()> {
+    fn check([n]: [Option<i64>; 1], [eta, phi]: [Option<f64>; 2]) -> Result<()> {
         obs::count(Self::NAME, "n", n)?;
         param::finite(Self::NAME, "eta", eta)?;
         param::positive_finite(Self::NAME, "phi", phi)

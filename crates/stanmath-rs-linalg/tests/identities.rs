@@ -366,4 +366,13 @@ fn complex_dot_products_match_stan() {
         &[(15.0, 0.0), (5.25, 0.0)]
     ));
     assert!(all(rows_dot_self_complex(&m), &[(6.0, 0.0), (14.25, 0.0)]));
+    // Matrix products do not conjugate, although multiply(row_vector, vector) does.
+    assert!(all(
+        multiply_vector_complex(&m, &b).unwrap(),
+        &[(5.0, 2.5), (5.5, -2.75)]
+    ));
+    assert!(all(
+        multiply_row_vector_complex(&a, &m).unwrap(),
+        &[(5.0, -2.0), (8.5, -1.5)]
+    ));
 }

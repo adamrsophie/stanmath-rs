@@ -10,10 +10,11 @@ use core::f64::consts::PI;
 use stanmath_rs_autodiff::functions::{
     atan2, beta_inc, gamma_p, gamma_q, log_Phi, log_inv_logit, log1m, log1m_exp, log1m_inv_logit,
 };
-use stanmath_rs_autodiff::{Broadcast, IntArg, Promoted, Real, broadcast_len};
+use stanmath_rs_autodiff::{Broadcast, IntArg, Promoted, Real};
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::{obs, param};
+use crate::kernel::sum_terms;
 
 /// `ln F` given closures for the lower tail `F` and the upper tail `1 - F`.
 ///
@@ -36,33 +37,6 @@ fn log_upper<T: Real>(lower: impl FnOnce() -> T, upper: impl FnOnce() -> T) -> T
     } else {
         log1m(lower())
     }
-}
-
-/// Sums `term` over broadcast elements after validating each with `check`.
-fn sum_terms<A, const N: usize>(
-    name: &'static str,
-    args: A,
-    ints: &[&dyn IntArg],
-    check: impl Fn(&[i64], [f64; N]) -> Result<()>,
-    term: impl Fn(&[i64], [Promoted<A, N>; N]) -> Promoted<A, N>,
-) -> Result<Promoted<A, N>>
-where
-    A: Broadcast<N>,
-{
-    let mut lens = args.lens().to_vec();
-    lens.extend(ints.iter().map(|a| a.int_len()));
-    let n = broadcast_len(name, &lens)?;
-    let mut total = Promoted::<A, N>::zero();
-    let mut int_row = vec![0i64; ints.len()];
-    for i in 0..n {
-        for (slot, a) in int_row.iter_mut().zip(ints) {
-            *slot = a.int_at(i);
-        }
-        let x = args.get(i);
-        check(&int_row, x.map(|v| v.value()))?;
-        total += term(&int_row, x);
-    }
-    Ok(total)
 }
 
 macro_rules! location_scale_cdfs {
@@ -104,7 +78,7 @@ macro_rules! location_scale_cdfs {
     };
 }
 
-fn check_location_scale(f: &'static str, [y, mu, sigma]: [f64; 3]) -> Result<()> {
+fn check_location_scale(f: &'static str, [y, mu, sigma]: [Option<f64>; 3]) -> Result<()> {
     obs::not_nan(f, "y", y)?;
     param::finite(f, "mu", mu)?;
     param::positive_finite(f, "sigma", sigma)
@@ -200,7 +174,7 @@ fn student_t_log_cdf<T: Real>(t: T, nu: T) -> T {
     }
 }
 
-fn check_student_t(f: &'static str, [y, nu, mu, sigma]: [f64; 4]) -> Result<()> {
+fn check_student_t(f: &'static str, [y, nu, mu, sigma]: [Option<f64>; 4]) -> Result<()> {
     obs::not_nan(f, "y", y)?;
     param::positive_finite(f, "nu", nu)?;
     param::finite(f, "mu", mu)?;
@@ -242,7 +216,7 @@ where
     )
 }
 
-fn check_exponential(f: &'static str, [y, beta]: [f64; 2]) -> Result<()> {
+fn check_exponential(f: &'static str, [y, beta]: [Option<f64>; 2]) -> Result<()> {
     obs::nonnegative(f, "y", y)?;
     param::positive_finite(f, "beta", beta)
 }
@@ -277,7 +251,7 @@ where
     )
 }
 
-fn check_gamma(f: &'static str, [y, alpha, beta]: [f64; 3]) -> Result<()> {
+fn check_gamma(f: &'static str, [y, alpha, beta]: [Option<f64>; 3]) -> Result<()> {
     obs::nonnegative(f, "y", y)?;
     param::positive_finite(f, "alpha", alpha)?;
     param::positive_finite(f, "beta", beta)
@@ -343,7 +317,7 @@ where
     )
 }
 
-fn check_beta(f: &'static str, [y, a, b]: [f64; 3]) -> Result<()> {
+fn check_beta(f: &'static str, [y, a, b]: [Option<f64>; 3]) -> Result<()> {
     obs::unit_interval(f, "y", y)?;
     param::positive_finite(f, "alpha", a)?;
     param::positive_finite(f, "beta", b)
@@ -379,7 +353,7 @@ where
     )
 }
 
-fn check_lognormal(f: &'static str, [y, mu, sigma]: [f64; 3]) -> Result<()> {
+fn check_lognormal(f: &'static str, [y, mu, sigma]: [Option<f64>; 3]) -> Result<()> {
     obs::nonnegative(f, "y", y)?;
     param::finite(f, "mu", mu)?;
     param::positive_finite(f, "sigma", sigma)
@@ -415,14 +389,13 @@ where
     )
 }
 
-fn check_uniform(f: &'static str, [y, alpha, beta]: [f64; 3]) -> Result<()> {
+fn check_uniform(f: &'static str, [y, alpha, beta]: [Option<f64>; 3]) -> Result<()> {
     obs::not_nan(f, "y", y)?;
     param::finite(f, "alpha", alpha)?;
     param::finite(f, "beta", beta)?;
-    if beta > alpha {
-        Ok(())
-    } else {
-        Err(Error::parameter(f, "beta", beta, "greater than alpha"))
+    match (alpha, beta) {
+        (Some(a), Some(b)) if !(b > a) => Err(Error::parameter(f, "beta", b, "greater than alpha")),
+        _ => Ok(()),
     }
 }
 
@@ -472,7 +445,7 @@ where
     )
 }
 
-fn check_weibull(f: &'static str, [y, alpha, sigma]: [f64; 3]) -> Result<()> {
+fn check_weibull(f: &'static str, [y, alpha, sigma]: [Option<f64>; 3]) -> Result<()> {
     obs::nonnegative(f, "y", y)?;
     param::positive_finite(f, "alpha", alpha)?;
     param::positive_finite(f, "sigma", sigma)
@@ -558,13 +531,14 @@ where
     )
 }
 
-fn check_binomial(f: &'static str, k: &[i64], theta: f64) -> Result<()> {
-    let (n, big_n) = (k[0], k[1]);
-    if big_n < 0 {
-        return Err(Error::parameter(f, "N", big_n as f64, "nonnegative"));
-    }
-    if !(0..=big_n).contains(&n) {
-        return Err(Error::observation(f, "n", n as f64, "in [0, N]"));
+fn check_binomial(f: &'static str, k: &[Option<i64>], theta: Option<f64>) -> Result<()> {
+    if let Some(big_n) = k[1] {
+        if big_n < 0 {
+            return Err(Error::parameter(f, "N", big_n as f64, "nonnegative"));
+        }
+        if let Some(n) = k[0].filter(|n| !(0..=big_n).contains(n)) {
+            return Err(Error::observation(f, "n", n as f64, "in [0, N]"));
+        }
     }
     param::probability(f, "theta", theta)
 }
@@ -619,7 +593,7 @@ where
     )
 }
 
-fn check_poisson(f: &'static str, k: &[i64], lambda: f64) -> Result<()> {
+fn check_poisson(f: &'static str, k: &[Option<i64>], lambda: Option<f64>) -> Result<()> {
     obs::count(f, "n", k[0])?;
     param::nonnegative(f, "lambda", lambda)
 }
@@ -662,7 +636,11 @@ where
     )
 }
 
-fn check_neg_binomial_2(f: &'static str, k: &[i64], [mu, phi]: [f64; 2]) -> Result<()> {
+fn check_neg_binomial_2(
+    f: &'static str,
+    k: &[Option<i64>],
+    [mu, phi]: [Option<f64>; 2],
+) -> Result<()> {
     obs::count(f, "n", k[0])?;
     param::positive_finite(f, "mu", mu)?;
     param::positive_finite(f, "phi", phi)

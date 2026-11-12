@@ -18,8 +18,9 @@ pub(crate) trait Kernel<const M: usize, const N: usize> {
     /// Function name used in error messages.
     const NAME: &'static str;
 
-    /// Validates one element's arguments.
-    fn check(ints: [i64; M], x: [f64; N]) -> Result<()>;
+    /// Validates one element's arguments. `None` marks an empty sequence argument; it is only
+    /// passed when the broadcast length is zero, to validate the scalar arguments as Stan does.
+    fn check(ints: [Option<i64>; M], x: [Option<f64>; N]) -> Result<()>;
 
     /// Log density of one element; writes `d/dx[j]` into `grad[j]` when `grad` is given.
     fn eval<S: Real>(ints: [i64; M], x: [S; N], grad: Option<&mut [S; N]>) -> S;
@@ -105,7 +106,7 @@ where
     for i in 0..n {
         let elems = args.get(i);
         let int_row: [i64; M] = core::array::from_fn(|m| ints[m].int_at(i));
-        K::check(int_row, elems.map(|e| e.value()))?;
+        K::check(int_row.map(Some), elems.map(|e| Some(e.value())))?;
         int_rows.push(int_row);
         for j in 0..N {
             if !scalar[j] || i == 0 {
@@ -114,6 +115,11 @@ where
         }
     }
     if n == 0 {
+        // Every sequence is empty; Stan still validates the scalars.
+        K::check(
+            core::array::from_fn(|m| ints[m].int_scalar()),
+            args.scalar_values(),
+        )?;
         return Ok(Promoted::<A, N>::zero());
     }
     let mut offset = [0; N];
@@ -130,4 +136,39 @@ where
         _kernel: PhantomData,
     };
     Ok(Promoted::<A, N>::map_nary(&operands, &f))
+}
+
+/// Sums `term` over broadcast elements after validating each with `check`. With an empty
+/// sequence argument, `check` sees `None` in its place and validates the scalars, as Stan does.
+pub(crate) fn sum_terms<A, const N: usize>(
+    name: &'static str,
+    args: A,
+    ints: &[&dyn IntArg],
+    check: impl Fn(&[Option<i64>], [Option<f64>; N]) -> Result<()>,
+    term: impl Fn(&[i64], [Promoted<A, N>; N]) -> Promoted<A, N>,
+) -> Result<Promoted<A, N>>
+where
+    A: Broadcast<N>,
+{
+    let mut lens = args.lens().to_vec();
+    lens.extend(ints.iter().map(|a| a.int_len()));
+    let n = broadcast_len(name, &lens)?;
+    if n == 0 {
+        let scalars: Vec<Option<i64>> = ints.iter().map(|a| a.int_scalar()).collect();
+        check(&scalars, args.scalar_values())?;
+        return Ok(Promoted::<A, N>::zero());
+    }
+    let mut total = Promoted::<A, N>::zero();
+    let mut int_row = vec![0i64; ints.len()];
+    let mut checked = vec![None; ints.len()];
+    for i in 0..n {
+        for ((slot, c), a) in int_row.iter_mut().zip(&mut checked).zip(ints) {
+            *slot = a.int_at(i);
+            *c = Some(*slot);
+        }
+        let x = args.get(i);
+        check(&checked, x.map(|v| Some(v.value())))?;
+        total += term(&int_row, x);
+    }
+    Ok(total)
 }

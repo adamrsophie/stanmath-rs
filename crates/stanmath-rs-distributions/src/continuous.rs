@@ -1,9 +1,10 @@
 //! Log densities of continuous distributions.
 //!
 //! Every function accepts scalars or sequences for each argument (see
-//! [`Broadcast`](stanmath_rs_autodiff::Broadcast)), returns the sum of the log densities, and returns
-//! zero when a sequence argument is empty. Argument checks follow Stan Math; the module
-//! documentation of each function lists them and the boundary behavior.
+//! [`Broadcast`](stanmath_rs_autodiff::Broadcast)) and returns the sum of the log densities. When
+//! a sequence argument is empty the result is zero, after the scalar arguments are validated as
+//! Stan does. Argument checks follow Stan Math; the module documentation of each function lists
+//! them and the boundary behavior.
 
 use stanmath_rs_autodiff::functions::{digamma, inv_logit, lbeta, lgamma, log1m, log1p, log1p_exp};
 use stanmath_rs_autodiff::special::digamma_diff;
@@ -29,7 +30,7 @@ pub(crate) struct Normal;
 impl Kernel<0, 3> for Normal {
     const NAME: &'static str = "normal_lpdf";
 
-    fn check(_: [i64; 0], [y, mu, sigma]: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, mu, sigma]: [Option<f64>; 3]) -> Result<()> {
         obs::not_nan(Self::NAME, "y", y)?;
         param::finite(Self::NAME, "mu", mu)?;
         param::positive(Self::NAME, "sigma", sigma)
@@ -70,7 +71,7 @@ pub(crate) struct StdNormal;
 impl Kernel<0, 1> for StdNormal {
     const NAME: &'static str = "std_normal_lpdf";
 
-    fn check(_: [i64; 0], [y]: [f64; 1]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y]: [Option<f64>; 1]) -> Result<()> {
         obs::not_nan(Self::NAME, "y", y)
     }
 
@@ -95,7 +96,7 @@ pub(crate) struct StudentT;
 impl Kernel<0, 4> for StudentT {
     const NAME: &'static str = "student_t_lpdf";
 
-    fn check(_: [i64; 0], [y, nu, mu, sigma]: [f64; 4]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, nu, mu, sigma]: [Option<f64>; 4]) -> Result<()> {
         obs::not_nan(Self::NAME, "y", y)?;
         param::positive_finite(Self::NAME, "nu", nu)?;
         param::finite(Self::NAME, "mu", mu)?;
@@ -143,7 +144,7 @@ pub(crate) struct Cauchy;
 impl Kernel<0, 3> for Cauchy {
     const NAME: &'static str = "cauchy_lpdf";
 
-    fn check(_: [i64; 0], [y, mu, sigma]: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, mu, sigma]: [Option<f64>; 3]) -> Result<()> {
         obs::not_nan(Self::NAME, "y", y)?;
         param::finite(Self::NAME, "mu", mu)?;
         param::positive_finite(Self::NAME, "sigma", sigma)
@@ -177,7 +178,7 @@ pub(crate) struct Logistic;
 impl Kernel<0, 3> for Logistic {
     const NAME: &'static str = "logistic_lpdf";
 
-    fn check(_: [i64; 0], [y, mu, sigma]: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, mu, sigma]: [Option<f64>; 3]) -> Result<()> {
         obs::finite(Self::NAME, "y", y)?;
         param::finite(Self::NAME, "mu", mu)?;
         param::positive_finite(Self::NAME, "sigma", sigma)
@@ -212,7 +213,7 @@ pub(crate) struct Exponential;
 impl Kernel<0, 2> for Exponential {
     const NAME: &'static str = "exponential_lpdf";
 
-    fn check(_: [i64; 0], [y, beta]: [f64; 2]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, beta]: [Option<f64>; 2]) -> Result<()> {
         obs::nonnegative(Self::NAME, "y", y)?;
         param::positive_finite(Self::NAME, "beta", beta)
     }
@@ -241,7 +242,7 @@ pub(crate) struct Gamma;
 impl Kernel<0, 3> for Gamma {
     const NAME: &'static str = "gamma_lpdf";
 
-    fn check(_: [i64; 0], [y, alpha, beta]: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, alpha, beta]: [Option<f64>; 3]) -> Result<()> {
         obs::positive_finite(Self::NAME, "y", y)?;
         param::positive_finite(Self::NAME, "alpha", alpha)?;
         param::positive_finite(Self::NAME, "beta", beta)
@@ -275,7 +276,7 @@ pub(crate) struct InvGamma;
 impl Kernel<0, 3> for InvGamma {
     const NAME: &'static str = "inv_gamma_lpdf";
 
-    fn check(_: [i64; 0], [y, alpha, beta]: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, alpha, beta]: [Option<f64>; 3]) -> Result<()> {
         obs::not_nan(Self::NAME, "y", y)?;
         param::positive_finite(Self::NAME, "alpha", alpha)?;
         param::positive_finite(Self::NAME, "beta", beta)
@@ -315,7 +316,7 @@ pub(crate) struct Beta;
 impl Kernel<0, 3> for Beta {
     const NAME: &'static str = "beta_lpdf";
 
-    fn check(_: [i64; 0], [y, a, b]: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, a, b]: [Option<f64>; 3]) -> Result<()> {
         param::positive_finite(Self::NAME, "alpha", a)?;
         param::positive_finite(Self::NAME, "beta", b)?;
         obs::unit_interval(Self::NAME, "y", y)
@@ -349,7 +350,7 @@ pub(crate) struct LogNormal;
 impl Kernel<0, 3> for LogNormal {
     const NAME: &'static str = "lognormal_lpdf";
 
-    fn check(_: [i64; 0], [y, mu, sigma]: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, mu, sigma]: [Option<f64>; 3]) -> Result<()> {
         obs::nonnegative(Self::NAME, "y", y)?;
         param::finite(Self::NAME, "mu", mu)?;
         param::positive_finite(Self::NAME, "sigma", sigma)
@@ -389,19 +390,18 @@ pub(crate) struct Uniform;
 impl Kernel<0, 3> for Uniform {
     const NAME: &'static str = "uniform_lpdf";
 
-    fn check(_: [i64; 0], [y, alpha, beta]: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, alpha, beta]: [Option<f64>; 3]) -> Result<()> {
         obs::not_nan(Self::NAME, "y", y)?;
         param::finite(Self::NAME, "alpha", alpha)?;
         param::finite(Self::NAME, "beta", beta)?;
-        if beta > alpha {
-            Ok(())
-        } else {
-            Err(stanmath_rs_core::Error::parameter(
+        match (alpha, beta) {
+            (Some(a), Some(b)) if !(b > a) => Err(stanmath_rs_core::Error::parameter(
                 Self::NAME,
                 "beta",
-                beta,
+                b,
                 "greater than alpha",
-            ))
+            )),
+            _ => Ok(()),
         }
     }
 
@@ -440,7 +440,7 @@ pub(crate) struct Weibull;
 impl Kernel<0, 3> for Weibull {
     const NAME: &'static str = "weibull_lpdf";
 
-    fn check(_: [i64; 0], [y, alpha, sigma]: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, alpha, sigma]: [Option<f64>; 3]) -> Result<()> {
         obs::finite(Self::NAME, "y", y)?;
         param::positive_finite(Self::NAME, "alpha", alpha)?;
         param::positive_finite(Self::NAME, "sigma", sigma)

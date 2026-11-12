@@ -97,6 +97,10 @@ pub trait Arg {
     fn arg_len(&self) -> Option<usize>;
     /// Element `i`; scalars ignore `i`.
     fn arg_at(&self, i: usize) -> Self::Elem;
+    /// The value of a scalar argument, `None` for a sequence.
+    fn arg_scalar(&self) -> Option<Self::Elem> {
+        self.arg_len().is_none().then(|| self.arg_at(0))
+    }
 }
 
 impl Arg for f64 {
@@ -177,6 +181,10 @@ pub trait IntArg {
     fn int_len(&self) -> Option<usize>;
     /// Element `i`; scalars ignore `i`.
     fn int_at(&self, i: usize) -> i64;
+    /// The value of a scalar argument, `None` for a sequence.
+    fn int_scalar(&self) -> Option<i64> {
+        self.int_len().is_none().then(|| self.int_at(0))
+    }
 }
 
 impl IntArg for i64 {
@@ -247,6 +255,9 @@ pub trait Broadcast<const N: usize> {
     fn lens(&self) -> [Option<usize>; N];
     /// Elements at index `i`, each converted to [`Broadcast::Out`].
     fn get(&self, i: usize) -> [Self::Out; N];
+    /// Values of the scalar arguments, `None` for sequences. Stan validates scalar arguments even
+    /// when a sequence argument is empty, and this is what it validates.
+    fn scalar_values(&self) -> [Option<f64>; N];
     /// Broadcast length; see [`broadcast_len`].
     fn broadcast_len(&self, function: &'static str) -> Result<usize> {
         broadcast_len(function, &self.lens())
@@ -255,6 +266,14 @@ pub trait Broadcast<const N: usize> {
     fn all_scalar(&self) -> bool {
         self.lens().iter().all(Option::is_none)
     }
+}
+
+/// The value of a scalar argument converted to `O`, `None` for a sequence.
+fn scalar_value<A: Arg, O: Real>(a: &A) -> Option<f64>
+where
+    A::Elem: Lift<O>,
+{
+    a.arg_scalar().map(|e| Lift::<O>::lift(e).value())
 }
 
 /// Promoted type of two element types.
@@ -276,6 +295,9 @@ where
     fn get(&self, i: usize) -> [Self::Out; 1] {
         [self.0.arg_at(i).lift()]
     }
+    fn scalar_values(&self) -> [Option<f64>; 1] {
+        [scalar_value::<_, Self::Out>(&self.0)]
+    }
 }
 
 // The where clauses for each arity are spelled out by hand so that the promoted type of every
@@ -293,6 +315,12 @@ where
     #[inline]
     fn get(&self, i: usize) -> [Self::Out; 2] {
         [self.0.arg_at(i).lift(), self.1.arg_at(i).lift()]
+    }
+    fn scalar_values(&self) -> [Option<f64>; 2] {
+        [
+            scalar_value::<_, Self::Out>(&self.0),
+            scalar_value::<_, Self::Out>(&self.1),
+        ]
     }
 }
 
@@ -318,6 +346,13 @@ where
             self.0.arg_at(i).lift(),
             self.1.arg_at(i).lift(),
             self.2.arg_at(i).lift(),
+        ]
+    }
+    fn scalar_values(&self) -> [Option<f64>; 3] {
+        [
+            scalar_value::<_, Self::Out>(&self.0),
+            scalar_value::<_, Self::Out>(&self.1),
+            scalar_value::<_, Self::Out>(&self.2),
         ]
     }
 }
@@ -348,6 +383,14 @@ where
             self.1.arg_at(i).lift(),
             self.2.arg_at(i).lift(),
             self.3.arg_at(i).lift(),
+        ]
+    }
+    fn scalar_values(&self) -> [Option<f64>; 4] {
+        [
+            scalar_value::<_, Self::Out>(&self.0),
+            scalar_value::<_, Self::Out>(&self.1),
+            scalar_value::<_, Self::Out>(&self.2),
+            scalar_value::<_, Self::Out>(&self.3),
         ]
     }
 }
@@ -382,6 +425,15 @@ where
             self.2.arg_at(i).lift(),
             self.3.arg_at(i).lift(),
             self.4.arg_at(i).lift(),
+        ]
+    }
+    fn scalar_values(&self) -> [Option<f64>; 5] {
+        [
+            scalar_value::<_, Self::Out>(&self.0),
+            scalar_value::<_, Self::Out>(&self.1),
+            scalar_value::<_, Self::Out>(&self.2),
+            scalar_value::<_, Self::Out>(&self.3),
+            scalar_value::<_, Self::Out>(&self.4),
         ]
     }
 }

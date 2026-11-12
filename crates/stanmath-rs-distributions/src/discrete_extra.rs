@@ -14,7 +14,7 @@ use stanmath_rs_autodiff::{Arg, Broadcast, Dual, IntArg, Lift, Promoted, Real, b
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::{obs, param};
-use crate::kernel::{Kernel, sum_kernel};
+use crate::kernel::{Kernel, sum_kernel, sum_terms};
 
 /// Tolerance for simplex checks, as Stan's `CONSTRAINT_TOLERANCE`.
 const SIMPLEX_TOL: f64 = 1e-8;
@@ -64,33 +64,6 @@ fn log_upper<T: Real>(lower: impl FnOnce() -> T, upper: impl FnOnce() -> T) -> T
     }
 }
 
-/// Sums `term` over broadcast elements after validating each with `check`.
-fn sum_over<A, const N: usize>(
-    name: &'static str,
-    args: A,
-    ints: &[&dyn IntArg],
-    check: impl Fn(&[i64], [f64; N]) -> Result<()>,
-    term: impl Fn(&[i64], [Promoted<A, N>; N]) -> Promoted<A, N>,
-) -> Result<Promoted<A, N>>
-where
-    A: Broadcast<N>,
-{
-    let mut lens = args.lens().to_vec();
-    lens.extend(ints.iter().map(|a| a.int_len()));
-    let n = broadcast_len(name, &lens)?;
-    let mut total = Promoted::<A, N>::zero();
-    let mut int_row = vec![0i64; ints.len()];
-    for i in 0..n {
-        for (slot, a) in int_row.iter_mut().zip(ints) {
-            *slot = a.int_at(i);
-        }
-        let x = args.get(i);
-        check(&int_row, x.map(|v| v.value()))?;
-        total += term(&int_row, x);
-    }
-    Ok(total)
-}
-
 /// Common length of integer-only arguments.
 fn int_len(name: &'static str, ints: &[&dyn IntArg]) -> Result<usize> {
     let lens: Vec<Option<usize>> = ints.iter().map(|a| a.int_len()).collect();
@@ -108,8 +81,12 @@ fn beta_binomial_density<S: Real>(n: i64, big_n: i64, [alpha, beta]: [S; 2]) -> 
     S::from_f64(lchoose_int(big_n, n)) + lbeta(alpha + nf, beta + mf) - lbeta(alpha, beta)
 }
 
-fn check_beta_binomial(f: &'static str, big_n: i64, [alpha, beta]: [f64; 2]) -> Result<()> {
-    if big_n < 0 {
+fn check_beta_binomial(
+    f: &'static str,
+    big_n: Option<i64>,
+    [alpha, beta]: [Option<f64>; 2],
+) -> Result<()> {
+    if let Some(big_n) = big_n.filter(|&n| n < 0) {
         return Err(Error::parameter(f, "N", big_n as f64, "nonnegative"));
     }
     param::positive_finite(f, "alpha", alpha)?;
@@ -121,7 +98,7 @@ pub(crate) struct BetaBinomial;
 impl Kernel<2, 2> for BetaBinomial {
     const NAME: &'static str = "beta_binomial_lpmf";
 
-    fn check([_, big_n]: [i64; 2], x: [f64; 2]) -> Result<()> {
+    fn check([_, big_n]: [Option<i64>; 2], x: [Option<f64>; 2]) -> Result<()> {
         check_beta_binomial(Self::NAME, big_n, x)
     }
 
@@ -182,7 +159,7 @@ where
     (A, B): Broadcast<2>,
 {
     const F: &str = "beta_binomial_lcdf";
-    sum_over(
+    sum_terms(
         F,
         (alpha, beta),
         &[&n, &trials],
@@ -213,7 +190,7 @@ where
     (A, B): Broadcast<2>,
 {
     const F: &str = "beta_binomial_lccdf";
-    sum_over(
+    sum_terms(
         F,
         (alpha, beta),
         &[&n, &trials],
@@ -289,7 +266,11 @@ fn neg_binomial_density<S: Real>(n: i64, [alpha, beta]: [S; 2]) -> S {
     coef - alpha * log1p(beta.recip()) - tail
 }
 
-fn check_neg_binomial(f: &'static str, n: i64, [alpha, beta]: [f64; 2]) -> Result<()> {
+fn check_neg_binomial(
+    f: &'static str,
+    n: Option<i64>,
+    [alpha, beta]: [Option<f64>; 2],
+) -> Result<()> {
     obs::count(f, "n", n)?;
     param::positive_finite(f, "alpha", alpha)?;
     param::positive_finite(f, "beta", beta)
@@ -300,7 +281,7 @@ pub(crate) struct NegBinomial;
 impl Kernel<1, 2> for NegBinomial {
     const NAME: &'static str = "neg_binomial_lpmf";
 
-    fn check([n]: [i64; 1], x: [f64; 2]) -> Result<()> {
+    fn check([n]: [Option<i64>; 1], x: [Option<f64>; 2]) -> Result<()> {
         check_neg_binomial(Self::NAME, n, x)
     }
 
@@ -330,7 +311,7 @@ where
     (A, B): Broadcast<2>,
 {
     const F: &str = "neg_binomial_lcdf";
-    sum_over(
+    sum_terms(
         F,
         (alpha, beta),
         &[&n],
@@ -351,7 +332,7 @@ where
     (A, B): Broadcast<2>,
 {
     const F: &str = "neg_binomial_lccdf";
-    sum_over(
+    sum_terms(
         F,
         (alpha, beta),
         &[&n],
@@ -376,7 +357,11 @@ fn beta_neg_binomial_density<S: Real>(n: i64, [r, alpha, beta]: [S; 3]) -> S {
     coef + lbeta(r + alpha, beta + nf) - lbeta(alpha, beta)
 }
 
-fn check_beta_neg_binomial(f: &'static str, n: i64, [r, alpha, beta]: [f64; 3]) -> Result<()> {
+fn check_beta_neg_binomial(
+    f: &'static str,
+    n: Option<i64>,
+    [r, alpha, beta]: [Option<f64>; 3],
+) -> Result<()> {
     obs::count(f, "n", n)?;
     param::positive_finite(f, "r", r)?;
     param::positive_finite(f, "alpha", alpha)?;
@@ -388,7 +373,7 @@ pub(crate) struct BetaNegBinomial;
 impl Kernel<1, 3> for BetaNegBinomial {
     const NAME: &'static str = "beta_neg_binomial_lpmf";
 
-    fn check([n]: [i64; 1], x: [f64; 3]) -> Result<()> {
+    fn check([n]: [Option<i64>; 1], x: [Option<f64>; 3]) -> Result<()> {
         check_beta_neg_binomial(Self::NAME, n, x)
     }
 
@@ -435,7 +420,7 @@ where
     (R, A, B): Broadcast<3>,
 {
     const F: &str = "beta_neg_binomial_lcdf";
-    sum_over(
+    sum_terms(
         F,
         (r, alpha, beta),
         &[&n],
@@ -459,7 +444,7 @@ where
     (R, A, B): Broadcast<3>,
 {
     const F: &str = "beta_neg_binomial_lccdf";
-    sum_over(
+    sum_terms(
         F,
         (r, alpha, beta),
         &[&n],
@@ -482,6 +467,21 @@ fn check_range(f: &'static str, lower: i64, upper: i64) -> Result<()> {
     Ok(())
 }
 
+/// Common length of the discrete range arguments. With an empty sequence, scalar bounds are
+/// still checked, as Stan does.
+fn range_len(
+    f: &'static str,
+    y: &dyn IntArg,
+    lower: &dyn IntArg,
+    upper: &dyn IntArg,
+) -> Result<usize> {
+    let len = int_len(f, &[y, lower, upper])?;
+    if let (0, Some(lo), Some(hi)) = (len, lower.int_scalar(), upper.int_scalar()) {
+        check_range(f, lo, hi)?;
+    }
+    Ok(len)
+}
+
 /// Uniform log mass on the integers `lower..=upper`.
 ///
 /// Requires `lower <= upper`; `y` outside the range gives `-inf`.
@@ -492,7 +492,7 @@ where
     U: IntArg,
 {
     const F: &str = "discrete_range_lpmf";
-    let len = int_len(F, &[&y, &lower, &upper])?;
+    let len = range_len(F, &y, &lower, &upper)?;
     let mut lp = 0.0;
     for i in 0..len {
         let (v, lo, hi) = (y.int_at(i), lower.int_at(i), upper.int_at(i));
@@ -514,7 +514,7 @@ where
     U: IntArg,
 {
     const F: &str = "discrete_range_lcdf";
-    let len = int_len(F, &[&y, &lower, &upper])?;
+    let len = range_len(F, &y, &lower, &upper)?;
     let mut lp = 0.0;
     for i in 0..len {
         let (v, lo, hi) = (y.int_at(i), lower.int_at(i), upper.int_at(i));
@@ -538,7 +538,7 @@ where
     U: IntArg,
 {
     const F: &str = "discrete_range_lccdf";
-    let len = int_len(F, &[&y, &lower, &upper])?;
+    let len = range_len(F, &y, &lower, &upper)?;
     let mut lp = 0.0;
     for i in 0..len {
         let (v, lo, hi) = (y.int_at(i), lower.int_at(i), upper.int_at(i));

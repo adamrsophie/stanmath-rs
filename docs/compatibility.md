@@ -104,12 +104,13 @@ Observations that fail a check return `Error::InvalidObservation`; parameters re
 `lognormal_lpdf(0 | ...)`, `poisson_lpmf(n > 0 | 0)`, `uniform_lpdf` outside the interval),
 stanmath-rs does the same.
 
+When a sequence argument is empty, the result is zero, but the scalar arguments are still
+validated, as in Stan: `normal_lpdf([] | 0, -1)` is an error. Checks that relate two arguments,
+such as `y > tau` for `wiener_lpdf`, apply only when both are present.
+
 Deliberate differences:
 
 * `beta_lpdf` and `weibull_lpdf` use `0 ln 0 = 0`, so for example `beta_lpdf(0 | 1, b)` is finite.
-* When a sequence argument is empty, stanmath-rs returns zero without validating the other
-  arguments. Stan validates scalar arguments before its size-zero return, so for example
-  `normal_lpdf([] | 0, -1)` throws in Stan and returns 0 in stanmath-rs. Matching this is planned.
 
 ## Linear algebra
 

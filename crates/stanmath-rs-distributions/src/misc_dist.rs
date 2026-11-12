@@ -13,12 +13,12 @@ pub(crate) struct NormalSufficient;
 impl Kernel<1, 4> for NormalSufficient {
     const NAME: &'static str = "normal_sufficient_lpdf";
 
-    fn check([n]: [i64; 1], [y_bar, s_squared, mu, sigma]: [f64; 4]) -> Result<()> {
+    fn check([n]: [Option<i64>; 1], [y_bar, s_squared, mu, sigma]: [Option<f64>; 4]) -> Result<()> {
         const F: &str = "normal_sufficient_lpdf";
         obs::finite(F, "y_bar", y_bar)?;
         obs::finite(F, "s_squared", s_squared)?;
         obs::nonnegative(F, "s_squared", s_squared)?;
-        if n < 1 {
+        if let Some(n) = n.filter(|&n| n < 1) {
             return Err(Error::observation(F, "n_obs", n as f64, "positive"));
         }
         param::finite(F, "mu", mu)?;

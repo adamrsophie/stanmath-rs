@@ -66,3 +66,36 @@ fn edge_cases_of_the_newer_densities() {
     let c = loglogistic_cdf(1.3, 0.9, 2.5).unwrap();
     assert!(close(c, 0.71490189009403016), "{c}");
 }
+
+#[test]
+fn empty_sequences_still_validate_the_scalars() {
+    let none: &[f64] = &[];
+    let none_int: &[i64] = &[];
+    assert!(normal_lpdf(none, 0.0, -1.0).is_err());
+    assert!(normal_lpdf(none, f64::NAN, 1.0).is_err());
+    assert!(normal_lpdf(none, &[0.0, 1.0][..], 1.0).is_err());
+    assert!(normal_lpdf(none, none, -1.0).is_err());
+    assert!(uniform_lpdf(none, 2.0, 1.0).is_err());
+    assert!(binomial_lpmf(none_int, -1i64, 0.3).is_err());
+    assert!(binomial_lpmf(none_int, 5i64, 1.5).is_err());
+    assert!(binomial_lpmf(7i64, 5i64, none).is_err());
+    assert!(normal_lcdf(none, 0.0, -1.0).is_err());
+    assert!(poisson_lpmf(none_int, -1.0).is_err());
+    assert!(student_t_lpdf(none, -1.0, 0.0, 1.0).is_err());
+    assert!(gamma_lccdf(none, 2.0, -1.0).is_err());
+    assert!(neg_binomial_2_lpmf(none_int, 1.0, -1.0).is_err());
+    // Checks between an empty argument and a scalar do not apply.
+    assert_eq!(pareto_lpdf(none, 2.0, 1.5).unwrap(), 0.0);
+    assert_eq!(pareto_lpdf(1.0, 2.0, 1.5).unwrap(), f64::NEG_INFINITY);
+    assert_eq!(wiener_lpdf(none, 1.5, 2.0, 0.5, 0.3).unwrap(), 0.0);
+    // Valid scalars with an empty sequence still give zero.
+    assert_eq!(normal_lpdf(none, 0.0, 1.0).unwrap(), 0.0);
+}
+
+#[test]
+fn cdf_supports_at_zero() {
+    assert_eq!(rayleigh_lcdf(0.0, 1.0).unwrap(), f64::NEG_INFINITY);
+    assert_eq!(rayleigh_lccdf(0.0, 1.0).unwrap(), 0.0);
+    assert_eq!(loglogistic_cdf(0.0, 1.0, 2.0).unwrap(), 0.0);
+    assert!(loglogistic_cdf(-0.5, 1.0, 2.0).is_err());
+}

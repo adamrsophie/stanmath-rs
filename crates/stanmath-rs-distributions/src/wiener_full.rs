@@ -39,7 +39,6 @@ use stanmath_rs_core::special::HALF_LN_2PI;
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::{obs, param};
-use crate::continuous_extra::{param_nonnegative_finite, param_open_unit};
 
 /// Default `precision`, as in Stan.
 const DEFAULT_PRECISION: f64 = 1e-4;
@@ -67,6 +66,8 @@ pub trait WienerArgs<const N: usize> {
     fn lens(&self) -> [Option<usize>; N];
     /// Elements at index `i`, each converted to the common scalar type.
     fn get(&self, i: usize) -> [Self::Out; N];
+    /// Values of the scalar arguments, `None` for sequences.
+    fn scalar_values(&self) -> [Option<f64>; N];
 }
 
 /// The common scalar type of a Wiener argument tuple.
@@ -81,6 +82,10 @@ impl<X: Broadcast<5>> WienerArgs<5> for X {
 
     fn get(&self, i: usize) -> [Self::Out; 5] {
         <X as Broadcast<5>>::get(self, i)
+    }
+
+    fn scalar_values(&self) -> [Option<f64>; 5] {
+        <X as Broadcast<5>>::scalar_values(self)
     }
 }
 
@@ -115,6 +120,12 @@ where
         let [d, e, f] = <(D, E, F) as Broadcast<3>>::get(&(self.3, self.4, self.5), i)
             .map(<Out3<D, E, F> as Lift<Self::Out>>::lift);
         [a, b, c, d, e, f]
+    }
+
+    fn scalar_values(&self) -> [Option<f64>; 6] {
+        let l = <(A, B, C) as Broadcast<3>>::scalar_values(&(self.0, self.1, self.2));
+        let r = <(D, E, F) as Broadcast<3>>::scalar_values(&(self.3, self.4, self.5));
+        [l[0], l[1], l[2], r[0], r[1], r[2]]
     }
 }
 
@@ -151,20 +162,30 @@ where
                 .map(<Out4<E, F, G, H> as Lift<Self::Out>>::lift);
         [a, b, c, d, e, f, g, h]
     }
+
+    fn scalar_values(&self) -> [Option<f64>; 8] {
+        let l = <(A, B, C, D) as Broadcast<4>>::scalar_values(&(self.0, self.1, self.2, self.3));
+        let r = <(E, F, G, H) as Broadcast<4>>::scalar_values(&(self.4, self.5, self.6, self.7));
+        [l[0], l[1], l[2], l[3], r[0], r[1], r[2], r[3]]
+    }
 }
 
-/// Sums `term` over broadcast elements after validating each with `check`.
+/// Sums `term` over broadcast elements after validating each with `check`. With an empty
+/// sequence argument, `check` sees `None` in its place and validates the scalars, as Stan does.
 fn sum_elements<X: WienerArgs<N>, const N: usize>(
     function: &'static str,
     args: X,
-    check: impl Fn([f64; N]) -> Result<()>,
+    check: impl Fn([Option<f64>; N]) -> Result<()>,
     term: impl Fn([X::Out; N]) -> X::Out,
 ) -> Result<X::Out> {
     let n = broadcast_len(function, &args.lens())?;
+    if n == 0 {
+        check(args.scalar_values())?;
+    }
     let mut total = <X::Out as Real>::zero();
     for i in 0..n {
         let x = args.get(i);
-        check(x.map(|e| e.value()))?;
+        check(x.map(|e| Some(e.value())))?;
         total += term(x);
     }
     Ok(total)
@@ -174,7 +195,7 @@ fn sum_elements<X: WienerArgs<N>, const N: usize>(
 /// densities (`y` positive finite and greater than `t0`) over those of the CDFs (`y` not NaN).
 fn check_element(
     f: &'static str,
-    [y, a, t0, w, v, sv, sw, st0]: [f64; 8],
+    [y, a, t0, w, v, sv, sw, st0]: [Option<f64>; 8],
     density: bool,
 ) -> Result<()> {
     if density {
@@ -183,29 +204,35 @@ fn check_element(
         obs::not_nan(f, "y", y)?;
     }
     param::positive_finite(f, "a", a)?;
-    param_nonnegative_finite(f, "t0", t0)?;
-    param_open_unit(f, "w", w)?;
+    param::nonnegative_finite(f, "t0", t0)?;
+    param::open_unit(f, "w", w)?;
     param::finite(f, "v", v)?;
-    param_nonnegative_finite(f, "sv", sv)?;
-    if !(0.0..1.0).contains(&sw) {
+    param::nonnegative_finite(f, "sv", sv)?;
+    if let Some(sw) = sw.filter(|sw| !(0.0..1.0).contains(sw)) {
         return Err(Error::parameter(f, "sw", sw, "in [0, 1)"));
     }
-    param_nonnegative_finite(f, "st0", st0)?;
-    if w - 0.5 * sw <= 0.0 || w + 0.5 * sw >= 1.0 {
-        return Err(Error::parameter(
-            f,
-            "sw",
-            sw,
-            "small enough that w +/- sw / 2 lies in (0, 1)",
-        ));
+    param::nonnegative_finite(f, "st0", st0)?;
+    match (w, sw) {
+        (Some(w), Some(sw)) if w - 0.5 * sw <= 0.0 || w + 0.5 * sw >= 1.0 => {
+            return Err(Error::parameter(
+                f,
+                "sw",
+                sw,
+                "small enough that w +/- sw / 2 lies in (0, 1)",
+            ));
+        }
+        _ => {}
     }
-    if density && y <= t0 {
-        return Err(Error::observation(
-            f,
-            "y",
-            y,
-            "greater than the nondecision time t0",
-        ));
+    match (y, t0) {
+        (Some(y), Some(t0)) if density && y <= t0 => {
+            return Err(Error::observation(
+                f,
+                "y",
+                y,
+                "greater than the nondecision time t0",
+            ));
+        }
+        _ => {}
     }
     Ok(())
 }
@@ -641,7 +668,7 @@ where
     sum_elements(
         F,
         (y, a, t0, w, v, sv),
-        |[y, a, t0, w, v, sv]| check_element(F, [y, a, t0, w, v, sv, 0.0, 0.0], true),
+        |[y, a, t0, w, v, sv]| check_element(F, [y, a, t0, w, v, sv, Some(0.0), Some(0.0)], true),
         |[y, a, t0, w, v, sv]| log_density_upper(y - t0, a, v, w, sv),
     )
 }
@@ -740,7 +767,9 @@ fn wiener4_tail<X: WienerArgs<5>>(f: &'static str, args: X, complement: bool) ->
     sum_elements(
         f,
         args,
-        |[y, a, t0, w, v]| check_element(f, [y, a, t0, w, v, 0.0, 0.0, 0.0], false),
+        |[y, a, t0, w, v]| {
+            check_element(f, [y, a, t0, w, v, Some(0.0), Some(0.0), Some(0.0)], false)
+        },
         |[y, a, t0, w, v]| log_cdf_upper(y - t0, a, v, w, complement),
     )
 }

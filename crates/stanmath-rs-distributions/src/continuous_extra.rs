@@ -1,8 +1,8 @@
 //! Further continuous distributions: log densities, log CDFs, and log complementary CDFs.
 //!
 //! Parameterizations and argument checks follow Stan Math. Every function accepts scalars or
-//! sequences for each argument, returns the sum over elements, and returns zero when a sequence
-//! argument is empty. Log densities are fused kernels with analytic partials; the Wiener first
+//! sequences for each argument and returns the sum over elements. When a sequence argument is
+//! empty the result is zero, after the scalar arguments are validated as Stan does. Log densities are fused kernels with analytic partials; the Wiener first
 //! passage time density obtains its partials by forward mode instead.
 
 use core::f64::consts::{LN_2, PI};
@@ -13,38 +13,12 @@ use stanmath_rs_autodiff::functions::{
     log1p_exp, owens_t,
 };
 use stanmath_rs_autodiff::special::{InvMillsRatio, digamma_diff};
-use stanmath_rs_autodiff::{Broadcast, Dual, Promoted, Real, broadcast_len};
+use stanmath_rs_autodiff::{Broadcast, Dual, Promoted, Real};
 use stanmath_rs_core::special::{HALF_LN_2PI, LN_2PI};
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::{obs, param};
-use crate::kernel::{Kernel, sum_kernel};
-
-// Checks not covered by `crate::check`.
-
-pub(crate) fn obs_positive(f: &'static str, name: &'static str, v: f64) -> Result<()> {
-    if v > 0.0 {
-        Ok(())
-    } else {
-        Err(Error::observation(f, name, v, "positive"))
-    }
-}
-
-pub(crate) fn param_open_unit(f: &'static str, name: &'static str, v: f64) -> Result<()> {
-    if v > 0.0 && v < 1.0 {
-        Ok(())
-    } else {
-        Err(Error::parameter(f, name, v, "in (0, 1)"))
-    }
-}
-
-pub(crate) fn param_nonnegative_finite(f: &'static str, name: &'static str, v: f64) -> Result<()> {
-    if v >= 0.0 && v.is_finite() {
-        Ok(())
-    } else {
-        Err(Error::parameter(f, name, v, "nonnegative finite"))
-    }
-}
+use crate::kernel::{Kernel, sum_kernel, sum_terms};
 
 /// `a ln y` with the convention `0 ln 0 = 0`.
 #[inline]
@@ -85,23 +59,6 @@ fn log_upper<T: Real>(lower: impl FnOnce() -> T, upper: impl FnOnce() -> T) -> T
     }
 }
 
-/// Sums `term` over broadcast elements after validating each with `check`.
-fn sum_terms<A: Broadcast<N>, const N: usize>(
-    name: &'static str,
-    args: A,
-    check: impl Fn([f64; N]) -> Result<()>,
-    term: impl Fn([Promoted<A, N>; N]) -> Promoted<A, N>,
-) -> Result<Promoted<A, N>> {
-    let n = broadcast_len(name, &args.lens())?;
-    let mut total = Promoted::<A, N>::zero();
-    for i in 0..n {
-        let x = args.get(i);
-        check(x.map(|v| v.value()))?;
-        total += term(x);
-    }
-    Ok(total)
-}
-
 /// A vectorized log density over kernel `$kernel` with `$n` real arguments.
 macro_rules! lpdf {
     ($(#[$doc:meta])* $name:ident, $kernel:ty, $n:literal, ($($arg:ident: $ty:ident),+)) => {
@@ -125,7 +82,7 @@ macro_rules! cdfs {
             ($($ty,)+): Broadcast<$n>,
         {
             const F: &str = stringify!($lcdf);
-            sum_terms(F, ($($arg,)+), |x| ($check)(F, x), |x| ($lower)(x))
+            sum_terms(F, ($($arg,)+), &[], |_, x| ($check)(F, x), |_, x| ($lower)(x))
         }
 
         #[doc = concat!(
@@ -137,14 +94,14 @@ macro_rules! cdfs {
             ($($ty,)+): Broadcast<$n>,
         {
             const F: &str = stringify!($lccdf);
-            sum_terms(F, ($($arg,)+), |x| ($check)(F, x), |x| ($upper)(x))
+            sum_terms(F, ($($arg,)+), &[], |_, x| ($check)(F, x), |_, x| ($upper)(x))
         }
     };
 }
 
 // Skew normal.
 
-fn check_skew_normal(f: &'static str, [y, xi, omega, alpha]: [f64; 4]) -> Result<()> {
+fn check_skew_normal(f: &'static str, [y, xi, omega, alpha]: [Option<f64>; 4]) -> Result<()> {
     obs::not_nan(f, "y", y)?;
     param::finite(f, "xi", xi)?;
     param::positive(f, "omega", omega)?;
@@ -156,7 +113,7 @@ pub(crate) struct SkewNormal;
 impl Kernel<0, 4> for SkewNormal {
     const NAME: &'static str = "skew_normal_lpdf";
 
-    fn check(_: [i64; 0], x: [f64; 4]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], x: [Option<f64>; 4]) -> Result<()> {
         check_skew_normal(Self::NAME, x)
     }
 
@@ -215,7 +172,7 @@ cdfs!(
 
 // Double exponential (Laplace).
 
-fn check_double_exponential(f: &'static str, [y, mu, sigma]: [f64; 3]) -> Result<()> {
+fn check_double_exponential(f: &'static str, [y, mu, sigma]: [Option<f64>; 3]) -> Result<()> {
     obs::finite(f, "y", y)?;
     param::finite(f, "mu", mu)?;
     param::positive_finite(f, "sigma", sigma)
@@ -226,7 +183,7 @@ pub(crate) struct DoubleExponential;
 impl Kernel<0, 3> for DoubleExponential {
     const NAME: &'static str = "double_exponential_lpdf";
 
-    fn check(_: [i64; 0], x: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], x: [Option<f64>; 3]) -> Result<()> {
         check_double_exponential(Self::NAME, x)
     }
 
@@ -294,10 +251,10 @@ pub(crate) struct VonMises;
 impl Kernel<0, 3> for VonMises {
     const NAME: &'static str = "von_mises_lpdf";
 
-    fn check(_: [i64; 0], [y, mu, kappa]: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, mu, kappa]: [Option<f64>; 3]) -> Result<()> {
         obs::finite(Self::NAME, "y", y)?;
         param::finite(Self::NAME, "mu", mu)?;
-        param_nonnegative_finite(Self::NAME, "kappa", kappa)
+        param::nonnegative_finite(Self::NAME, "kappa", kappa)
     }
 
     fn eval<S: Real>(_: [i64; 0], [y, mu, kappa]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
@@ -365,8 +322,8 @@ fn von_mises_h<T: Real>(theta: T, kappa: T) -> T {
     h + series / PI
 }
 
-fn check_von_mises_cdf(f: &'static str, [y, mu, kappa]: [f64; 3]) -> Result<()> {
-    if !(-PI..=PI).contains(&y) {
+fn check_von_mises_cdf(f: &'static str, [y, mu, kappa]: [Option<f64>; 3]) -> Result<()> {
+    if let Some(y) = y.filter(|y| !(-PI..=PI).contains(y)) {
         return Err(Error::observation(f, "y", y, "in [-pi, pi]"));
     }
     param::finite(f, "mu", mu)?;
@@ -396,7 +353,7 @@ cdfs!(
 
 // Rayleigh.
 
-fn check_rayleigh(f: &'static str, [y, sigma]: [f64; 2]) -> Result<()> {
+fn check_rayleigh(f: &'static str, [y, sigma]: [Option<f64>; 2]) -> Result<()> {
     obs::nonnegative(f, "y", y)?;
     param::positive_finite(f, "sigma", sigma)
 }
@@ -407,7 +364,7 @@ impl Kernel<0, 2> for Rayleigh {
     const NAME: &'static str = "rayleigh_lpdf";
 
     // Stan's density rejects y = 0; its CDFs use `check_rayleigh`.
-    fn check(_: [i64; 0], [y, sigma]: [f64; 2]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, sigma]: [Option<f64>; 2]) -> Result<()> {
         obs::positive(Self::NAME, "y", y)?;
         param::positive_finite(Self::NAME, "sigma", sigma)
     }
@@ -456,7 +413,7 @@ pub(crate) struct Pareto;
 impl Kernel<0, 3> for Pareto {
     const NAME: &'static str = "pareto_lpdf";
 
-    fn check(_: [i64; 0], [y, y_min, alpha]: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, y_min, alpha]: [Option<f64>; 3]) -> Result<()> {
         obs::not_nan(Self::NAME, "y", y)?;
         param::positive_finite(Self::NAME, "y_min", y_min)?;
         param::positive_finite(Self::NAME, "alpha", alpha)
@@ -484,7 +441,7 @@ lpdf!(
     pareto_lpdf, Pareto, 3, (y: Y, y_min: M, alpha: A)
 );
 
-fn check_pareto_cdf(f: &'static str, [y, y_min, alpha]: [f64; 3]) -> Result<()> {
+fn check_pareto_cdf(f: &'static str, [y, y_min, alpha]: [Option<f64>; 3]) -> Result<()> {
     obs::not_nan(f, "y", y)?;
     obs::nonnegative(f, "y", y)?;
     param::positive_finite(f, "y_min", y_min)?;
@@ -518,15 +475,16 @@ cdfs!(
 
 // Pareto type II (Lomax with location).
 
-fn check_pareto_type_2(f: &'static str, [y, mu, lambda, alpha]: [f64; 4]) -> Result<()> {
+fn check_pareto_type_2(f: &'static str, [y, mu, lambda, alpha]: [Option<f64>; 4]) -> Result<()> {
     obs::not_nan(f, "y", y)?;
     param::finite(f, "mu", mu)?;
     param::positive_finite(f, "lambda", lambda)?;
     param::positive_finite(f, "alpha", alpha)?;
-    if y >= mu {
-        Ok(())
-    } else {
-        Err(Error::observation(f, "y", y, "greater than or equal to mu"))
+    match (y, mu) {
+        (Some(y), Some(mu)) if !(y >= mu) => {
+            Err(Error::observation(f, "y", y, "greater than or equal to mu"))
+        }
+        _ => Ok(()),
     }
 }
 
@@ -535,7 +493,7 @@ pub(crate) struct ParetoType2;
 impl Kernel<0, 4> for ParetoType2 {
     const NAME: &'static str = "pareto_type_2_lpdf";
 
-    fn check(_: [i64; 0], x: [f64; 4]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], x: [Option<f64>; 4]) -> Result<()> {
         check_pareto_type_2(Self::NAME, x)
     }
 
@@ -583,8 +541,8 @@ cdfs!(
 
 // Frechet.
 
-fn check_frechet(f: &'static str, [y, alpha, sigma]: [f64; 3]) -> Result<()> {
-    obs_positive(f, "y", y)?;
+fn check_frechet(f: &'static str, [y, alpha, sigma]: [Option<f64>; 3]) -> Result<()> {
+    obs::positive(f, "y", y)?;
     param::positive_finite(f, "alpha", alpha)?;
     param::positive_finite(f, "sigma", sigma)
 }
@@ -594,7 +552,7 @@ pub(crate) struct Frechet;
 impl Kernel<0, 3> for Frechet {
     const NAME: &'static str = "frechet_lpdf";
 
-    fn check(_: [i64; 0], x: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], x: [Option<f64>; 3]) -> Result<()> {
         check_frechet(Self::NAME, x)
     }
 
@@ -638,7 +596,7 @@ cdfs!(
 
 // Gumbel.
 
-fn check_gumbel(f: &'static str, [y, mu, beta]: [f64; 3]) -> Result<()> {
+fn check_gumbel(f: &'static str, [y, mu, beta]: [Option<f64>; 3]) -> Result<()> {
     obs::not_nan(f, "y", y)?;
     param::finite(f, "mu", mu)?;
     param::positive(f, "beta", beta)
@@ -649,7 +607,7 @@ pub(crate) struct Gumbel;
 impl Kernel<0, 3> for Gumbel {
     const NAME: &'static str = "gumbel_lpdf";
 
-    fn check(_: [i64; 0], x: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], x: [Option<f64>; 3]) -> Result<()> {
         check_gumbel(Self::NAME, x)
     }
 
@@ -695,7 +653,7 @@ cdfs!(
 
 // Chi-square.
 
-fn check_chi_square(f: &'static str, [y, nu]: [f64; 2]) -> Result<()> {
+fn check_chi_square(f: &'static str, [y, nu]: [Option<f64>; 2]) -> Result<()> {
     obs::nonnegative(f, "y", y)?;
     param::positive_finite(f, "nu", nu)
 }
@@ -705,7 +663,7 @@ pub(crate) struct ChiSquare;
 impl Kernel<0, 2> for ChiSquare {
     const NAME: &'static str = "chi_square_lpdf";
 
-    fn check(_: [i64; 0], x: [f64; 2]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], x: [Option<f64>; 2]) -> Result<()> {
         check_chi_square(Self::NAME, x)
     }
 
@@ -755,7 +713,7 @@ pub(crate) struct InvChiSquare;
 impl Kernel<0, 2> for InvChiSquare {
     const NAME: &'static str = "inv_chi_square_lpdf";
 
-    fn check(_: [i64; 0], [y, nu]: [f64; 2]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, nu]: [Option<f64>; 2]) -> Result<()> {
         obs::not_nan(Self::NAME, "y", y)?;
         param::positive_finite(Self::NAME, "nu", nu)
     }
@@ -782,7 +740,7 @@ lpdf!(
     inv_chi_square_lpdf, InvChiSquare, 2, (y: Y, nu: N)
 );
 
-fn check_inv_chi_square_cdf(f: &'static str, [y, nu]: [f64; 2]) -> Result<()> {
+fn check_inv_chi_square_cdf(f: &'static str, [y, nu]: [Option<f64>; 2]) -> Result<()> {
     obs::nonnegative(f, "y", y)?;
     param::positive_finite(f, "nu", nu)
 }
@@ -822,7 +780,7 @@ pub(crate) struct ScaledInvChiSquare;
 impl Kernel<0, 3> for ScaledInvChiSquare {
     const NAME: &'static str = "scaled_inv_chi_square_lpdf";
 
-    fn check(_: [i64; 0], [y, nu, s]: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, nu, s]: [Option<f64>; 3]) -> Result<()> {
         obs::not_nan(Self::NAME, "y", y)?;
         param::positive_finite(Self::NAME, "nu", nu)?;
         param::positive_finite(Self::NAME, "s", s)
@@ -857,7 +815,7 @@ lpdf!(
     scaled_inv_chi_square_lpdf, ScaledInvChiSquare, 3, (y: Y, nu: N, s: S)
 );
 
-fn check_scaled_inv_chi_square_cdf(f: &'static str, [y, nu, s]: [f64; 3]) -> Result<()> {
+fn check_scaled_inv_chi_square_cdf(f: &'static str, [y, nu, s]: [Option<f64>; 3]) -> Result<()> {
     obs::nonnegative(f, "y", y)?;
     param::positive_finite(f, "nu", nu)?;
     param::positive_finite(f, "s", s)
@@ -895,7 +853,7 @@ cdfs!(
 
 // Exponentially modified normal.
 
-fn check_exp_mod_normal(f: &'static str, [y, mu, sigma, lambda]: [f64; 4]) -> Result<()> {
+fn check_exp_mod_normal(f: &'static str, [y, mu, sigma, lambda]: [Option<f64>; 4]) -> Result<()> {
     obs::not_nan(f, "y", y)?;
     param::finite(f, "mu", mu)?;
     param::positive_finite(f, "sigma", sigma)?;
@@ -907,7 +865,7 @@ pub(crate) struct ExpModNormal;
 impl Kernel<0, 4> for ExpModNormal {
     const NAME: &'static str = "exp_mod_normal_lpdf";
 
-    fn check(_: [i64; 0], x: [f64; 4]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], x: [Option<f64>; 4]) -> Result<()> {
         check_exp_mod_normal(Self::NAME, x)
     }
 
@@ -980,7 +938,10 @@ cdfs!(
 
 // Skew double exponential.
 
-fn check_skew_double_exponential(f: &'static str, [y, mu, sigma, tau]: [f64; 4]) -> Result<()> {
+fn check_skew_double_exponential(
+    f: &'static str,
+    [y, mu, sigma, tau]: [Option<f64>; 4],
+) -> Result<()> {
     obs::finite(f, "y", y)?;
     param::finite(f, "mu", mu)?;
     param::positive_finite(f, "sigma", sigma)?;
@@ -992,7 +953,7 @@ pub(crate) struct SkewDoubleExponential;
 impl Kernel<0, 4> for SkewDoubleExponential {
     const NAME: &'static str = "skew_double_exponential_lpdf";
 
-    fn check(_: [i64; 0], x: [f64; 4]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], x: [Option<f64>; 4]) -> Result<()> {
         check_skew_double_exponential(Self::NAME, x)
     }
 
@@ -1059,7 +1020,7 @@ cdfs!(
 
 // Log-logistic.
 
-fn check_loglogistic(f: &'static str, [y, alpha, beta]: [f64; 3]) -> Result<()> {
+fn check_loglogistic(f: &'static str, [y, alpha, beta]: [Option<f64>; 3]) -> Result<()> {
     obs::finite(f, "y", y)?;
     obs::nonnegative(f, "y", y)?;
     param::positive_finite(f, "alpha", alpha)?;
@@ -1072,7 +1033,7 @@ impl Kernel<0, 3> for LogLogistic {
     const NAME: &'static str = "loglogistic_lpdf";
 
     // Stan's density requires y positive finite; its CDF uses `check_loglogistic`.
-    fn check(_: [i64; 0], [y, alpha, beta]: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, alpha, beta]: [Option<f64>; 3]) -> Result<()> {
         obs::positive_finite(Self::NAME, "y", y)?;
         param::positive_finite(Self::NAME, "alpha", alpha)?;
         param::positive_finite(Self::NAME, "beta", beta)
@@ -1127,9 +1088,9 @@ cdfs!(
 
 // Beta with mean and precision.
 
-fn check_beta_proportion(f: &'static str, [y, mu, kappa]: [f64; 3]) -> Result<()> {
+fn check_beta_proportion(f: &'static str, [y, mu, kappa]: [Option<f64>; 3]) -> Result<()> {
     obs::unit_interval(f, "y", y)?;
-    param_open_unit(f, "mu", mu)?;
+    param::open_unit(f, "mu", mu)?;
     param::positive_finite(f, "kappa", kappa)
 }
 
@@ -1138,7 +1099,7 @@ pub(crate) struct BetaProportion;
 impl Kernel<0, 3> for BetaProportion {
     const NAME: &'static str = "beta_proportion_lpdf";
 
-    fn check(_: [i64; 0], x: [f64; 3]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], x: [Option<f64>; 3]) -> Result<()> {
         check_beta_proportion(Self::NAME, x)
     }
 
@@ -1260,21 +1221,20 @@ pub(crate) struct Wiener;
 impl Kernel<0, 5> for Wiener {
     const NAME: &'static str = "wiener_lpdf";
 
-    fn check(_: [i64; 0], [y, alpha, tau, beta, delta]: [f64; 5]) -> Result<()> {
+    fn check(_: [Option<i64>; 0], [y, alpha, tau, beta, delta]: [Option<f64>; 5]) -> Result<()> {
         obs::positive_finite(Self::NAME, "y", y)?;
         param::positive_finite(Self::NAME, "alpha", alpha)?;
-        param_nonnegative_finite(Self::NAME, "tau", tau)?;
-        param_open_unit(Self::NAME, "beta", beta)?;
+        param::nonnegative_finite(Self::NAME, "tau", tau)?;
+        param::open_unit(Self::NAME, "beta", beta)?;
         param::finite(Self::NAME, "delta", delta)?;
-        if y > tau {
-            Ok(())
-        } else {
-            Err(Error::observation(
+        match (y, tau) {
+            (Some(y), Some(tau)) if !(y > tau) => Err(Error::observation(
                 Self::NAME,
                 "y",
                 y,
                 "greater than the nondecision time tau",
-            ))
+            )),
+            _ => Ok(()),
         }
     }
 

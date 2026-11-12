@@ -11,7 +11,6 @@ use rand_distr::{Beta, ChiSquared, Distribution, Exp1, Open01, StandardNormal};
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::param;
-use crate::continuous_extra::{param_nonnegative_finite, param_open_unit};
 
 fn uniform<R: Rng + ?Sized>(rng: &mut R) -> f64 {
     Open01.sample(rng)
@@ -73,7 +72,7 @@ pub fn double_exponential_rng<R: Rng + ?Sized>(mu: f64, sigma: f64, rng: &mut R)
 pub fn von_mises_rng<R: Rng + ?Sized>(mu: f64, kappa: f64, rng: &mut R) -> Result<f64> {
     const F: &str = "von_mises_rng";
     param::finite(F, "mu", mu)?;
-    param_nonnegative_finite(F, "kappa", kappa)?;
+    param::nonnegative_finite(F, "kappa", kappa)?;
     let center = mu % (2.0 * PI);
     if kappa < 1e-8 {
         return Ok(center + PI * (2.0 * uniform(rng) - 1.0));
@@ -193,7 +192,7 @@ pub fn skew_double_exponential_rng<R: Rng + ?Sized>(
     const F: &str = "skew_double_exponential_rng";
     param::finite(F, "mu", mu)?;
     param::positive_finite(F, "sigma", sigma)?;
-    param_open_unit(F, "tau", tau)?;
+    param::open_unit(F, "tau", tau)?;
     let u = uniform(rng);
     Ok(if u < tau {
         mu + sigma / (2.0 * (1.0 - tau)) * (u / tau).ln()
@@ -214,7 +213,7 @@ pub fn loglogistic_rng<R: Rng + ?Sized>(alpha: f64, beta: f64, rng: &mut R) -> R
 /// Draw from `beta_proportion(mu, kappa)`, that is `beta(mu kappa, (1 - mu) kappa)`.
 pub fn beta_proportion_rng<R: Rng + ?Sized>(mu: f64, kappa: f64, rng: &mut R) -> Result<f64> {
     const F: &str = "beta_proportion_rng";
-    param_open_unit(F, "mu", mu)?;
+    param::open_unit(F, "mu", mu)?;
     param::positive_finite(F, "kappa", kappa)?;
     let d = Beta::new(mu * kappa, (1.0 - mu) * kappa)
         .map_err(|_| Error::parameter(F, "kappa", kappa, "valid for the sampler"))?;

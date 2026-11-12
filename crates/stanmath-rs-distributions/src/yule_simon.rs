@@ -15,8 +15,8 @@ use stanmath_rs_core::{Error, Result};
 use crate::check::param;
 use crate::kernel::{Kernel, sum_kernel};
 
-fn check_yule_simon(f: &'static str, n: i64, alpha: f64) -> Result<()> {
-    if n < 1 {
+fn check_yule_simon(f: &'static str, n: Option<i64>, alpha: Option<f64>) -> Result<()> {
+    if let Some(n) = n.filter(|&n| n < 1) {
         return Err(Error::observation(f, "n", n as f64, "positive"));
     }
     param::positive_finite(f, "alpha", alpha)
@@ -36,7 +36,7 @@ pub(crate) struct YuleSimon;
 impl Kernel<1, 1> for YuleSimon {
     const NAME: &'static str = "yule_simon_lpmf";
 
-    fn check([n]: [i64; 1], [alpha]: [f64; 1]) -> Result<()> {
+    fn check([n]: [Option<i64>; 1], [alpha]: [Option<f64>; 1]) -> Result<()> {
         check_yule_simon(Self::NAME, n, alpha)
     }
 
@@ -55,7 +55,7 @@ pub(crate) struct YuleSimonLccdf;
 impl Kernel<1, 1> for YuleSimonLccdf {
     const NAME: &'static str = "yule_simon_lccdf";
 
-    fn check([n]: [i64; 1], [alpha]: [f64; 1]) -> Result<()> {
+    fn check([n]: [Option<i64>; 1], [alpha]: [Option<f64>; 1]) -> Result<()> {
         check_yule_simon(Self::NAME, n, alpha)
     }
 
@@ -73,7 +73,7 @@ pub(crate) struct YuleSimonLcdf;
 impl Kernel<1, 1> for YuleSimonLcdf {
     const NAME: &'static str = "yule_simon_lcdf";
 
-    fn check([n]: [i64; 1], [alpha]: [f64; 1]) -> Result<()> {
+    fn check([n]: [Option<i64>; 1], [alpha]: [Option<f64>; 1]) -> Result<()> {
         check_yule_simon(Self::NAME, n, alpha)
     }
 
