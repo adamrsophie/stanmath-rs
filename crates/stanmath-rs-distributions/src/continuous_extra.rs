@@ -406,14 +406,13 @@ pub(crate) struct Rayleigh;
 impl Kernel<0, 2> for Rayleigh {
     const NAME: &'static str = "rayleigh_lpdf";
 
-    fn check(_: [i64; 0], x: [f64; 2]) -> Result<()> {
-        check_rayleigh(Self::NAME, x)
+    // Stan's density rejects y = 0; its CDFs use `check_rayleigh`.
+    fn check(_: [i64; 0], [y, sigma]: [f64; 2]) -> Result<()> {
+        obs::positive(Self::NAME, "y", y)?;
+        param::positive_finite(Self::NAME, "sigma", sigma)
     }
 
     fn eval<S: Real>(_: [i64; 0], [y, sigma]: [S; 2], grad: Option<&mut [S; 2]>) -> S {
-        if y.value() == 0.0 {
-            return neg_inf(grad);
-        }
         let inv_sigma = sigma.recip();
         let z = y * inv_sigma;
         if let Some(g) = grad {
@@ -427,7 +426,7 @@ impl Kernel<0, 2> for Rayleigh {
 lpdf!(
     /// Rayleigh log density with scale `sigma`.
     ///
-    /// Requires `y >= 0` and `sigma` positive finite; `y = 0` gives `-inf`.
+    /// Requires `y` positive and `sigma` positive finite.
     rayleigh_lpdf, Rayleigh, 2, (y: Y, sigma: S)
 );
 
@@ -1072,26 +1071,14 @@ pub(crate) struct LogLogistic;
 impl Kernel<0, 3> for LogLogistic {
     const NAME: &'static str = "loglogistic_lpdf";
 
-    fn check(_: [i64; 0], x: [f64; 3]) -> Result<()> {
-        check_loglogistic(Self::NAME, x)
+    // Stan's density requires y positive finite; its CDF uses `check_loglogistic`.
+    fn check(_: [i64; 0], [y, alpha, beta]: [f64; 3]) -> Result<()> {
+        obs::positive_finite(Self::NAME, "y", y)?;
+        param::positive_finite(Self::NAME, "alpha", alpha)?;
+        param::positive_finite(Self::NAME, "beta", beta)
     }
 
     fn eval<S: Real>(_: [i64; 0], [y, alpha, beta]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
-        if y.value() == 0.0 {
-            // y^(beta - 1) at y = 0: finite only for beta = 1. Partials are set to zero here.
-            let b = beta.value();
-            let value = if b == 1.0 {
-                beta.ln() - alpha.ln()
-            } else if b > 1.0 {
-                S::from_f64(f64::NEG_INFINITY)
-            } else {
-                S::from_f64(f64::INFINITY)
-            };
-            if let Some(g) = grad {
-                *g = [S::zero(); 3];
-            }
-            return value;
-        }
         let r = (y / alpha).ln();
         let br = beta * r;
         if let Some(g) = grad {
@@ -1109,7 +1096,7 @@ lpdf!(
     /// Log-logistic log density with scale `alpha` and shape `beta`:
     /// `(beta / alpha) (y / alpha)^(beta - 1) / (1 + (y / alpha)^beta)^2`.
     ///
-    /// Requires `y` nonnegative finite, `alpha` and `beta` positive finite.
+    /// Requires `y`, `alpha`, and `beta` positive finite.
     loglogistic_lpdf, LogLogistic, 3, (y: Y, alpha: A, beta: B)
 );
 

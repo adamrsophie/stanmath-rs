@@ -475,3 +475,66 @@ fn canonical_partial_correlations() {
     assert_eq!(nu.len(), k * (k - 1) / 2);
     assert!(make_nu(0.0, k).is_err());
 }
+
+/// Lower triangles, row by row, from `tools/stan-reference/stan_probe.cpp` run against Stan Math
+/// 5.4.0 on 2026-11-12.
+#[test]
+fn cpc_order_matches_stan() {
+    let lower = |m: &Matrix<f64>| strictly_lower(m, true);
+    let check = |name: &str, got: Vec<f64>, want: &[f64]| {
+        assert_eq!(got.len(), want.len(), "{name}");
+        for (g, w) in got.iter().zip(want) {
+            assert!(close(*g, *w, 1e-13), "{name}: {got:?} vs {want:?}");
+        }
+    };
+    let cpcs = [0.3, -0.6, 0.15, 0.45, -0.2, 0.7];
+    check(
+        "read_corr_L",
+        lower(&read_corr_L(&cpcs, 4).unwrap()),
+        &[
+            1.0,
+            0.29999999999999999,
+            0.95393920141694566,
+            -0.59999999999999998,
+            0.36000000000000004,
+            0.71442284397967004,
+            0.14999999999999999,
+            -0.19773719933285192,
+            0.67809733814549067,
+            0.69179765827877737,
+        ],
+    );
+    let x = [0.3, -1.2, 0.8, 0.05, 2.0, -0.4];
+    check(
+        "corr_matrix_constrain",
+        lower(&corr_matrix_constrain(&x, 4).unwrap()),
+        &[
+            1.0,
+            0.29131261245159085,
+            1.0,
+            -0.83365460701215532,
+            -0.21645947578043095,
+            1.0,
+            0.66403677026784902,
+            0.88298288302537598,
+            -0.57534109757356888,
+            1.0,
+        ],
+    );
+    check(
+        "cholesky_corr_constrain",
+        lower(&cholesky_corr_constrain(&x, 4).unwrap()),
+        &[
+            1.0,
+            0.29131261245159085,
+            0.95662791190024832,
+            -0.83365460701215532,
+            0.36673831415054997,
+            0.41294431239747253,
+            0.04995837495787997,
+            0.96282379957009423,
+            -0.10086517327487965,
+            0.24556202591851101,
+        ],
+    );
+}

@@ -364,7 +364,8 @@ fn zero<R: Ring>() -> R {
     core::iter::empty::<R>().sum()
 }
 
-/// The dot product convention of every `_complex` function: `sum_i x_i y_i`, no conjugation.
+/// `sum_i x_i y_i`, no conjugation. Stan uses it for products of matrices and for
+/// `columns_dot_product` and `rows_dot_product`.
 fn dot<'a, R: Ring + 'a>(
     x: impl IntoIterator<Item = &'a R>,
     y: impl IntoIterator<Item = &'a R>,
@@ -424,26 +425,35 @@ pub fn multiply_row_vector_complex<R: Ring>(x: &[R], a: &Matrix<R>) -> Result<Ve
     Ok((0..a.ncols()).map(|j| dot(x, a.column(j))).collect())
 }
 
-/// `sum_i x_i y_i`, without conjugation. Stan's `dot_product` and `multiply(row_vector, vector)`
-/// for complex vectors.
+/// `sum_i conj(x_i) y_i`, conjugating the first argument. Stan's `dot_product` and
+/// `multiply(row_vector, vector)` for complex vectors (checked against Stan Math 5.4.0).
 ///
 /// # Errors
 ///
 /// [`Error::DimensionMismatch`] when the lengths differ.
-pub fn dot_product_complex<R: Ring>(x: &[R], y: &[R]) -> Result<R> {
+pub fn dot_product_complex<T: Real>(x: &[Complex<T>], y: &[Complex<T>]) -> Result<Complex<T>> {
     if x.len() != y.len() {
         return Err(length_mismatch("dot_product", "y", x.len(), y.len()));
     }
-    Ok(dot(x, y))
+    Ok(conj_dot(x, y))
 }
 
-/// `sum_i x_i x_i`, without conjugation. Stan's `dot_self` for complex vectors.
-pub fn dot_self_complex<R: Ring>(x: &[R]) -> R {
-    dot(x, x)
+/// `sum_i conj(x_i) y_i`.
+fn conj_dot<'a, T: Real + 'a>(
+    x: impl IntoIterator<Item = &'a Complex<T>>,
+    y: impl IntoIterator<Item = &'a Complex<T>>,
+) -> Complex<T> {
+    x.into_iter().zip(y).map(|(&a, &b)| a.conj() * b).sum()
 }
 
-/// Dot products of matching columns. Stan's `columns_dot_product` for complex matrices; for
-/// two vectors pass `to_matrix_from_vector` of each.
+/// `sum_i |x_i|^2`, a real number stored as a complex one. Stan's `dot_self` for complex vectors.
+pub fn dot_self_complex<T: Real>(x: &[Complex<T>]) -> Complex<T> {
+    conj_dot(x, x)
+}
+
+/// Dot products of matching columns, without conjugation (unlike [`dot_product_complex`]; checked
+/// against Stan Math 5.4.0). Stan's `columns_dot_product` for complex matrices; for two vectors
+/// pass `to_matrix_from_vector` of each.
 ///
 /// # Errors
 ///
@@ -455,7 +465,8 @@ pub fn columns_dot_product_complex<R: Ring>(a: &Matrix<R>, b: &Matrix<R>) -> Res
         .collect())
 }
 
-/// Dot products of matching rows. Stan's `rows_dot_product` for complex matrices.
+/// Dot products of matching rows, without conjugation. Stan's `rows_dot_product` for complex
+/// matrices.
 ///
 /// # Errors
 ///
@@ -465,16 +476,18 @@ pub fn rows_dot_product_complex<R: Ring>(a: &Matrix<R>, b: &Matrix<R>) -> Result
     Ok((0..a.nrows()).map(|i| dot(a.row(i), b.row(i))).collect())
 }
 
-/// Dot product of each column with itself. Stan's `columns_dot_self` for complex matrices.
-pub fn columns_dot_self_complex<R: Ring>(a: &Matrix<R>) -> Vec<R> {
+/// Squared norm of each column, `sum_i |a_ij|^2`. Stan's `columns_dot_self` for complex matrices.
+pub fn columns_dot_self_complex<T: Real>(a: &Matrix<Complex<T>>) -> Vec<Complex<T>> {
     (0..a.ncols())
-        .map(|j| dot(a.column(j), a.column(j)))
+        .map(|j| conj_dot(a.column(j), a.column(j)))
         .collect()
 }
 
-/// Dot product of each row with itself. Stan's `rows_dot_self` for complex matrices.
-pub fn rows_dot_self_complex<R: Ring>(a: &Matrix<R>) -> Vec<R> {
-    (0..a.nrows()).map(|i| dot(a.row(i), a.row(i))).collect()
+/// Squared norm of each row. Stan's `rows_dot_self` for complex matrices.
+pub fn rows_dot_self_complex<T: Real>(a: &Matrix<Complex<T>>) -> Vec<Complex<T>> {
+    (0..a.nrows())
+        .map(|i| conj_dot(a.row(i), a.row(i)))
+        .collect()
 }
 
 /// Sum of the diagonal; zero for an empty matrix. Stan's `trace` for complex matrices.

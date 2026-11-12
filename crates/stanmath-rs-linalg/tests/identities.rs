@@ -331,3 +331,39 @@ fn gp_kernels_are_symmetric_with_the_marginal_variance_on_the_diagonal() {
     let cross = gp_exp_quad_cov_cross(&x, &x, sigma, l).unwrap();
     assert_close("cross", &cross, &gp_exp_quad_cov(&x, sigma, l).unwrap());
 }
+
+/// Values from `tools/stan-reference/stan_probe.cpp` run against Stan Math 5.4.0 on 2026-11-12:
+/// `dot_product` and the `_dot_self` forms conjugate the first argument, while
+/// `columns_dot_product` and `rows_dot_product` do not.
+#[test]
+fn complex_dot_products_match_stan() {
+    let a = [C::new(1.0, 2.0), C::new(3.0, -1.0)];
+    let b = [C::new(2.0, -1.0), C::new(0.5, 1.0)];
+    let eq = |z: C, re: f64, im: f64| (z.re - re).abs() < TOL && (z.im - im).abs() < TOL;
+    assert!(eq(dot_product_complex(&a, &b).unwrap(), 0.5, -1.5));
+    assert!(eq(dot_self_complex(&a), 15.0, 0.0));
+    let m = Matrix::from_rows(&[
+        [C::new(1.0, 2.0), C::new(0.0, -1.0)],
+        [C::new(3.0, -1.0), C::new(2.0, 0.5)],
+    ]);
+    let n = Matrix::from_rows(&[
+        [C::new(2.0, -1.0), C::new(1.0, 1.0)],
+        [C::new(0.5, 1.0), C::new(-1.0, 2.0)],
+    ]);
+    let all = |got: Vec<C>, want: &[(f64, f64)]| {
+        got.len() == want.len() && got.iter().zip(want).all(|(z, &(re, im))| eq(*z, re, im))
+    };
+    assert!(all(
+        columns_dot_product_complex(&m, &n).unwrap(),
+        &[(6.5, 5.5), (-2.0, 2.5)]
+    ));
+    assert!(all(
+        rows_dot_product_complex(&m, &n).unwrap(),
+        &[(5.0, 2.0), (-0.5, 6.0)]
+    ));
+    assert!(all(
+        columns_dot_self_complex(&m),
+        &[(15.0, 0.0), (5.25, 0.0)]
+    ));
+    assert!(all(rows_dot_self_complex(&m), &[(6.0, 0.0), (14.25, 0.0)]));
+}

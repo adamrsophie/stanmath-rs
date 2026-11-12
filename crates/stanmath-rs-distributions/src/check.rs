@@ -59,6 +59,10 @@ pub(crate) mod obs {
         require(v >= 0.0, || Error::observation(f, name, v, "nonnegative"))
     }
 
+    pub(crate) fn positive(f: &'static str, name: &'static str, v: f64) -> Result<()> {
+        require(v > 0.0, || Error::observation(f, name, v, "positive"))
+    }
+
     pub(crate) fn positive_finite(f: &'static str, name: &'static str, v: f64) -> Result<()> {
         require(v > 0.0 && v.is_finite(), || {
             Error::observation(f, name, v, "positive finite")
