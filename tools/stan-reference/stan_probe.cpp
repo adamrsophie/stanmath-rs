@@ -126,6 +126,44 @@ int main() {
     const std::complex<double> d = dot_product(ca, cb);
     return std::vector<double>{d.real(), d.imag()};
   });
+  const auto parts = [](const Eigen::VectorXcd& v) {
+    std::vector<double> out;
+    for (int i = 0; i < v.size(); ++i) {
+      out.push_back(v(i).real());
+      out.push_back(v(i).imag());
+    }
+    return out;
+  };
+  probe("dot_self.complex", [&] {
+    const std::complex<double> d = dot_self(ca);
+    return std::vector<double>{d.real(), d.imag()};
+  });
+  probe("multiply.complex_row_vector_vector", [&] {
+    const Eigen::RowVectorXcd r = ca.transpose();
+    const std::complex<double> d = multiply(r, cb);
+    return std::vector<double>{d.real(), d.imag()};
+  });
+  Eigen::MatrixXcd cm(2, 2), cn(2, 2);
+  cm << std::complex<double>(1.0, 2.0), std::complex<double>(0.0, -1.0),
+      std::complex<double>(3.0, -1.0), std::complex<double>(2.0, 0.5);
+  cn << std::complex<double>(2.0, -1.0), std::complex<double>(1.0, 1.0),
+      std::complex<double>(0.5, 1.0), std::complex<double>(-1.0, 2.0);
+  probe("columns_dot_product.complex", [&] {
+    const Eigen::VectorXcd v = columns_dot_product(cm, cn).transpose();
+    return parts(v);
+  });
+  probe("rows_dot_product.complex", [&] {
+    const Eigen::VectorXcd v = rows_dot_product(cm, cn);
+    return parts(v);
+  });
+  probe("columns_dot_self.complex", [&] {
+    const Eigen::VectorXcd v = columns_dot_self(cm).transpose();
+    return parts(v);
+  });
+  probe("rows_dot_self.complex", [&] {
+    const Eigen::VectorXcd v = rows_dot_self(cm);
+    return parts(v);
+  });
 
   // Order of the canonical partial correlations.
   V cpcs(6);
