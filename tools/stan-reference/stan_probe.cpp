@@ -281,5 +281,74 @@ int main() {
   V lsd(3);
   lsd << 1.0, 0.8, 1.2;
   probe1("lkj_cov_lpdf.interior", [&] { return lkj_cov_lpdf(sigma, lmu, lsd, 1.5); });
+
+  // Special numerics: values, and the value with its gradient as value;d1;d2.
+  const auto grad1 = [](double a, const std::function<var(const var&)>& f) {
+    const var x = a;
+    var r = f(x);
+    r.grad();
+    std::vector<double> out{r.val(), x.adj()};
+    recover_memory();
+    return out;
+  };
+  const auto grad2 = [](double a, double b, const std::function<var(const var&, const var&)>& f) {
+    const var x = a;
+    const var y = b;
+    var r = f(x, y);
+    r.grad();
+    std::vector<double> out{r.val(), x.adj(), y.adj()};
+    recover_memory();
+    return out;
+  };
+  for (const auto& pr : std::vector<std::pair<int, double>>{{0, 0.5}, {1, 3.7}, {2, 30.0}, {5, 10.0}, {3, 0.01}, {0, -2.5}, {4, 60.0}}) {
+    const int v = pr.first;
+    const double z = pr.second;
+    const std::string at = std::to_string(v) + "_" + std::to_string(z);
+    probe1("bessel_first_kind." + at, [&] { return bessel_first_kind(v, z); });
+    probe1("modified_bessel_first_kind." + at, [&] { return modified_bessel_first_kind(v, z); });
+    if (z > 0) {
+      probe1("bessel_second_kind." + at, [&] { return bessel_second_kind(v, z); });
+      probe1("modified_bessel_second_kind." + at, [&] { return modified_bessel_second_kind(v, z); });
+    }
+  }
+  probe("bessel_first_kind.grad_1_3.7", [&] { return grad1(3.7, [](const var& z) { return bessel_first_kind(1, z); }); });
+  probe("bessel_second_kind.grad_2_5.5", [&] { return grad1(5.5, [](const var& z) { return bessel_second_kind(2, z); }); });
+  probe("modified_bessel_first_kind.grad_1_3.7", [&] { return grad1(3.7, [](const var& z) { return modified_bessel_first_kind(1, z); }); });
+  probe("modified_bessel_second_kind.grad_2_1.5", [&] { return grad1(1.5, [](const var& z) { return modified_bessel_second_kind(2, z); }); });
+  for (const auto& pr : std::vector<std::pair<double, double>>{{0.0, 0.5}, {1.5, 3.7}, {2.3, 50.0}, {0.5, 200.0}, {7.0, 0.2}, {0.25, 1e-3}}) {
+    const double v = pr.first;
+    const double z = pr.second;
+    probe1("log_modified_bessel_first_kind." + std::to_string(v) + "_" + std::to_string(z), [&] { return log_modified_bessel_first_kind(v, z); });
+  }
+  probe("log_modified_bessel_first_kind.grad_1.5_3.7", [&] { return grad2(1.5, 3.7, [](const var& v, const var& z) { return log_modified_bessel_first_kind(v, z); }); });
+  for (const auto& pr : std::vector<std::pair<double, double>>{{0.5, 0.3}, {1.2, 2.0}, {-0.7, 0.9}, {3.0, 0.5}, {0.1, 10.0}, {6.0, 0.99}, {0.0, 1.0}}) {
+    const double h = pr.first;
+    const double a = pr.second;
+    probe1("owens_t." + std::to_string(h) + "_" + std::to_string(a), [&] { return owens_t(h, a); });
+  }
+  probe("owens_t.grad_1.2_2.0", [&] { return grad2(1.2, 2.0, [](const var& h, const var& a) { return owens_t(h, a); }); });
+  for (double x : {0.5, 5.0, -0.3, 100.0, -0.36, 1e-8}) {
+    probe1("lambert_w0." + std::to_string(x), [&] { return lambert_w0(x); });
+  }
+  for (double x : {-0.3, -0.01, -0.36, -1e-5}) {
+    probe1("lambert_wm1." + std::to_string(x), [&] { return lambert_wm1(x); });
+  }
+  probe("lambert_w0.grad_0.5", [&] { return grad1(0.5, [](const var& x) { return lambert_w0(x); }); });
+  probe("lambert_wm1.grad_-0.3", [&] { return grad1(-0.3, [](const var& x) { return lambert_wm1(x); }); });
+  probe1("hypergeometric_2F1.1_2_3.5_0.4", [&] { return hypergeometric_2F1(1.0, 2.0, 3.5, 0.4); });
+  probe1("hypergeometric_2F1.0.5_1.5_2_-0.6", [&] { return hypergeometric_2F1(0.5, 1.5, 2.0, -0.6); });
+  probe1("hypergeometric_2F1.1.2_-0.7_2.1_0.9", [&] { return hypergeometric_2F1(1.2, -0.7, 2.1, 0.9); });
+  probe("hypergeometric_2F1.grad_z_1_2_3.5_0.4", [&] { return grad1(0.4, [](const var& z) { return hypergeometric_2F1(1.0, 2.0, 3.5, z); }); });
+  V a3(3);
+  a3 << 1.0, 1.5, 2.0;
+  V b2(2);
+  b2 << 2.5, 3.0;
+  probe1("hypergeometric_3F2.1_1.5_2__2.5_3__0.3", [&] { return hypergeometric_3F2(a3, b2, 0.3); });
+  V pa(2);
+  pa << 0.5, 1.2;
+  V pb(2);
+  pb << 1.7, 2.4;
+  probe1("hypergeometric_pFq.0.5_1.2__1.7_2.4__0.8", [&] { return hypergeometric_pFq(pa, pb, 0.8); });
+  probe1("hypergeometric_pFq.0.5_1.2__1.7_2.4__-3.5", [&] { return hypergeometric_pFq(pa, pb, -3.5); });
   return 0;
 }
