@@ -20,6 +20,29 @@ const KERNEL: &str =
   }
   k[i + j * n] = sigma * sigma * exp(-0.5 * s / (l * l));
 }
+// Row i of the adjoint: the point's gradient, and its shares of the sigma and l gradients.
+__kernel void adjoint(__global const double* x, __global const double* k,
+                      __global const double* ka, __global double* gx, __global double* gs,
+                      __global double* gl, const ulong n, const ulong d, const double sigma,
+                      const double l) {
+  const size_t i = get_global_id(0);
+  for (size_t c = 0; c < d; c++) gx[i * d + c] = 0.0;
+  double s_sigma = 0.0, s_l = 0.0;
+  for (size_t j = 0; j < n; j++) {
+    const double w = ka[i + j * n] * k[i + j * n];
+    const double wt = ka[j + i * n] * k[j + i * n];
+    double s = 0.0;
+    for (size_t c = 0; c < d; c++) {
+      const double t = x[i * d + c] - x[j * d + c];
+      s += t * t;
+      gx[i * d + c] -= (w + wt) * t / (l * l);
+    }
+    s_sigma += 2.0 * w / sigma;
+    s_l += w * s / (l * l * l);
+  }
+  gs[i] = s_sigma;
+  gl[i] = s_l;
+}
 ";
 
 /// Inputs: the `n` points of dimension `d` row by row, then sigma and the length scale.
@@ -51,6 +74,44 @@ impl Cov {
         )?;
         k.to_vec()
     }
+
+    /// The gradient with respect to the points, then sigma and the length scale.
+    fn device_adjoint(&self, x: &[f64], k: &[f64], k_adj: &[f64]) -> Result<Vec<f64>> {
+        let (n, d) = (self.n, self.d);
+        let (points, kb, ka) = (
+            DeviceBuffer::from_slice(&x[..n * d])?,
+            DeviceBuffer::from_slice(k)?,
+            DeviceBuffer::from_slice(k_adj)?,
+        );
+        let (gx, gs, gl) = (
+            DeviceBuffer::new(n * d)?,
+            DeviceBuffer::new(n)?,
+            DeviceBuffer::new(n)?,
+        );
+        launch(
+            FUNCTION,
+            FUNCTION,
+            "adjoint",
+            || format!("{PRELUDE}{KERNEL}"),
+            &[
+                Arg::Buffer(&points),
+                Arg::Buffer(&kb),
+                Arg::Buffer(&ka),
+                Arg::Buffer(&gx),
+                Arg::Buffer(&gs),
+                Arg::Buffer(&gl),
+                Arg::Size(n),
+                Arg::Size(d),
+                Arg::Real(x[n * d]),
+                Arg::Real(x[n * d + 1]),
+            ],
+            &[n],
+        )?;
+        let mut g = gx.to_vec()?;
+        g.push(gs.to_vec()?.iter().sum());
+        g.push(gl.to_vec()?.iter().sum());
+        Ok(g)
+    }
 }
 
 impl MultiFn for Cov {
@@ -68,45 +129,22 @@ impl MultiFn for Cov {
     }
 
     fn reverse(&self, x: &[f64], y: &[f64], y_adj: &[f64], needed: &[bool], x_adj: &mut [f64]) {
-        // ponytail: the adjoint is one host pass over the n² entries, as cheap as the forward.
         let (n, d) = (self.n, self.d);
-        let (sigma, l) = (x[n * d], x[n * d + 1]);
-        let (mut ds, mut dl) = (0.0, 0.0);
-        for j in 0..n {
-            for i in 0..n {
-                let w = y_adj[i + j * n] * y[i + j * n];
-                if w == 0.0 {
-                    continue;
-                }
-                let mut s = 0.0;
-                for c in 0..d {
-                    let t = x[i * d + c] - x[j * d + c];
-                    s += t * t;
-                    // d/dx_i of exp(-s / 2l²) is -(x_i - x_j) / l² times the entry.
-                    let g = w * t / (l * l);
-                    if needed[i * d + c] {
-                        x_adj[i * d + c] -= g;
-                    }
-                    if needed[j * d + c] {
-                        x_adj[j * d + c] += g;
-                    }
-                }
-                ds += 2.0 * w / sigma;
-                dl += w * s / (l * l * l);
+        // A failed kernel leaves NaN gradients.
+        let g = self
+            .device_adjoint(x, y, y_adj)
+            .unwrap_or_else(|_| vec![f64::NAN; n * d + 2]);
+        for ((o, gi), &need) in x_adj.iter_mut().zip(g).zip(needed) {
+            if need {
+                *o += gi;
             }
-        }
-        if needed[n * d] {
-            x_adj[n * d] += ds;
-        }
-        if needed[n * d + 1] {
-            x_adj[n * d + 1] += dl;
         }
     }
 }
 
 /// Stan's `gp_exp_quad_cov(x, sigma, length_scale)`, `sigma² exp(-|x_i - x_j|² / (2 l²))`, with
-/// the matrix computed on the device, in any scalar type. In reverse mode the adjoint runs on
-/// the host; forward-mode scalars are computed on the host.
+/// the matrix computed on the device, in any scalar type. In reverse mode the adjoint also runs
+/// on the device, one work item per point; forward-mode scalars are computed on the host.
 ///
 /// # Errors
 ///

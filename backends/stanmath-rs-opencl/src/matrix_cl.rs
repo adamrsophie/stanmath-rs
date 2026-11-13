@@ -70,12 +70,21 @@ fn run(function: &'static str, kernel: &str, args: &[Arg<'_>], global: &[usize])
     )
 }
 
+/// A `rows` by `cols` device matrix; sizes that overflow are refused before any kernel runs.
 fn new(rows: usize, cols: usize) -> Result<MatrixCl> {
+    let len = rows
+        .checked_mul(cols)
+        .ok_or_else(|| Error::dimension("matrix_cl", format!("{rows}x{cols} is too large")))?;
     Ok(MatrixCl {
         rows,
         cols,
-        buffer: DeviceBuffer::new(rows * cols)?,
+        buffer: DeviceBuffer::new(len)?,
     })
+}
+
+fn add(a: usize, b: usize) -> Result<usize> {
+    a.checked_add(b)
+        .ok_or_else(|| Error::dimension("matrix_cl", "size overflows"))
 }
 
 fn copy(function: &'static str, a: &MatrixCl) -> Result<MatrixCl> {
@@ -119,7 +128,9 @@ impl MatrixCl {
     /// [`Error::DimensionMismatch`] when the block leaves the matrix; [`Error::Backend`] when a
     /// kernel fails.
     pub fn block(&self, i: usize, j: usize, rows: usize, cols: usize) -> Result<MatrixCl> {
-        if i + rows > self.rows || j + cols > self.cols {
+        let ends =
+            |start: usize, len: usize, size: usize| start.checked_add(len).is_none_or(|e| e > size);
+        if ends(i, rows, self.rows) || ends(j, cols, self.cols) {
             return Err(Error::dimension(
                 "block",
                 format!(
@@ -220,7 +231,7 @@ impl MatrixCl {
                 format!("{} and {} columns", self.cols, b.cols),
             ));
         }
-        let c = new(self.rows + b.rows, self.cols)?;
+        let c = new(add(self.rows, b.rows)?, self.cols)?;
         run(
             "append_row",
             "append_row",
@@ -249,7 +260,7 @@ impl MatrixCl {
                 format!("{} and {} rows", self.rows, b.rows),
             ));
         }
-        let c = new(self.rows, self.cols + b.cols)?;
+        let c = new(self.rows, add(self.cols, b.cols)?)?;
         let na = self.rows * self.cols;
         run(
             "append_col",
