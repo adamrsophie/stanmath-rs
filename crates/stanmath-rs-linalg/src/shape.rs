@@ -196,3 +196,23 @@ pub fn trace_dot<T: Real>(a: &Matrix<T>, b: &Matrix<T>) -> Result<T> {
         .map(|(i, k)| a[(i, k)] * b[(k, i)])
         .sum())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::containers::num_elements;
+
+    #[test]
+    fn dims_of_nested_containers() {
+        let ms = vec![Matrix::<f64>::zeros(2, 3); 4];
+        assert_eq!(dims(&ms), [4, 2, 3]);
+        assert_eq!(num_elements(&ms), 24);
+        let empty: Vec<Vec<f64>> = Vec::new();
+        assert_eq!(dims(&empty), [0]);
+        assert_eq!(dims(&1.5), Vec::<usize>::new());
+        assert_eq!(dims(&[[1i64, 2], [3, 4], [5, 6]]), [3, 2]);
+        let ragged = vec![vec![1.0], vec![2.0, 3.0, 4.0], vec![]];
+        assert_eq!(num_elements(&ragged), 4);
+        assert_eq!(dims(&ragged), [3, 1]);
+    }
+}

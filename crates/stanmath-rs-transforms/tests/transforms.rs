@@ -447,6 +447,26 @@ fn canonical_partial_correlations() {
     for i in 0..k {
         assert!(close(sigma[(i, i)], sds[i] * sds[i], 1e-14));
     }
+    // Both forms add the log Jacobian of (CPCs, sds) to the lower triangle of the covariance.
+    let cpcs_sds: Vec<f64> = cpcs.iter().chain(&sds).copied().collect();
+    let cov_lp = |v: &[f64], from_l: bool| {
+        let mut lp = 0.0;
+        if from_l {
+            read_cov_L_lp(&v[..6], &v[6..], &mut lp).unwrap();
+        } else {
+            read_cov_matrix_lp(&v[..6], &v[6..], &mut lp).unwrap();
+        }
+        lp
+    };
+    for from_l in [false, true] {
+        check_jacobian(
+            "read_cov",
+            &cpcs_sds,
+            |v| strictly_lower(&read_cov_matrix(&v[..6], &v[6..]).unwrap(), true),
+            |v| cov_lp(v, from_l),
+            0.0,
+        );
+    }
     let (z, log_sds) = factor_cov_matrix(&sigma).unwrap();
     assert!(z.iter().zip(&cpcs).all(|(a, b)| close(a.tanh(), *b, 1e-12)));
     assert!(

@@ -162,6 +162,88 @@ fn dae_value_and_sensitivity() {
     assert!(close(g[0], want, 1e-4), "{} vs {want}", g[0]);
 }
 
+/// Robertson's stiff chemical kinetics with its conservation law as the algebraic equation.
+struct Robertson;
+
+impl DaeSystem for Robertson {
+    fn eval<S: Real>(&self, _t: S, y: &[S], yp: &[S], p: &[S]) -> Vec<S> {
+        let forward = p[0] * y[0];
+        let back = p[1] * y[1] * y[2];
+        vec![
+            yp[0] + forward - back,
+            yp[1] - forward + back + p[2] * y[1] * y[1],
+            y[0] + y[1] + y[2] - 1.0,
+        ]
+    }
+}
+
+/// The same kinetics as an ODE in all three species.
+struct RobertsonOde;
+
+impl OdeSystem for RobertsonOde {
+    fn eval<S: Real>(&self, _t: S, y: &[S], p: &[S]) -> Vec<S> {
+        let forward = p[0] * y[0];
+        let back = p[1] * y[1] * y[2];
+        let third = p[2] * y[1] * y[1];
+        vec![back - forward, forward - back - third, third]
+    }
+}
+
+#[test]
+fn dae_robertson_matches_the_ode_form() {
+    const P: [f64; 3] = [0.04, 1e4, 3e7];
+    let ts = [0.4, 4.0, 40.0, 400.0];
+    let tight = OdeOptions {
+        relative_tolerance: 1e-10,
+        absolute_tolerance: 1e-12,
+        max_num_steps: 1_000_000,
+    };
+    let y_dae = dae(
+        &Robertson,
+        &[1.0, 0.0, 0.0],
+        &[-0.04, 0.04, 0.0],
+        0.0,
+        &ts,
+        &P,
+    )
+    .unwrap();
+    let y_ode = ode_bdf_tol(&RobertsonOde, &[1.0, 0.0, 0.0], 0.0, &ts, &P, &tight).unwrap();
+    for ((a, b), t) in y_dae.iter().zip(&y_ode).zip(ts) {
+        for k in 0..3 {
+            assert!(close(a[k], b[k], 1e-7), "t={t}, y{k}: {} vs {}", a[k], b[k]);
+        }
+        assert!((a.iter().sum::<f64>() - 1.0).abs() < 1e-9, "t={t}: {a:?}");
+    }
+    let g_dae = grad(
+        |p| {
+            let y0 = [
+                Real::from_f64(1.0),
+                Real::from_f64(0.0),
+                Real::from_f64(0.0),
+            ];
+            let yp0 = [-p[0], p[0], Real::from_f64(0.0)];
+            dae(&Robertson, &y0, &yp0, 0.0, &[40.0], p).unwrap()[0][0]
+        },
+        &P,
+    );
+    let g_ode = grad(
+        |p| {
+            let y0 = [
+                Real::from_f64(1.0),
+                Real::from_f64(0.0),
+                Real::from_f64(0.0),
+            ];
+            ode_bdf_tol(&RobertsonOde, &y0, 0.0, &[40.0], p, &tight).unwrap()[0][0]
+        },
+        &P,
+    );
+    // Compare elasticities p dy/dp, since the rates differ by eleven orders of magnitude.
+    for k in 0..3 {
+        let (a, b) = (P[k] * g_dae[k], P[k] * g_ode[k]);
+        assert!(close(a, b, 1e-6), "p{k} d y1(40) / d p{k}: {a} vs {b}");
+    }
+}
+
 /// `x^theta`.
 struct Power;
 
@@ -299,4 +381,46 @@ fn powell_solution_and_implicit_derivatives() {
     // x = (d + s) / 2 with s = sqrt(2 r2 - d^2).
     assert!(close(g[0], 0.5 / s, 1e-8), "{}", g[0]);
     assert!(close(g[1], 0.5 * (1.0 - d / s), 1e-8), "{}", g[1]);
+}
+
+#[test]
+fn ode_tol_times_differentiates_the_times() {
+    let o = OdeOptions {
+        relative_tolerance: 1e-10,
+        absolute_tolerance: 1e-10,
+        max_num_steps: 1_000_000,
+    };
+    let (t0, omega) = (0.25, 1.3);
+    // y[0] = cos(omega (t - t0)), so the last output depends on t0, the last time, and omega only.
+    let point = [t0, 0.5, 1.0, 2.0, omega];
+    let span = point[3] - t0;
+    let want = [
+        omega * (omega * span).sin(),
+        0.0,
+        0.0,
+        -omega * (omega * span).sin(),
+        -span * (omega * span).sin(),
+    ];
+    for method in [
+        OdeMethod::Rk45,
+        OdeMethod::Ckrk,
+        OdeMethod::Adams,
+        OdeMethod::Bdf,
+    ] {
+        let g = grad(
+            |v| {
+                let y0 = [Real::from_f64(1.0), Real::from_f64(0.0)];
+                let y =
+                    ode_tol_times(method, &Oscillator, &y0, v[0], &v[1..4], &v[4..], &o).unwrap();
+                y[2][0]
+            },
+            &point,
+        );
+        for (k, (a, b)) in g.iter().zip(want).enumerate() {
+            assert!(
+                (a - b).abs() < 1e-6,
+                "{method:?}, derivative {k}: {a} vs {b}"
+            );
+        }
+    }
 }

@@ -613,5 +613,12 @@ int main() {
   probe1("laplace.bernoulli_logit.full", [&] { return laplace_marginal_bernoulli_logit_lpmf<false>(lb, lidx, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
   probe1("laplace.bernoulli_logit.all_data", [&] { return laplace_marginal_bernoulli_logit_lpmf<true>(lb, lidx, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
   probe1("laplace.bernoulli_logit.var_alpha", [&] { return with_var(1.2, [&](const var& a) { return laplace_marginal_bernoulli_logit_lpmf<true>(lb, lidx, lm, 1, laplace_cov(), std::forward_as_tuple(lx, a, 0.7), nullptr); }); });
+  // The fields of the options tuple, in order, with Stan's defaults.
+  probe1("laplace.options.0_size", [&] { return static_cast<double>(std::get<0>(generate_laplace_options(3)).size()); });
+  probe1("laplace.options.1", [&] { return static_cast<double>(std::get<1>(generate_laplace_options(3))); });
+  probe1("laplace.options.2", [&] { return static_cast<double>(std::get<2>(generate_laplace_options(3))); });
+  probe1("laplace.options.3", [&] { return static_cast<double>(std::get<3>(generate_laplace_options(3))); });
+  probe1("laplace.options.4", [&] { return static_cast<double>(std::get<4>(generate_laplace_options(3))); });
+  probe1("laplace.options.5", [&] { return static_cast<double>(std::get<5>(generate_laplace_options(3))); });
   return 0;
 }

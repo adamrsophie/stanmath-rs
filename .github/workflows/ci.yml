@@ -92,19 +92,26 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libopenmpi-dev openmpi-bin libclang-dev pocl-opencl-icd ocl-icd-opencl-dev clinfo
-      - name: MPI backend
+      - name: MPI example on one and three processes
         working-directory: backends/stanmath-rs-mpi
         run: |
-          cargo fmt --check
-          cargo clippy --all-targets -- -D warnings
-          cargo test
           cargo build --example map_rect_mpi
           mpirun -n 1 target/debug/examples/map_rect_mpi
           mpirun -n 3 --oversubscribe target/debug/examples/map_rect_mpi
-      - name: OpenCL backend
+      - name: MPI tests
+        if: ${{ !cancelled() }}
+        working-directory: backends/stanmath-rs-mpi
+        run: cargo test
+      - name: OpenCL tests
+        if: ${{ !cancelled() }}
         working-directory: backends/stanmath-rs-opencl
         run: |
           clinfo -l
-          cargo fmt --check
-          cargo clippy --all-targets -- -D warnings
-          cargo test
+          cargo test -- --nocapture
+      - name: Format and lint both backends
+        if: ${{ !cancelled() }}
+        run: |
+          for d in backends/stanmath-rs-mpi backends/stanmath-rs-opencl; do
+            (cd "$d" && cargo fmt --check && cargo clippy --all-targets -- -D warnings) || status=1
+          done
+          exit "${status:-0}"

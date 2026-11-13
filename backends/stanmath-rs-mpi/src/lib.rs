@@ -148,8 +148,8 @@ impl Cluster {
         }
     }
 
-    /// Serves the root's requests until the root's cluster is dropped. Returns at once on the
-    /// root.
+    /// Serves the root's requests until the root's cluster is dropped, then finalizes MPI. On the
+    /// root it drops the cluster at once, which stops the workers.
     pub fn listen(self) {
         if self.is_root() {
             return;
@@ -276,7 +276,7 @@ fn vjp_chunk(
     let mut out = vec![0.0; phi.len()];
     for ((theta, (x_r, x_i)), w) in thetas.iter().zip(data).zip(weights) {
         let g = job.vjp(phi, theta, x_r, x_i, w)?;
-        for (o, gk) in out.iter_mut().zip(&g) {
+        for (o, gk) in out[..phi.len()].iter_mut().zip(&g) {
             *o += gk;
         }
         out.extend_from_slice(&g[phi.len()..]);
@@ -565,6 +565,25 @@ mod tests {
                 assert_eq!(w[0].end, w[1].start);
             }
         }
+    }
+
+    /// Outputs `phi[0] theta[0]`.
+    struct Scale;
+
+    impl MapRectJob for Scale {
+        fn eval<S: Real>(&self, phi: &[S], theta: &[S], _: &[f64], _: &[i64]) -> Result<Vec<S>> {
+            Ok(vec![phi[0] * theta[0]])
+        }
+    }
+
+    #[test]
+    fn vjp_chunk_sums_phi_and_keeps_each_theta() {
+        let data = vec![(vec![], vec![]); 3];
+        let thetas: [&[f64]; 3] = [&[2.0], &[3.0], &[4.0]];
+        let weights: [&[f64]; 3] = [&[1.0], &[1.0], &[0.5]];
+        let g = vjp_chunk(&Scale, &[5.0], &thetas, &data, &weights);
+        // phi: 2 + 3 + 0.5 * 4; each theta: phi[0] times its weight.
+        assert_eq!(g.unwrap(), [7.0, 5.0, 5.0, 2.5]);
     }
 
     #[test]
