@@ -18,6 +18,7 @@
 
 use stanmath_rs_core::{Error, Matrix, Result};
 
+use crate::complex::Complex;
 use crate::dual::Dual;
 use crate::real::Real;
 use crate::tape::Var;
@@ -62,6 +63,17 @@ macro_rules! leaf {
 leaf!(f64; i64; Var<'t>, 't);
 
 impl<T: Real> ScalarContainer for Dual<T> {
+    type Scalar = Self;
+    type Mapped<U> = U;
+    fn map_scalars<U>(&self, f: &mut impl FnMut(Self) -> U) -> U {
+        f(*self)
+    }
+    fn zip_scalars<U>(&self, other: &Self, f: &mut impl FnMut(Self, Self) -> U) -> Result<U> {
+        Ok(f(*self, *other))
+    }
+}
+
+impl<T: Copy> ScalarContainer for Complex<T> {
     type Scalar = Self;
     type Mapped<U> = U;
     fn map_scalars<U>(&self, f: &mut impl FnMut(Self) -> U) -> U {

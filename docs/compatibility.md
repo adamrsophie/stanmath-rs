@@ -285,6 +285,10 @@ for `_jacobian`, the summed log Jacobian. `tests/signatures_qf.rs` covers the 25
 signatures of `dims`, `num_elements`, `size`, `rep_array`, `reverse`, `append_array`, `head`,
 `tail`, and `segment` over every element type, complex ones included, and checks the shape of each
 result (239 deeper array forms run the same generic code).
+`tests/signatures_complex.rs`, written by `tools/reference/gen_complex.py`, calls 84 signatures of
+`to_complex`, `get_real`, `get_imag`, and `conj` over complex containers (`ScalarContainer` now
+treats `Complex<T>` as a leaf) and checks each against the definition (111 deeper array forms share
+the recursive impl).
 
 The scalar sweep also fixed four conventions to match Stan: `fmax` and `fmin` return the second argument
 on ties (and take its derivative); `beta(a, b)` with a nonpositive argument is
