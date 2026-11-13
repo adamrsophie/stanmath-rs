@@ -1,11 +1,11 @@
-"""High-precision reference values for probgrad's special functions.
+"""High-precision reference values for stanmath-rs's special functions.
 
 Run from the repository root:
 
     uv run --with mpmath python tools/reference/special.py
 
 Writes special_unary_reference.csv, special_binary_reference.csv, and beta_inc_reference.csv into
-crates/probgrad-autodiff/tests/data. Derivatives are central differences evaluated at 60 digits
+crates/stanmath-rs-autodiff/tests/data. Derivatives are central differences evaluated at 60 digits
 with a step relative to the argument, which keeps their error far below double precision.
 """
 
@@ -16,7 +16,7 @@ from mpmath import mp, mpf, diff
 mp.dps = 60
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-OUT = os.path.join(ROOT, "crates", "probgrad-autodiff", "tests", "data")
+OUT = os.path.join(ROOT, "crates", "stanmath-rs-autodiff", "tests", "data")
 
 
 def phi_cdf(x):

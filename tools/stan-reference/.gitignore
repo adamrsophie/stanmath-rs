@@ -1,4 +1,10 @@
 stan_reference
 stan_bench
+stan_probe
 *.o
 *.d
+stan_reference_extra
+stan_reference_scalar
+stan_reference_matrix
+stan_reference_complex
+stan_reference_scalar_extra

@@ -1,4 +1,4 @@
-// Reference values and gradients from Stan Math for probgrad's distribution tests.
+// Reference values and gradients from Stan Math for stanmath-rs's distribution tests.
 //
 // Each output line is
 //   function,ints,reals,value,gradient
@@ -227,7 +227,7 @@ int main() {
     return dirichlet_lpdf(theta, alpha);
   });
 
-  // Invalid arguments: Stan throws, probgrad must return an error.
+  // Invalid arguments: Stan throws, stanmath-rs must return an error.
   continuous("normal_lpdf", {{1.0, 0.0, -1.0}}, [](const Vars& v) { return normal_lpdf(v[0], v[1], v[2]); });
   continuous("gamma_lpdf", {{-1.0, 2.0, 1.0}}, [](const Vars& v) { return gamma_lpdf(v[0], v[1], v[2]); });
   continuous("beta_lpdf", {{1.5, 2.0, 1.0}}, [](const Vars& v) { return beta_lpdf(v[0], v[1], v[2]); });

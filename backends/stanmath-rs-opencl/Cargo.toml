@@ -1,0 +1,30 @@
+[package]
+name = "stanmath-rs-opencl"
+description = "OpenCL backend of stanmath-rs: device matrices, linear algebra, GLMs, and densities"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-only"
+authors = ["Adam R Sophie <adamrsophie@gmail.com>"]
+repository = "https://github.com/adamrsophie/stanmath-rs"
+
+# Built on its own: it needs an OpenCL runtime, which the main workspace does not require.
+[workspace]
+
+[dependencies]
+stanmath-rs-core = { path = "../../crates/stanmath-rs-core" }
+stanmath-rs-autodiff = { path = "../../crates/stanmath-rs-autodiff" }
+stanmath-rs-linalg = { path = "../../crates/stanmath-rs-linalg" }
+opencl3 = "0.12.4"
+
+[dev-dependencies]
+stanmath-rs-distributions = { path = "../../crates/stanmath-rs-distributions" }
+
+
+[lints.rust]
+# OpenCL buffers and kernel launches are unsafe; each use is confined to `device.rs`.
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+float_cmp = "allow"

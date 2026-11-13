@@ -1,0 +1,30 @@
+[package]
+name = "stanmath-rs-distributions"
+description = "Differentiable probability distributions for stanmath-rs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[features]
+default = ["rand"]
+## Random number generation (`*_rng` functions).
+rand = ["dep:rand", "dep:rand_distr"]
+
+[dependencies]
+stanmath-rs-core.workspace = true
+stanmath-rs-autodiff.workspace = true
+stanmath-rs-linalg.workspace = true
+rand = { workspace = true, optional = true, features = ["alloc"] }
+rand_distr = { workspace = true, optional = true }
+
+[dev-dependencies]
+rand = { workspace = true, features = ["std_rng"] }
+
+[lints]
+workspace = true

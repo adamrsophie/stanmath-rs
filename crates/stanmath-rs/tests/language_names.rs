@@ -1,0 +1,135 @@
+//! Every function name in the Stan language, from `stanc --dump-stan-math-signatures` of CmdStan
+//! 2.40.0, imported by name from the prelude. The test compiles only if each is a public item;
+//! the `_rng` names need the default `rand` feature.
+
+#[allow(unused_imports)]
+use stanmath_rs::prelude::{
+    Phi, Phi_approx, abs, acos, acosh, add, add_diag, algebra_solver, algebra_solver_newton,
+    append_array, append_col, append_row, arg, asin, asinh, atan, atan2, atanh, bernoulli_cdf,
+    bernoulli_lccdf, bernoulli_lcdf, bernoulli_logit_glm_lpmf, bernoulli_logit_lpmf,
+    bernoulli_lpmf, bessel_first_kind, bessel_second_kind, beta, beta_binomial_cdf,
+    beta_binomial_lccdf, beta_binomial_lcdf, beta_binomial_lpmf, beta_cdf, beta_lccdf, beta_lcdf,
+    beta_lpdf, beta_neg_binomial_cdf, beta_neg_binomial_lccdf, beta_neg_binomial_lcdf,
+    beta_neg_binomial_lpmf, beta_proportion_lccdf, beta_proportion_lcdf, beta_proportion_lpdf,
+    binary_log_loss, binomial_cdf, binomial_lccdf, binomial_lcdf, binomial_logit_glm_lpmf,
+    binomial_logit_lpmf, binomial_lpmf, block, categorical_logit_glm_lpmf, categorical_logit_lpmf,
+    categorical_lpmf, cauchy_cdf, cauchy_lccdf, cauchy_lcdf, cauchy_lpdf, cbrt, ceil,
+    chi_square_cdf, chi_square_lccdf, chi_square_lcdf, chi_square_lpdf, chol2inv,
+    cholesky_decompose, cholesky_factor_corr_constrain, cholesky_factor_corr_jacobian,
+    cholesky_factor_corr_unconstrain, cholesky_factor_cov_constrain, cholesky_factor_cov_jacobian,
+    cholesky_factor_cov_unconstrain, choose, col, cols, columns_dot_product, columns_dot_self,
+    complex_schur_decompose, complex_schur_decompose_t, complex_schur_decompose_u, conj,
+    corr_matrix_constrain, corr_matrix_jacobian, corr_matrix_unconstrain, cos, cosh,
+    cov_matrix_constrain, cov_matrix_jacobian, cov_matrix_unconstrain, crossprod, csr_extract,
+    csr_extract_u, csr_extract_v, csr_extract_w, csr_matrix_times_vector, csr_to_dense_matrix,
+    cumulative_sum, determinant, diag_matrix, diag_post_multiply, diag_pre_multiply, diagonal,
+    digamma, dims, dirichlet_lpdf, dirichlet_multinomial_lpmf, discrete_range_cdf,
+    discrete_range_lccdf, discrete_range_lcdf, discrete_range_lpmf, distance, divide, dot_product,
+    dot_self, double_exponential_cdf, double_exponential_lccdf, double_exponential_lcdf,
+    double_exponential_lpdf, e, eigendecompose, eigendecompose_sym, eigenvalues, eigenvalues_sym,
+    eigenvectors, eigenvectors_sym, elt_divide, elt_multiply, erf, erfc, exp, exp_mod_normal_cdf,
+    exp_mod_normal_lccdf, exp_mod_normal_lcdf, exp_mod_normal_lpdf, exp2, expm1, exponential_cdf,
+    exponential_lccdf, exponential_lcdf, exponential_lpdf, falling_factorial, fdim, fft, fft2,
+    floor, fma, fmax, fmin, fmod, frechet_cdf, frechet_lccdf, frechet_lcdf, frechet_lpdf,
+    gamma_cdf, gamma_lccdf, gamma_lcdf, gamma_lpdf, gamma_p, gamma_q, gaussian_dlm_obs_lpdf,
+    generalized_inverse, generate_laplace_options, get_imag, get_real, gp_dot_prod_cov,
+    gp_exp_quad_cov, gp_exponential_cov, gp_matern32_cov, gp_matern52_cov, gp_periodic_cov,
+    gumbel_cdf, gumbel_lccdf, gumbel_lcdf, gumbel_lpdf, head, hmm_hidden_state_prob, hmm_marginal,
+    hypergeometric_1F0, hypergeometric_2F1, hypergeometric_3F2, hypergeometric_lpmf,
+    hypergeometric_pFq, hypot, identity_matrix, inc_beta, int_step, integrate_1d, integrate_ode,
+    integrate_ode_adams, integrate_ode_bdf, integrate_ode_rk45, inv, inv_Phi, inv_chi_square_cdf,
+    inv_chi_square_lccdf, inv_chi_square_lcdf, inv_chi_square_lpdf, inv_cloglog, inv_erfc, inv_fft,
+    inv_fft2, inv_gamma_cdf, inv_gamma_lccdf, inv_gamma_lcdf, inv_gamma_lpdf, inv_inc_beta,
+    inv_logit, inv_sqrt, inv_square, inv_wishart_cholesky_lpdf, inv_wishart_lpdf, inverse,
+    inverse_spd, is_inf, is_nan, lambert_w0, lambert_wm1, lbeta, lchoose, ldexp, lgamma,
+    linspaced_array, linspaced_int_array, linspaced_row_vector, linspaced_vector,
+    lkj_corr_cholesky_lpdf, lkj_corr_lpdf, lkj_cov_lpdf, lmgamma, lmultiply, log, log_determinant,
+    log_determinant_spd, log_diff_exp, log_falling_factorial, log_inv_logit, log_inv_logit_diff,
+    log_mix, log_modified_bessel_first_kind, log_rising_factorial, log_softmax, log_sum_exp, log1m,
+    log1m_exp, log1m_inv_logit, log1p, log1p_exp, log2, log10, logical_and, logical_eq, logical_gt,
+    logical_gte, logical_lt, logical_lte, logical_negation, logical_neq, logical_or, logistic_cdf,
+    logistic_lccdf, logistic_lcdf, logistic_lpdf, logit, loglogistic_cdf, loglogistic_lpdf,
+    lognormal_cdf, lognormal_lccdf, lognormal_lcdf, lognormal_lpdf, lower_bound_constrain,
+    lower_bound_jacobian, lower_bound_unconstrain, lower_upper_bound_constrain,
+    lower_upper_bound_jacobian, lower_upper_bound_unconstrain, machine_precision, map_rect,
+    matrix_exp, matrix_exp_multiply, matrix_power, max, mdivide_left, mdivide_left_spd,
+    mdivide_left_tri_low, mdivide_right, mdivide_right_spd, mdivide_right_tri_low, mean, min,
+    minus, modified_bessel_first_kind, modified_bessel_second_kind, modulus,
+    multi_gp_cholesky_lpdf, multi_gp_lpdf, multi_normal_cholesky_lpdf, multi_normal_lpdf,
+    multi_normal_prec_lpdf, multi_student_t_cholesky_lpdf, multi_student_t_lpdf,
+    multinomial_logit_lpmf, multinomial_lpmf, multiply, multiply_lower_tri_self_transpose,
+    neg_binomial_2_cdf, neg_binomial_2_lccdf, neg_binomial_2_lcdf, neg_binomial_2_log_glm_lpmf,
+    neg_binomial_2_log_lpmf, neg_binomial_2_lpmf, neg_binomial_cdf, neg_binomial_lccdf,
+    neg_binomial_lcdf, neg_binomial_lpmf, negative_infinity, norm, norm1, norm2, normal_cdf,
+    normal_id_glm_lpdf, normal_lccdf, normal_lcdf, normal_lpdf, not_a_number, num_elements,
+    offset_multiplier_constrain, offset_multiplier_jacobian, offset_multiplier_unconstrain,
+    one_hot_array, one_hot_int_array, one_hot_row_vector, one_hot_vector, ones_array,
+    ones_int_array, ones_row_vector, ones_vector, ordered_constrain, ordered_jacobian,
+    ordered_logistic_glm_lpmf, ordered_logistic_lpmf, ordered_probit_lpmf, ordered_unconstrain,
+    owens_t, pareto_cdf, pareto_lccdf, pareto_lcdf, pareto_lpdf, pareto_type_2_cdf,
+    pareto_type_2_lccdf, pareto_type_2_lcdf, pareto_type_2_lpdf, pi, plus, poisson_binomial_cdf,
+    poisson_binomial_lccdf, poisson_binomial_lcdf, poisson_binomial_lpmf, poisson_cdf,
+    poisson_lccdf, poisson_lcdf, poisson_log_glm_lpmf, poisson_log_lpmf, poisson_lpmf, polar,
+    positive_infinity, positive_ordered_constrain, positive_ordered_jacobian,
+    positive_ordered_unconstrain, pow, prod, proj, qr, qr_Q, qr_R, qr_thin, qr_thin_Q, qr_thin_R,
+    quad_form, quad_form_diag, quad_form_sym, quantile, rank, rayleigh_cdf, rayleigh_lccdf,
+    rayleigh_lcdf, rayleigh_lpdf, rep_array, rep_matrix, rep_row_vector, rep_vector, reverse,
+    rising_factorial, round, row, rows, rows_dot_product, rows_dot_self, scale_matrix_exp_multiply,
+    scaled_inv_chi_square_cdf, scaled_inv_chi_square_lccdf, scaled_inv_chi_square_lcdf,
+    scaled_inv_chi_square_lpdf, sd, segment, simplex_constrain, simplex_jacobian,
+    simplex_unconstrain, sin, singular_values, sinh, size, skew_double_exponential_cdf,
+    skew_double_exponential_lccdf, skew_double_exponential_lcdf, skew_double_exponential_lpdf,
+    skew_normal_cdf, skew_normal_lccdf, skew_normal_lcdf, skew_normal_lpdf, softmax, sort_asc,
+    sort_desc, sort_indices_asc, sort_indices_desc, sqrt, sqrt2, square, squared_distance,
+    std_normal_cdf, std_normal_lccdf, std_normal_lcdf, std_normal_log_qf, std_normal_lpdf,
+    std_normal_qf, step, stochastic_column_constrain, stochastic_column_jacobian,
+    stochastic_column_unconstrain, stochastic_row_constrain, stochastic_row_jacobian,
+    stochastic_row_unconstrain, student_t_cdf, student_t_lccdf, student_t_lcdf, student_t_lpdf,
+    student_t_qf, sub_col, sub_row, subtract, sum, sum_to_zero_constrain, sum_to_zero_jacobian,
+    sum_to_zero_unconstrain, svd, svd_U, svd_V, symmetrize_from_lower_tri, tail, tan, tanh,
+    tcrossprod, tgamma, to_array_1d, to_array_2d, to_complex, to_int, to_matrix, to_row_vector,
+    to_row_vector_array, to_vector, to_vector_array, trace, trace_dot, trace_gen_quad_form,
+    trace_quad_form, transpose, trigamma, trunc, uniform_cdf, uniform_lccdf, uniform_lcdf,
+    uniform_lpdf, uniform_simplex, unit_vector_constrain, unit_vector_jacobian,
+    unit_vector_unconstrain, upper_bound_constrain, upper_bound_jacobian, upper_bound_unconstrain,
+    variance, von_mises_cdf, von_mises_lccdf, von_mises_lcdf, von_mises_lpdf, weibull_cdf,
+    weibull_lccdf, weibull_lcdf, weibull_lpdf, wiener_lccdf_unnorm, wiener_lcdf_unnorm,
+    wiener_lpdf, wishart_cholesky_lpdf, wishart_lpdf, yule_simon_cdf, yule_simon_lccdf,
+    yule_simon_lcdf, yule_simon_lpmf, zeros_array, zeros_int_array, zeros_row_vector, zeros_vector,
+};
+
+#[cfg(feature = "rand")]
+#[allow(unused_imports)]
+use stanmath_rs::prelude::{
+    bernoulli_logit_glm_rng, bernoulli_logit_rng, bernoulli_rng, beta_binomial_rng,
+    beta_neg_binomial_rng, beta_proportion_rng, beta_rng, binomial_rng, categorical_logit_rng,
+    categorical_rng, cauchy_rng, chi_square_rng, dirichlet_multinomial_rng, dirichlet_rng,
+    discrete_range_rng, double_exponential_rng, exp_mod_normal_rng, exponential_rng, frechet_rng,
+    gamma_rng, gumbel_rng, hmm_latent_rng, hypergeometric_rng, inv_chi_square_rng, inv_gamma_rng,
+    inv_wishart_cholesky_rng, inv_wishart_rng, lkj_corr_cholesky_rng, lkj_corr_rng, logistic_rng,
+    loglogistic_rng, lognormal_rng, multi_normal_cholesky_rng, multi_normal_rng,
+    multi_student_t_cholesky_rng, multi_student_t_rng, multinomial_logit_rng, multinomial_rng,
+    neg_binomial_2_log_rng, neg_binomial_2_rng, neg_binomial_rng, normal_rng, ordered_logistic_rng,
+    ordered_probit_rng, pareto_rng, pareto_type_2_rng, poisson_binomial_rng, poisson_log_rng,
+    poisson_rng, rayleigh_rng, scaled_inv_chi_square_rng, skew_double_exponential_rng,
+    skew_normal_rng, std_normal_rng, student_t_rng, uniform_rng, von_mises_rng, weibull_rng,
+    wishart_cholesky_rng, wishart_rng, yule_simon_rng,
+};
+
+/// Stan Math library functions outside the language, from the public API documentation.
+#[allow(unused_imports)]
+use stanmath_rs::prelude::{
+    cov_exp_quad, csr_u_to_z, divide_columns, finite_diff_stepsize, grad_2F1, grad_F32, grad_pFq,
+    grad_reg_inc_beta, grad_reg_inc_gamma, grad_reg_lower_inc_gamma, i_times, inc_beta_dda,
+    inc_beta_ddb, inc_beta_ddz, is_any_nan, is_integer, log_gamma_q_dgamma, matrix_exp_2x2,
+    matrix_exp_pade, neg_i_times, scaled_add, unitspaced_array,
+};
+
+#[test]
+fn every_stan_language_name_is_public() {
+    // The imports above are the check; this records how many names they cover.
+    assert_eq!(NAMES + RNG_NAMES, 571);
+}
+
+const NAMES: usize = 510;
+const RNG_NAMES: usize = 61;

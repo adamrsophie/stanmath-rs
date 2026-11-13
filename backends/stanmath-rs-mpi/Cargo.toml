@@ -1,0 +1,25 @@
+[package]
+name = "stanmath-rs-mpi"
+description = "MPI backend for the map_rect functor of stanmath-rs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-only"
+authors = ["Adam R Sophie <adamrsophie@gmail.com>"]
+repository = "https://github.com/adamrsophie/stanmath-rs"
+
+# Built on its own: it needs an MPI library, which the main workspace does not require.
+[workspace]
+
+[dependencies]
+stanmath-rs-core = { path = "../../crates/stanmath-rs-core" }
+stanmath-rs-autodiff = { path = "../../crates/stanmath-rs-autodiff" }
+stanmath-rs-solvers = { path = "../../crates/stanmath-rs-solvers", default-features = false }
+mpi = "0.8.2"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+float_cmp = "allow"

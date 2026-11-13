@@ -1,11 +1,11 @@
-# probgrad
+# stanmath-rs
 
 Differentiable mathematics for Bayesian computation in Rust: automatic differentiation, special
 functions, and probability distributions, with Stan Math as the specification and correctness
 baseline.
 
 ```rust
-use probgrad::prelude::*;
+use stanmath_rs::prelude::*;
 
 fn main() -> Result<()> {
     let observation = 1.3;
@@ -17,14 +17,14 @@ fn main() -> Result<()> {
 
 ## Status
 
-probgrad is at version 0.1, under active development, and not yet published to crates.io.
+stanmath-rs is at version 0.1, under active development, and not yet published to crates.io.
 Automatic differentiation, special functions, univariate and multivariate distributions, dense
 linear algebra, parameter transforms, root finding, nonlinear systems, and quadrature are
 implemented and tested. ODE solvers are next, and benchmark timings still have to be recorded on an
 idle machine.
 See [`docs/roadmap.md`](docs/roadmap.md).
 
-Documentation, including the API reference, is at <https://adamrsophie.github.io/probgrad/>.
+Documentation, including the API reference, is at <https://adamrsophie.github.io/stanmath-rs/>.
 
 ## What it provides
 
@@ -50,7 +50,7 @@ Documentation, including the API reference, is at <https://adamrsophie.github.io
 * **Fused likelihoods.** A vectorized log density over `n` observations records one reverse-mode
   node with analytic partials, like Stan's `operands_and_partials`.
 * **Sampler ready.** `GradientWorkspace` matches the `logp(position, gradient)` interface of NUTS
-  implementations; an integration test samples probgrad models with `nuts-rs`.
+  implementations; an integration test samples stanmath-rs models with `nuts-rs`.
 
 ## Installation
 
@@ -58,7 +58,7 @@ Until the first release, depend on the repository:
 
 ```toml
 [dependencies]
-probgrad = { git = "https://github.com/adamrsophie/probgrad" }
+stanmath-rs = { git = "https://github.com/adamrsophie/stanmath-rs" }
 ```
 
 The minimum supported Rust version is 1.85 (edition 2024); the library crates are checked with
@@ -71,7 +71,7 @@ enables the `*_rng` functions.
 Write a model once, generically over `T: Real`, and evaluate it in any mode:
 
 ```rust
-use probgrad::prelude::*;
+use stanmath_rs::prelude::*;
 
 fn log_posterior<T: Real>(p: &[T], y: &[f64]) -> Result<T> {
     let (mu, log_sigma) = (p[0], p[1]);
@@ -93,7 +93,7 @@ fn main() -> Result<()> {
 Reverse-mode drivers take closures (`|p| model(p)`) because the closure must accept variables from
 a tape created inside the driver. Forward-mode drivers accept generic functions directly.
 
-Runnable examples are in [`crates/probgrad/examples`](crates/probgrad/examples):
+Runnable examples are in [`crates/stanmath-rs/examples`](crates/stanmath-rs/examples):
 
 | Example | Shows |
 | --- | --- |
@@ -113,13 +113,13 @@ Run one with `cargo run --example logistic_regression`.
 
 | Crate | Contents |
 | --- | --- |
-| `probgrad-core` | `Error`, `Matrix<T>` container, `f64` special functions |
-| `probgrad-autodiff` | `Real`, `Dual`, `Var`, `Tape`, drivers, differentiable functions |
-| `probgrad-linalg` | matrix operations with structured adjoints |
-| `probgrad-distributions` | log densities, CDFs, samplers |
-| `probgrad-transforms` | constraining transforms with log Jacobians |
-| `probgrad-solvers` | root finding, nonlinear systems, quadrature |
-| `probgrad` | umbrella crate and prelude |
+| `stanmath-rs-core` | `Error`, `Matrix<T>` container, `f64` special functions |
+| `stanmath-rs-autodiff` | `Real`, `Dual`, `Var`, `Tape`, drivers, differentiable functions |
+| `stanmath-rs-linalg` | matrix operations with structured adjoints |
+| `stanmath-rs-distributions` | log densities, CDFs, samplers |
+| `stanmath-rs-transforms` | constraining transforms with log Jacobians |
+| `stanmath-rs-solvers` | root finding, nonlinear systems, quadrature |
+| `stanmath-rs` | umbrella crate and prelude |
 
 Design decisions and the alternatives considered are in
 [`docs/architecture.md`](docs/architecture.md).
@@ -128,8 +128,8 @@ Design decisions and the alternatives considered are in
 
 * Every elementary and special function is checked in five modes (value, forward, reverse, forward
   over reverse, forward over forward) against mpmath references computed at 60 to 320 digits.
-* Every distribution is checked against Stan Math 5.4.0 output. Where probgrad and Stan disagree,
-  a test requires probgrad to be closer to the high-precision value; it is in all 45 such cases,
+* Every distribution is checked against Stan Math 5.4.0 output. Where stanmath-rs and Stan disagree,
+  a test requires stanmath-rs to be closer to the high-precision value; it is in all 45 such cases,
   including a 1.6% error in Stan's `gamma_lccdf` shape gradient and a missing term in its LKJ
   shape gradient at `eta = 1`.
 * Identities tie the pieces together: CDF derivatives equal densities, densities integrate to one,
@@ -152,13 +152,13 @@ method are in [`docs/performance.md`](docs/performance.md).
 
 Stan Math is the specification: function names, parameterizations, argument checks, and boundary
 behavior follow it, and its output is a test reference. No Stan Math code is translated; the
-implementation is independent Rust. probgrad is not affiliated with the Stan project.
+implementation is independent Rust. stanmath-rs is not affiliated with the Stan project.
 
 ## License
 
 Copyright (C) 2026 Adam R Sophie.
 
-probgrad is free software: you can redistribute it and/or modify it under the terms of the
+stanmath-rs is free software: you can redistribute it and/or modify it under the terms of the
 [GNU General Public License, version 3](LICENSE), as published by the Free Software Foundation.
 It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
 implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the license for
