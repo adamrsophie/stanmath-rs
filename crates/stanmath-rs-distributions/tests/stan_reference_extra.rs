@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 
 use stanmath_rs_autodiff::{Var, try_value_and_grad};
-use stanmath_rs_core::Result;
+use stanmath_rs_core::{Matrix, Result};
 use stanmath_rs_distributions::*;
 
 fn eval<'t>(name: &str, n: &[i64], x: &[Var<'t>]) -> Result<Var<'t>> {
@@ -68,8 +68,44 @@ fn eval<'t>(name: &str, n: &[i64], x: &[Var<'t>]) -> Result<Var<'t>> {
         "poisson_binomial_lpmf" => poisson_binomial_lpmf(n[0], x),
         "poisson_binomial_lcdf" => poisson_binomial_lcdf(n[0], x),
         "poisson_binomial_lccdf" => poisson_binomial_lccdf(n[0], x),
+        "ordered_logistic_lpmf" => ordered_logistic_lpmf(n[0], x[0], &x[1..4]),
+        "ordered_probit_lpmf" => ordered_probit_lpmf(n[0], x[0], &x[1..4]),
+        "multinomial_lpmf" => multinomial_lpmf(n, x),
+        "multinomial_logit_lpmf" => multinomial_logit_lpmf(n, x),
+        "dirichlet_multinomial_lpmf" => dirichlet_multinomial_lpmf(n, x),
+        "multi_normal_prec_lpdf" => multi_normal_prec_lpdf(&x[0..3], &x[3..6], &sym(&x[6..])),
+        "multi_student_t_lpdf" => multi_student_t_lpdf(&x[0..3], x[3], &x[4..7], &sym(&x[7..])),
+        "multi_student_t_cholesky_lpdf" => {
+            multi_student_t_cholesky_lpdf(&x[0..3], x[3], &x[4..7], &low(&x[7..]))
+        }
+        "wishart_lpdf" => wishart_lpdf(&sym(&x[0..6]), x[6], &sym(&x[7..])),
+        "inv_wishart_lpdf" => inv_wishart_lpdf(&sym(&x[0..6]), x[6], &sym(&x[7..])),
+        "wishart_cholesky_lpdf" => wishart_cholesky_lpdf(&low(&x[0..6]), x[6], &low(&x[7..])),
+        "inv_wishart_cholesky_lpdf" => {
+            inv_wishart_cholesky_lpdf(&low(&x[0..6]), x[6], &low(&x[7..]))
+        }
+        "lkj_corr_lpdf" => lkj_corr_lpdf(&sym(&x[0..6]), x[6]),
+        "lkj_cov_lpdf" => lkj_cov_lpdf(&sym(&x[0..6]), &x[6..9], &x[9..12], x[12]),
+        "multi_gp_lpdf" => multi_gp_lpdf(&gp_y(x), &sym(&x[6..12]), &x[12..14]),
+        "multi_gp_cholesky_lpdf" => multi_gp_cholesky_lpdf(&gp_y(x), &low(&x[6..12]), &x[12..14]),
         other => panic!("no dispatch for {other}"),
     }
+}
+
+/// A 3 by 3 lower triangular matrix from six values, row by row.
+fn low<'t>(v: &[Var<'t>]) -> Matrix<Var<'t>> {
+    let z = Var::constant(0.0);
+    Matrix::from_rows(&[[v[0], z, z], [v[1], v[2], z], [v[3], v[4], v[5]]])
+}
+
+/// A 3 by 3 symmetric matrix from its lower triangle, row by row.
+fn sym<'t>(v: &[Var<'t>]) -> Matrix<Var<'t>> {
+    Matrix::from_rows(&[[v[0], v[1], v[3]], [v[1], v[2], v[4]], [v[3], v[4], v[5]]])
+}
+
+/// The 2 by 3 response of the multi_gp cases, column major.
+fn gp_y<'t>(v: &[Var<'t>]) -> Matrix<Var<'t>> {
+    Matrix::from_column_major(2, 3, v[0..6].to_vec())
 }
 
 fn list(s: &str) -> Vec<f64> {

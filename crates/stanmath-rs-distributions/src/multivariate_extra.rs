@@ -764,8 +764,9 @@ fn lkj_corr_core<T: Real>(
         lp += lkj_constant(eta, k);
     }
     if keep(propto, &[is_param::<T, T>(), pe]) {
-        // (η - 1) ln det y, with ln det y = 2 Σ ln L_ii and L_00 = 1.
-        for i in 1..k {
+        // (η - 1) ln det y, with ln det y = 2 Σ ln L_ii. L_00 is one in value, but its term
+        // carries the derivative with respect to y_00.
+        for i in 0..k {
             lp += l[(i, i)].ln() * (eta * 2.0 - 2.0);
         }
     }

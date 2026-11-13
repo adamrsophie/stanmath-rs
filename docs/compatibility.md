@@ -212,12 +212,14 @@ components disagree, and all 45 are resolved in stanmath-rs's favor. The largest
 
 Run `cargo test -p stanmath-rs-distributions --test stan_reference -- --nocapture` for the full list.
 
-`tests/stan_reference_extra.rs` adds 165 cases for 19 more families (chi-square, inverse and scaled
+`tests/stan_reference_extra.rs` adds 189 cases for 34 more families: chi-square, inverse and scaled
 inverse chi-square, double exponential, exponentially modified normal, Frechet, Gumbel, Pareto,
 Pareto type 2, Rayleigh, skew normal, skew double exponential, von Mises, beta proportion,
-log-logistic, negative binomial, beta binomial, beta negative binomial, Poisson binomial), each
-`_lpdf`/`_lpmf` and, where Stan has them, `_lcdf` and `_lccdf`. They agree with Stan to `1e-10`
-except 26 rows, where stanmath-rs matches a 40 digit mpmath reference (`tools/reference/extra.py`)
+log-logistic, negative binomial, beta binomial, beta negative binomial, and Poisson binomial (each
+`_lpdf`/`_lpmf` and, where Stan has them, `_lcdf` and `_lccdf`), and the ordered logistic and
+probit, multinomial, multinomial logit, Dirichlet multinomial, multi normal precision, multi
+Student t and its Cholesky form, Wishart, inverse Wishart and their Cholesky forms, LKJ correlation
+and covariance, and multi GP and its Cholesky form. They agree with Stan to `1e-10` except 29 rows, where stanmath-rs matches a 40 digit mpmath reference (`tools/reference/extra.py`)
 to `1e-12` and Stan does not:
 
 | Case | Stan relative error | stanmath-rs |
@@ -226,3 +228,4 @@ to `1e-12` and Stan does not:
 | `beta_neg_binomial_lcdf`, `beta_neg_binomial_lccdf`, gradient | 5e-7 to 6e-5 | about 1e-15 |
 | `exp_mod_normal_lcdf(-2 \| 0, 0.5, 3)`, value and gradient | 1.6e-10 to 2e-8 | about 1e-15 |
 | `poisson_binomial_lccdf(3 \| [0.6, 0.4, 0.8])`, value | NaN (the exact value is `log 0`) | `-inf`, zero gradient |
+| `ordered_probit_lpmf`, d/d eta and cutpoints | 7e-7 to 3e-6 | about 1e-16 |

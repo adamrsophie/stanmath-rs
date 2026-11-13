@@ -1,7 +1,7 @@
 """High-precision values and gradients for the rows of stan_reference_extra.csv where Stan Math
 and stanmath-rs disagree: the shape derivatives of the chi-square family CDFs, the beta negative
-binomial CDFs, one exp_mod_normal CDF in the tail, and the Poisson binomial CCDF at its upper
-bound.
+binomial CDFs, one exp_mod_normal CDF in the tail, the Poisson binomial CCDF at its upper
+bound, and the ordered probit gradients.
 
 Run from the repository root:
 
@@ -13,7 +13,7 @@ format.
 
 import csv
 import os
-from mpmath import mp, mpf, diff, log, exp, erfc, sqrt, gammainc, loggamma, beta, inf
+from mpmath import mp, mpf, diff, log, exp, erfc, sqrt, gammainc, loggamma, beta, inf, ncdf
 
 mp.dps = 40
 DATA = "crates/stanmath-rs-distributions/tests/data"
@@ -57,6 +57,14 @@ def pb_lccdf(n, p):
     return log(tail) if tail > 0 else -inf
 
 
+def ordered_probit(k, eta, c):
+    if k == 1:
+        return log(1 - ncdf(eta - c[0]))
+    if k == len(c) + 1:
+        return log(ncdf(eta - c[-1]))
+    return log(ncdf(eta - c[k - 2]) - ncdf(eta - c[k - 1]))
+
+
 F = {
     "chi_square_lcdf": lambda n, x: log(P(x[1] / 2, x[0] / 2)),
     "chi_square_lccdf": lambda n, x: log(Q(x[1] / 2, x[0] / 2)),
@@ -68,6 +76,7 @@ F = {
     "beta_neg_binomial_lcdf": lambda n, x: log(bnb_cdf(n[0], *x)),
     "beta_neg_binomial_lccdf": lambda n, x: log(1 - bnb_cdf(n[0], *x)),
     "poisson_binomial_lccdf": lambda n, x: pb_lccdf(n[0], x),
+    "ordered_probit_lpmf": lambda n, x: ordered_probit(n[0], x[0], x[1:]),
 }
 
 

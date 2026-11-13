@@ -73,6 +73,34 @@ void discrete(const std::string& name,
   }
 }
 
+
+using M3 = Eigen::Matrix<var, -1, -1>;
+using V = Eigen::Matrix<var, -1, 1>;
+
+// A 3 by 3 lower triangular matrix from six values, row by row.
+M3 low(const Vars& v, int o) {
+  M3 m = M3::Zero(3, 3);
+  m(0, 0) = v[o]; m(1, 0) = v[o + 1]; m(1, 1) = v[o + 2];
+  m(2, 0) = v[o + 3]; m(2, 1) = v[o + 4]; m(2, 2) = v[o + 5];
+  return m;
+}
+
+// A 3 by 3 symmetric matrix from its lower triangle, row by row.
+M3 sym(const Vars& v, int o) {
+  M3 m(3, 3);
+  m(0, 0) = v[o]; m(1, 0) = m(0, 1) = v[o + 1]; m(1, 1) = v[o + 2];
+  m(2, 0) = m(0, 2) = v[o + 3]; m(2, 1) = m(1, 2) = v[o + 4]; m(2, 2) = v[o + 5];
+  return m;
+}
+
+V vec(const Vars& v, int o, int n) {
+  V r(n);
+  for (int i = 0; i < n; ++i) r(i) = v[o + i];
+  return r;
+}
+
+std::vector<var> arr(const Vars& v, int o, int n) { return Vars(v.begin() + o, v.begin() + o + n); }
+
 }  // namespace
 
 int main() {
@@ -133,4 +161,62 @@ int main() {
   discrete("poisson_binomial_lpmf", {{{1}, {0.2, 0.5, 0.7}}, {{0}, {0.1, 0.9, 0.3}}, {{3}, {0.6, 0.4, 0.8}}}, [](const std::vector<int>& k, const Vars& v) { return poisson_binomial_lpmf(k[0], Eigen::Map<const Eigen::Matrix<var, -1, 1>>(v.data(), v.size())); });
   discrete("poisson_binomial_lcdf", {{{1}, {0.2, 0.5, 0.7}}, {{0}, {0.1, 0.9, 0.3}}, {{3}, {0.6, 0.4, 0.8}}}, [](const std::vector<int>& k, const Vars& v) { return poisson_binomial_lcdf(k[0], Eigen::Map<const Eigen::Matrix<var, -1, 1>>(v.data(), v.size())); });
   discrete("poisson_binomial_lccdf", {{{1}, {0.2, 0.5, 0.7}}, {{0}, {0.1, 0.9, 0.3}}, {{3}, {0.6, 0.4, 0.8}}}, [](const std::vector<int>& k, const Vars& v) { return poisson_binomial_lccdf(k[0], Eigen::Map<const Eigen::Matrix<var, -1, 1>>(v.data(), v.size())); });
+
+  // Ordinal, multinomial, and multivariate families.
+  const std::vector<std::pair<std::vector<int>, std::vector<double>>> ord = {
+      {{1}, {0.3, -1.0, 0.2, 1.5}}, {{3}, {0.8, -1.0, 0.2, 1.5}}, {{4}, {2.5, -1.0, 0.2, 1.5}}};
+  discrete("ordered_logistic_lpmf", ord, [](const std::vector<int>& k, const Vars& v) {
+    return ordered_logistic_lpmf(k[0], v[0], vec(v, 1, 3)); });
+  discrete("ordered_probit_lpmf", ord, [](const std::vector<int>& k, const Vars& v) {
+    return ordered_probit_lpmf(k[0], v[0], vec(v, 1, 3)); });
+  discrete("multinomial_lpmf", {{{2, 0, 3}, {0.2, 0.3, 0.5}}, {{1, 4, 1}, {0.6, 0.3, 0.1}}},
+           [](const std::vector<int>& k, const Vars& v) { return multinomial_lpmf(k, vec(v, 0, 3)); });
+  discrete("multinomial_logit_lpmf", {{{2, 0, 3}, {0.2, -0.3, 1.5}}, {{1, 4, 1}, {0.0, 2.0, -1.0}}},
+           [](const std::vector<int>& k, const Vars& v) {
+             return multinomial_logit_lpmf(k, vec(v, 0, 3)); });
+  discrete("dirichlet_multinomial_lpmf", {{{2, 0, 3}, {0.2, 1.3, 2.5}}, {{1, 4, 1}, {3.0, 0.5, 1.0}}},
+           [](const std::vector<int>& k, const Vars& v) {
+             return dirichlet_multinomial_lpmf(k, vec(v, 0, 3)); });
+
+  const std::vector<double> s6 = {2.0, 0.3, 1.5, -0.2, 0.4, 1.8};
+  const std::vector<double> l6 = {1.4, 0.2, 1.1, -0.3, 0.5, 0.9};
+  auto cat = [](std::initializer_list<std::vector<double>> parts) {
+    std::vector<double> r;
+    for (const auto& p : parts) r.insert(r.end(), p.begin(), p.end());
+    return r;
+  };
+  continuous("multi_normal_prec_lpdf", {cat({{0.3, -0.5, 1.2}, {0.1, 0.0, 0.8}, s6})},
+             [](const Vars& v) { return multi_normal_prec_lpdf(vec(v, 0, 3), vec(v, 3, 3), sym(v, 6)); });
+  continuous("multi_student_t_lpdf", {cat({{0.3, -0.5, 1.2}, {4.5}, {0.1, 0.0, 0.8}, s6})},
+             [](const Vars& v) {
+               return multi_student_t_lpdf(vec(v, 0, 3), v[3], vec(v, 4, 3), sym(v, 7)); });
+  continuous("multi_student_t_cholesky_lpdf", {cat({{0.3, -0.5, 1.2}, {4.5}, {0.1, 0.0, 0.8}, l6})},
+             [](const Vars& v) {
+               return multi_student_t_cholesky_lpdf(vec(v, 0, 3), v[3], vec(v, 4, 3), low(v, 7)); });
+  const std::vector<double> w6 = {3.0, 0.5, 2.5, -0.4, 0.6, 2.2};
+  continuous("wishart_lpdf", {cat({w6, {5.5}, s6})},
+             [](const Vars& v) { return wishart_lpdf(sym(v, 0), v[6], sym(v, 7)); });
+  continuous("inv_wishart_lpdf", {cat({w6, {5.5}, s6})},
+             [](const Vars& v) { return inv_wishart_lpdf(sym(v, 0), v[6], sym(v, 7)); });
+  continuous("wishart_cholesky_lpdf", {cat({l6, {5.5}, {1.2, 0.1, 0.9, 0.2, -0.3, 1.3}})},
+             [](const Vars& v) { return wishart_cholesky_lpdf(low(v, 0), v[6], low(v, 7)); });
+  continuous("inv_wishart_cholesky_lpdf", {cat({l6, {5.5}, {1.2, 0.1, 0.9, 0.2, -0.3, 1.3}})},
+             [](const Vars& v) { return inv_wishart_cholesky_lpdf(low(v, 0), v[6], low(v, 7)); });
+  const std::vector<double> c6 = {1.0, 0.3, 1.0, -0.2, 0.4, 1.0};
+  continuous("lkj_corr_lpdf", {cat({c6, {2.5}}), cat({c6, {0.7}})},
+             [](const Vars& v) { return lkj_corr_lpdf(sym(v, 0), v[6]); });
+  continuous("lkj_cov_lpdf", {cat({s6, {0.1, -0.2, 0.3}, {0.5, 0.8, 1.1}, {2.0}})},
+             [](const Vars& v) {
+               return lkj_cov_lpdf(sym(v, 0), vec(v, 6, 3), vec(v, 9, 3), v[12]); });
+  // y is 2 by 3, column major.
+  auto gp_y = [](const Vars& v) {
+    M3 y(2, 3);
+    for (int j = 0; j < 3; ++j)
+      for (int i = 0; i < 2; ++i) y(i, j) = v[i + 2 * j];
+    return y;
+  };
+  continuous("multi_gp_lpdf", {cat({{0.3, -0.5, 1.2, 0.1, 0.0, 0.8}, s6, {1.5, 0.7}})},
+             [&](const Vars& v) { return multi_gp_lpdf(gp_y(v), sym(v, 6), vec(v, 12, 2)); });
+  continuous("multi_gp_cholesky_lpdf", {cat({{0.3, -0.5, 1.2, 0.1, 0.0, 0.8}, l6, {1.5, 0.7}})},
+             [&](const Vars& v) { return multi_gp_cholesky_lpdf(gp_y(v), low(v, 6), vec(v, 12, 2)); });
 }
