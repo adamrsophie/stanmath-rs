@@ -3,3 +3,4 @@ stan_bench
 stan_probe
 *.o
 *.d
+stan_reference_extra
