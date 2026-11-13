@@ -18,7 +18,7 @@ use stanmath_rs_core::special::{HALF_LN_2PI, LN_2PI};
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::{obs, param};
-use crate::kernel::{Kernel, sum_kernel, sum_terms};
+use crate::kernel::{Kernel, sum_kernel, sum_kernel_propto, sum_terms};
 
 /// `a ln y` with the convention `0 ln 0 = 0`.
 #[inline]
