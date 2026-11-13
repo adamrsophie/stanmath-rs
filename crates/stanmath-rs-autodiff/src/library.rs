@@ -43,9 +43,10 @@ pub fn neg_i_times<T: Real>(z: Complex<T>) -> Complex<T> {
     Complex::new(z.im, -z.re)
 }
 
-/// Whether `x` is a finite whole number.
+/// Whether `x` equals its floor: true for whole numbers and infinities, false for NaN (checked
+/// against Stan Math 5.4.0).
 pub fn is_integer(x: f64) -> bool {
-    x.is_finite() && x == x.trunc()
+    x == x.floor()
 }
 
 /// Whether any of `xs` is NaN.
@@ -175,7 +176,8 @@ mod tests {
         let z = Complex::new(1.0, 2.0);
         let (p, n) = (i_times(z), neg_i_times(z));
         assert_eq!((p.re, p.im, n.re, n.im), (-2.0, 1.0, 2.0, -1.0));
-        assert!(is_integer(3.0) && !is_integer(3.5) && !is_integer(f64::INFINITY));
+        assert!(is_integer(3.0) && !is_integer(3.5) && is_integer(f64::INFINITY));
+        assert!(!is_integer(f64::NAN));
         assert!(is_any_nan(&[1.0, f64::NAN]) && !is_any_nan(&[1.0]));
         let mut x = vec![1.0, 2.0];
         scaled_add(&mut x, &[1.0, 1.0], 0.5);

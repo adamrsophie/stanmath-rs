@@ -63,9 +63,21 @@ pub fn divide_columns<T: Real>(x: &[Vec<T>], v: &[T]) -> Result<Vec<Vec<T>>> {
         .collect()
 }
 
-/// The integers `low, low + 1, ..., high`; empty when `high < low`.
-pub fn unitspaced_array(low: i64, high: i64) -> Vec<i64> {
-    (low..=high).collect()
+/// The integers `low, low + 1, ..., high`.
+///
+/// # Errors
+///
+/// [`Error::InvalidParameter`] when `high < low`, as Stan Math 5.4.0.
+pub fn unitspaced_array(low: i64, high: i64) -> Result<Vec<i64>> {
+    if high < low {
+        return Err(Error::parameter(
+            "unitspaced_array",
+            "high",
+            high as f64,
+            "greater than or equal to low",
+        ));
+    }
+    Ok((low..=high).collect())
 }
 
 /// The number of nonzeros in row `i` (zero based) of a compressed sparse row matrix with row
@@ -99,8 +111,9 @@ mod tests {
         let d = divide_columns(&[vec![2.0, 6.0]], &[2.0, 3.0]).unwrap();
         assert_eq!(d, [[1.0, 2.0]]);
         assert!(divide_columns(&[vec![1.0]], &[1.0, 2.0]).is_err());
-        assert_eq!(unitspaced_array(2, 4), [2, 3, 4]);
-        assert!(unitspaced_array(3, 2).is_empty());
+        assert_eq!(unitspaced_array(2, 4).unwrap(), [2, 3, 4]);
+        assert_eq!(unitspaced_array(2, 2).unwrap(), [2]);
+        assert!(unitspaced_array(3, 2).is_err());
         assert_eq!(csr_u_to_z(&[0, 2, 5], 1).unwrap(), 3);
         assert!(csr_u_to_z(&[0, 2], 1).is_err());
         let x = [vec![0.0], vec![1.0]];
