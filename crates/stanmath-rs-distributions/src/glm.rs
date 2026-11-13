@@ -4,10 +4,11 @@
 //! [`multiply_vector`](stanmath_rs_linalg::multiply_vector) (one structured reverse-mode node) and
 //! passes it to the fused vectorized log density of the response distribution, so the likelihood
 //! adds a single further node. The design matrix `x` is usually data (`Matrix<f64>`); `alpha` is a
-//! scalar or a vector with one entry per row; `beta` fixes the scalar type.
+//! scalar or a vector with one entry per row. As in Stan, the result's scalar type is the promotion
+//! of every argument's, so data `beta` with an autodiff `x` or `alpha` works.
 
 use stanmath_rs_autodiff::functions::log_sum_exp_slice;
-use stanmath_rs_autodiff::{Arg, IntArg, Lift, Real, broadcast_len};
+use stanmath_rs_autodiff::{Arg, Broadcast, IntArg, Lift, Real, broadcast_len};
 use stanmath_rs_core::{Error, Matrix, Result};
 use stanmath_rs_linalg::{multiply, multiply_vector};
 
@@ -54,10 +55,11 @@ where
 }
 
 /// `x beta`, after checking sizes and finiteness.
-fn x_beta<T, X>(f: &'static str, x: &Matrix<X>, beta: &[T]) -> Result<Vec<T>>
+fn x_beta<T, X, B>(f: &'static str, x: &Matrix<X>, beta: &[B]) -> Result<Vec<T>>
 where
     T: Real,
     X: Lift<T> + Copy,
+    B: Lift<T> + Copy,
 {
     if x.ncols() != beta.len() {
         return Err(Error::dimension(
@@ -70,23 +72,25 @@ where
         ));
     }
     let xt = lift_matrix(x);
+    let beta: Vec<T> = beta.iter().map(|&b| b.lift()).collect();
     check_finite(f, "x", xt.as_slice())?;
-    check_finite(f, "beta", beta)?;
-    multiply_vector(&xt, beta)
+    check_finite(f, "beta", &beta)?;
+    multiply_vector(&xt, &beta)
 }
 
 /// `x beta + alpha`.
-fn linear_predictor<T, X, A>(
+fn linear_predictor<T, X, A, B>(
     f: &'static str,
     x: &Matrix<X>,
     alpha: &A,
-    beta: &[T],
+    beta: &[B],
 ) -> Result<Vec<T>>
 where
     T: Real,
     X: Lift<T> + Copy,
     A: Arg,
     A::Elem: Lift<T>,
+    B: Lift<T> + Copy,
 {
     let alpha: Vec<T> = broadcast_arg(f, "alpha", alpha, x.nrows())?;
     check_finite(f, "alpha", &alpha)?;
@@ -95,14 +99,15 @@ where
 }
 
 /// Whether the linear predictor `x beta + alpha` depends only on data.
-fn eta_data<T, X, A>() -> bool
+fn eta_data<T, X, A, B>() -> bool
 where
     T: Real,
     X: Lift<T>,
     A: Arg,
     A::Elem: Lift<T>,
+    B: Lift<T>,
 {
-    <X as Lift<T>>::DATA && <A::Elem as Lift<T>>::DATA && <T as Lift<T>>::DATA
+    <X as Lift<T>>::DATA && <A::Elem as Lift<T>>::DATA && <B as Lift<T>>::DATA
 }
 
 /// Requires a sequence response to have one entry per row of `x`.
@@ -117,11 +122,11 @@ fn check_rows(f: &'static str, response: Option<usize>, n: usize) -> Result<()> 
 }
 
 /// [`poisson_log_glm_lpmf`] and, with `propto`, [`poisson_log_glm_lupmf`].
-fn poisson_log_glm_lpmf_with<N, X, A, T>(
+fn poisson_log_glm_lpmf_with<N, X, A, B, T>(
     y: N,
     x: &Matrix<X>,
     alpha: A,
-    beta: &[T],
+    beta: &[B],
     propto: bool,
 ) -> Result<T>
 where
@@ -130,6 +135,7 @@ where
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
 {
     const F: &str = "poisson_log_glm_lpmf";
     check_rows(F, y.int_len(), x.nrows())?;
@@ -138,40 +144,44 @@ where
         return Ok(T::zero());
     }
     let eta = linear_predictor(F, x, &alpha, beta)?;
-    let data = [eta_data::<T, X, A>()];
+    let data = [eta_data::<T, X, A, B>()];
     sum_kernel_masked::<PoissonLog, _, 1, 1>([&y], (&eta[..],), propto, data)
 }
 
 /// Poisson regression with log link: `poisson_log_lpmf(y | x beta + alpha)`.
-pub fn poisson_log_glm_lpmf<N, X, A, T>(y: N, x: &Matrix<X>, alpha: A, beta: &[T]) -> Result<T>
+pub fn poisson_log_glm_lpmf<N, X, A, B, T>(y: N, x: &Matrix<X>, alpha: A, beta: &[B]) -> Result<T>
 where
+    (X, A, B): Broadcast<3, Out = T>,
     N: IntArg,
     X: Lift<T> + Copy,
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
 {
     poisson_log_glm_lpmf_with(y, x, alpha, beta, false)
 }
 
 /// [`poisson_log_glm_lpmf`] without the terms that depend only on data (Stan's `poisson_log_glm_lupmf`).
-pub fn poisson_log_glm_lupmf<N, X, A, T>(y: N, x: &Matrix<X>, alpha: A, beta: &[T]) -> Result<T>
+pub fn poisson_log_glm_lupmf<N, X, A, B, T>(y: N, x: &Matrix<X>, alpha: A, beta: &[B]) -> Result<T>
 where
+    (X, A, B): Broadcast<3, Out = T>,
     N: IntArg,
     X: Lift<T> + Copy,
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
 {
     poisson_log_glm_lpmf_with(y, x, alpha, beta, true)
 }
 
 /// [`bernoulli_logit_glm_lpmf`] and, with `propto`, [`bernoulli_logit_glm_lupmf`].
-fn bernoulli_logit_glm_lpmf_with<N, X, A, T>(
+fn bernoulli_logit_glm_lpmf_with<N, X, A, B, T>(
     y: N,
     x: &Matrix<X>,
     alpha: A,
-    beta: &[T],
+    beta: &[B],
     propto: bool,
 ) -> Result<T>
 where
@@ -180,6 +190,7 @@ where
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
 {
     const F: &str = "bernoulli_logit_glm_lpmf";
     check_rows(F, y.int_len(), x.nrows())?;
@@ -188,41 +199,55 @@ where
         return Ok(T::zero());
     }
     let eta = linear_predictor(F, x, &alpha, beta)?;
-    let data = [eta_data::<T, X, A>()];
+    let data = [eta_data::<T, X, A, B>()];
     sum_kernel_masked::<BernoulliLogit, _, 1, 1>([&y], (&eta[..],), propto, data)
 }
 
 /// Logistic regression: `bernoulli_logit_lpmf(y | x beta + alpha)`.
-pub fn bernoulli_logit_glm_lpmf<N, X, A, T>(y: N, x: &Matrix<X>, alpha: A, beta: &[T]) -> Result<T>
+pub fn bernoulli_logit_glm_lpmf<N, X, A, B, T>(
+    y: N,
+    x: &Matrix<X>,
+    alpha: A,
+    beta: &[B],
+) -> Result<T>
 where
+    (X, A, B): Broadcast<3, Out = T>,
     N: IntArg,
     X: Lift<T> + Copy,
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
 {
     bernoulli_logit_glm_lpmf_with(y, x, alpha, beta, false)
 }
 
 /// [`bernoulli_logit_glm_lpmf`] without the terms that depend only on data (Stan's `bernoulli_logit_glm_lupmf`).
-pub fn bernoulli_logit_glm_lupmf<N, X, A, T>(y: N, x: &Matrix<X>, alpha: A, beta: &[T]) -> Result<T>
+pub fn bernoulli_logit_glm_lupmf<N, X, A, B, T>(
+    y: N,
+    x: &Matrix<X>,
+    alpha: A,
+    beta: &[B],
+) -> Result<T>
 where
+    (X, A, B): Broadcast<3, Out = T>,
     N: IntArg,
     X: Lift<T> + Copy,
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
 {
     bernoulli_logit_glm_lpmf_with(y, x, alpha, beta, true)
 }
 
 /// [`binomial_logit_glm_lpmf`] and, with `propto`, [`binomial_logit_glm_lupmf`].
-fn binomial_logit_glm_lpmf_with<N, M, X, A, T>(
+fn binomial_logit_glm_lpmf_with<N, M, X, A, B, T>(
     n: N,
     trials: M,
     x: &Matrix<X>,
     alpha: A,
-    beta: &[T],
+    beta: &[B],
     propto: bool,
 ) -> Result<T>
 where
@@ -232,59 +257,64 @@ where
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
 {
     const F: &str = "binomial_logit_glm_lpmf";
     check_rows(F, n.int_len(), x.nrows())?;
     check_rows(F, trials.int_len(), x.nrows())?;
     let eta = linear_predictor(F, x, &alpha, beta)?;
-    let data = [eta_data::<T, X, A>()];
+    let data = [eta_data::<T, X, A, B>()];
     sum_kernel_masked::<BinomialLogit, _, 2, 1>([&n, &trials], (&eta[..],), propto, data)
 }
 
 /// Binomial regression with logit link: `binomial_logit_lpmf(n | N, x beta + alpha)`.
-pub fn binomial_logit_glm_lpmf<N, M, X, A, T>(
+pub fn binomial_logit_glm_lpmf<N, M, X, A, B, T>(
     n: N,
     trials: M,
     x: &Matrix<X>,
     alpha: A,
-    beta: &[T],
+    beta: &[B],
 ) -> Result<T>
 where
+    (X, A, B): Broadcast<3, Out = T>,
     N: IntArg,
     M: IntArg,
     X: Lift<T> + Copy,
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
 {
     binomial_logit_glm_lpmf_with(n, trials, x, alpha, beta, false)
 }
 
 /// [`binomial_logit_glm_lpmf`] without the terms that depend only on data (Stan's `binomial_logit_glm_lupmf`).
-pub fn binomial_logit_glm_lupmf<N, M, X, A, T>(
+pub fn binomial_logit_glm_lupmf<N, M, X, A, B, T>(
     n: N,
     trials: M,
     x: &Matrix<X>,
     alpha: A,
-    beta: &[T],
+    beta: &[B],
 ) -> Result<T>
 where
+    (X, A, B): Broadcast<3, Out = T>,
     N: IntArg,
     M: IntArg,
     X: Lift<T> + Copy,
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
 {
     binomial_logit_glm_lpmf_with(n, trials, x, alpha, beta, true)
 }
 
 /// [`neg_binomial_2_log_glm_lpmf`] and, with `propto`, [`neg_binomial_2_log_glm_lupmf`].
-fn neg_binomial_2_log_glm_lpmf_with<N, X, A, T, P>(
+fn neg_binomial_2_log_glm_lpmf_with<N, X, A, B, T, P>(
     y: N,
     x: &Matrix<X>,
     alpha: A,
-    beta: &[T],
+    beta: &[B],
     phi: P,
     propto: bool,
 ) -> Result<T>
@@ -294,6 +324,7 @@ where
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
     P: Arg,
     P::Elem: Lift<T>,
 {
@@ -305,25 +336,27 @@ where
     }
     let eta = linear_predictor(F, x, &alpha, beta)?;
     let phi: Vec<T> = broadcast_arg(F, "phi", &phi, x.nrows())?;
-    let data = [eta_data::<T, X, A>(), <P::Elem as Lift<T>>::DATA];
+    let data = [eta_data::<T, X, A, B>(), <P::Elem as Lift<T>>::DATA];
     sum_kernel_masked::<NegBinomial2LogGlm, _, 1, 2>([&y], (&eta[..], &phi[..]), propto, data)
 }
 
 /// Negative binomial regression with log link:
 /// `neg_binomial_2_log_lpmf(y | x beta + alpha, phi)`; `phi` is a scalar or one value per row.
-pub fn neg_binomial_2_log_glm_lpmf<N, X, A, T, P>(
+pub fn neg_binomial_2_log_glm_lpmf<N, X, A, B, T, P>(
     y: N,
     x: &Matrix<X>,
     alpha: A,
-    beta: &[T],
+    beta: &[B],
     phi: P,
 ) -> Result<T>
 where
+    (X, A, B, P): Broadcast<4, Out = T>,
     N: IntArg,
     X: Lift<T> + Copy,
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
     P: Arg,
     P::Elem: Lift<T>,
 {
@@ -331,19 +364,21 @@ where
 }
 
 /// [`neg_binomial_2_log_glm_lpmf`] without the terms that depend only on data (Stan's `neg_binomial_2_log_glm_lupmf`).
-pub fn neg_binomial_2_log_glm_lupmf<N, X, A, T, P>(
+pub fn neg_binomial_2_log_glm_lupmf<N, X, A, B, T, P>(
     y: N,
     x: &Matrix<X>,
     alpha: A,
-    beta: &[T],
+    beta: &[B],
     phi: P,
 ) -> Result<T>
 where
+    (X, A, B, P): Broadcast<4, Out = T>,
     N: IntArg,
     X: Lift<T> + Copy,
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
     P: Arg,
     P::Elem: Lift<T>,
 {
@@ -351,11 +386,11 @@ where
 }
 
 /// [`normal_id_glm_lpdf`] and, with `propto`, [`normal_id_glm_lupdf`].
-fn normal_id_glm_lpdf_with<Y, X, A, T, S>(
+fn normal_id_glm_lpdf_with<Y, X, A, B, T, S>(
     y: &[Y],
     x: &Matrix<X>,
     alpha: A,
-    beta: &[T],
+    beta: &[B],
     sigma: S,
     propto: bool,
 ) -> Result<T>
@@ -365,6 +400,7 @@ where
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
     S: Arg,
     S::Elem: Lift<T>,
 {
@@ -379,7 +415,7 @@ where
     let sigma: Vec<T> = broadcast_arg(F, "sigma", &sigma, x.nrows())?;
     let data = [
         <Y as Lift<T>>::DATA,
-        eta_data::<T, X, A>(),
+        eta_data::<T, X, A, B>(),
         <S::Elem as Lift<T>>::DATA,
     ];
     sum_kernel_masked::<Normal, _, 0, 3>([], (&y[..], &mu[..], &sigma[..]), propto, data)
@@ -387,19 +423,21 @@ where
 
 /// Linear regression: `normal_lpdf(y | x beta + alpha, sigma)`; `sigma` is a scalar or one value
 /// per row.
-pub fn normal_id_glm_lpdf<Y, X, A, T, S>(
+pub fn normal_id_glm_lpdf<Y, X, A, B, T, S>(
     y: &[Y],
     x: &Matrix<X>,
     alpha: A,
-    beta: &[T],
+    beta: &[B],
     sigma: S,
 ) -> Result<T>
 where
+    (Y, X, A, B, S): Broadcast<5, Out = T>,
     Y: Lift<T> + Copy,
     X: Lift<T> + Copy,
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
     S: Arg,
     S::Elem: Lift<T>,
 {
@@ -407,19 +445,21 @@ where
 }
 
 /// [`normal_id_glm_lpdf`] without the terms that depend only on data (Stan's `normal_id_glm_lupdf`).
-pub fn normal_id_glm_lupdf<Y, X, A, T, S>(
+pub fn normal_id_glm_lupdf<Y, X, A, B, T, S>(
     y: &[Y],
     x: &Matrix<X>,
     alpha: A,
-    beta: &[T],
+    beta: &[B],
     sigma: S,
 ) -> Result<T>
 where
+    (Y, X, A, B, S): Broadcast<5, Out = T>,
     Y: Lift<T> + Copy,
     X: Lift<T> + Copy,
     A: Arg,
     A::Elem: Lift<T>,
     T: Real,
+    B: Lift<T> + Copy,
     S: Arg,
     S::Elem: Lift<T>,
 {
@@ -427,11 +467,11 @@ where
 }
 
 /// [`categorical_logit_glm_lpmf`] and, with `propto`, [`categorical_logit_glm_lupmf`].
-fn categorical_logit_glm_lpmf_with<N, X, A, T>(
+fn categorical_logit_glm_lpmf_with<N, X, A, B, T>(
     y: N,
     x: &Matrix<X>,
     alpha: &[A],
-    beta: &Matrix<T>,
+    beta: &Matrix<B>,
     propto: bool,
 ) -> Result<T>
 where
@@ -439,6 +479,7 @@ where
     X: Lift<T> + Copy,
     A: Lift<T> + Copy,
     T: Real,
+    B: Lift<T> + Copy,
 {
     const F: &str = "categorical_logit_glm_lpmf";
     if x.ncols() != beta.nrows() {
@@ -472,14 +513,15 @@ where
         return Ok(T::zero());
     }
     let alpha: Vec<T> = alpha.iter().map(|&a| a.lift()).collect();
+    let beta: Matrix<T> = lift_matrix(beta);
     let xt = lift_matrix(x);
     check_finite(F, "x", xt.as_slice())?;
     check_finite(F, "alpha", &alpha)?;
     check_finite(F, "beta", beta.as_slice())?;
-    if propto && <X as Lift<T>>::DATA && <A as Lift<T>>::DATA && <T as Lift<T>>::DATA {
+    if propto && <X as Lift<T>>::DATA && <A as Lift<T>>::DATA && <B as Lift<T>>::DATA {
         return Ok(T::zero());
     }
-    let eta = multiply(&xt, beta)?;
+    let eta = multiply(&xt, &beta)?;
     let mut lp = T::zero();
     for i in 0..n {
         let row: Vec<T> = (0..c).map(|j| eta[(i, j)] + alpha[j]).collect();
@@ -491,42 +533,46 @@ where
 
 /// Multi-logit regression: category `y_i` in `1..=C` has log probability
 /// `log_softmax(x_i beta + alpha)[y_i]`, with `beta` of size `K` by `C` and `alpha` of length `C`.
-pub fn categorical_logit_glm_lpmf<N, X, A, T>(
+pub fn categorical_logit_glm_lpmf<N, X, A, B, T>(
     y: N,
     x: &Matrix<X>,
     alpha: &[A],
-    beta: &Matrix<T>,
+    beta: &Matrix<B>,
 ) -> Result<T>
 where
+    (X, A, B): Broadcast<3, Out = T>,
     N: IntArg,
     X: Lift<T> + Copy,
     A: Lift<T> + Copy,
     T: Real,
+    B: Lift<T> + Copy,
 {
     categorical_logit_glm_lpmf_with(y, x, alpha, beta, false)
 }
 
 /// [`categorical_logit_glm_lpmf`] without the terms that depend only on data (Stan's `categorical_logit_glm_lupmf`).
-pub fn categorical_logit_glm_lupmf<N, X, A, T>(
+pub fn categorical_logit_glm_lupmf<N, X, A, B, T>(
     y: N,
     x: &Matrix<X>,
     alpha: &[A],
-    beta: &Matrix<T>,
+    beta: &Matrix<B>,
 ) -> Result<T>
 where
+    (X, A, B): Broadcast<3, Out = T>,
     N: IntArg,
     X: Lift<T> + Copy,
     A: Lift<T> + Copy,
     T: Real,
+    B: Lift<T> + Copy,
 {
     categorical_logit_glm_lpmf_with(y, x, alpha, beta, true)
 }
 
 /// [`ordered_logistic_glm_lpmf`] and, with `propto`, [`ordered_logistic_glm_lupmf`].
-fn ordered_logistic_glm_lpmf_with<N, X, T, C>(
+fn ordered_logistic_glm_lpmf_with<N, X, B, T, C>(
     y: N,
     x: &Matrix<X>,
-    beta: &[T],
+    beta: &[B],
     cuts: &[C],
     propto: bool,
 ) -> Result<T>
@@ -534,6 +580,7 @@ where
     N: IntArg,
     X: Lift<T> + Copy,
     T: Real,
+    B: Lift<T> + Copy,
     C: Lift<T> + Copy,
 {
     const F: &str = "ordered_logistic_glm_lpmf";
@@ -545,39 +592,43 @@ where
     check_cutpoints(F, &cuts)?;
     let lp = ordered_logistic_lpmf(y, &eta[..], &cuts)?;
     // No term of the ordered logistic depends only on data, so propto drops all or nothing.
-    if propto && <X as Lift<T>>::DATA && <T as Lift<T>>::DATA && <C as Lift<T>>::DATA {
+    if propto && <X as Lift<T>>::DATA && <B as Lift<T>>::DATA && <C as Lift<T>>::DATA {
         return Ok(T::zero());
     }
     Ok(lp)
 }
 
 /// Ordered logistic regression: `ordered_logistic_lpmf(y | x beta, cuts)`.
-pub fn ordered_logistic_glm_lpmf<N, X, T, C>(
+pub fn ordered_logistic_glm_lpmf<N, X, B, T, C>(
     y: N,
     x: &Matrix<X>,
-    beta: &[T],
+    beta: &[B],
     cuts: &[C],
 ) -> Result<T>
 where
+    (X, B, C): Broadcast<3, Out = T>,
     N: IntArg,
     X: Lift<T> + Copy,
     T: Real,
+    B: Lift<T> + Copy,
     C: Lift<T> + Copy,
 {
     ordered_logistic_glm_lpmf_with(y, x, beta, cuts, false)
 }
 
 /// [`ordered_logistic_glm_lpmf`] without the terms that depend only on data (Stan's `ordered_logistic_glm_lupmf`).
-pub fn ordered_logistic_glm_lupmf<N, X, T, C>(
+pub fn ordered_logistic_glm_lupmf<N, X, B, T, C>(
     y: N,
     x: &Matrix<X>,
-    beta: &[T],
+    beta: &[B],
     cuts: &[C],
 ) -> Result<T>
 where
+    (X, B, C): Broadcast<3, Out = T>,
     N: IntArg,
     X: Lift<T> + Copy,
     T: Real,
+    B: Lift<T> + Copy,
     C: Lift<T> + Copy,
 {
     ordered_logistic_glm_lpmf_with(y, x, beta, cuts, true)

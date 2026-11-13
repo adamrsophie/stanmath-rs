@@ -16,7 +16,7 @@
 // The return types name one generic parameter per Wiener argument; aliases would only hide them.
 #![allow(clippy::type_complexity)]
 
-use stanmath_rs_autodiff::{Arg, IntArg, Lift, Real, broadcast_len};
+use stanmath_rs_autodiff::{Arg, Broadcast, IntArg, Lift, Real, broadcast_len};
 use stanmath_rs_core::{Error, Matrix, Result};
 use stanmath_rs_linalg::cholesky_decompose;
 
@@ -306,13 +306,21 @@ propto_pair! {
 propto_pair! {
     /// [`poisson_log_glm_lpmf`] with `row_vector x`: every observation uses the predictors `x`. The
     /// number of observations is the length of `y` or of `alpha`.
-    poisson_log_glm_lpmf_row, poisson_log_glm_lupmf_row <N, X, A, T>(
+    poisson_log_glm_lpmf_row, poisson_log_glm_lupmf_row <N, X, A, B, T>(
         y: N,
         x: &[X],
         alpha: A,
-        beta: &[T],
+        beta: &[B],
     ) -> Result<T>
-    where { N: IntArg, X: Lift<T> + Copy, A: Arg, A::Elem: Lift<T>, T: Real }
+    where {
+        N: IntArg,
+        X: Lift<T> + Copy,
+        A: Arg,
+        A::Elem: Lift<T>,
+        B: Lift<T> + Copy,
+        T: Real,
+        (X, A, B): Broadcast<3, Out = T>,
+    }
     base(poisson_log_glm_lpmf, poisson_log_glm_lupmf) |base| {
         let n = broadcast_len("poisson_log_glm_lpmf", &[y.int_len(), alpha.arg_len()])?;
         base(y, &repeat_row(x, n), alpha, beta)
@@ -322,13 +330,21 @@ propto_pair! {
 propto_pair! {
     /// [`bernoulli_logit_glm_lpmf`] with `row_vector x`: every observation uses the predictors `x`.
     /// The number of observations is the length of `y` or of `alpha`.
-    bernoulli_logit_glm_lpmf_row, bernoulli_logit_glm_lupmf_row <N, X, A, T>(
+    bernoulli_logit_glm_lpmf_row, bernoulli_logit_glm_lupmf_row <N, X, A, B, T>(
         y: N,
         x: &[X],
         alpha: A,
-        beta: &[T],
+        beta: &[B],
     ) -> Result<T>
-    where { N: IntArg, X: Lift<T> + Copy, A: Arg, A::Elem: Lift<T>, T: Real }
+    where {
+        N: IntArg,
+        X: Lift<T> + Copy,
+        A: Arg,
+        A::Elem: Lift<T>,
+        B: Lift<T> + Copy,
+        T: Real,
+        (X, A, B): Broadcast<3, Out = T>,
+    }
     base(bernoulli_logit_glm_lpmf, bernoulli_logit_glm_lupmf) |base| {
         let n = broadcast_len("bernoulli_logit_glm_lpmf", &[y.int_len(), alpha.arg_len()])?;
         base(y, &repeat_row(x, n), alpha, beta)
@@ -338,14 +354,23 @@ propto_pair! {
 propto_pair! {
     /// [`binomial_logit_glm_lpmf`] with `row_vector x`: every observation uses the predictors `x`.
     /// The number of observations is the common length of `n`, `trials`, and `alpha`.
-    binomial_logit_glm_lpmf_row, binomial_logit_glm_lupmf_row <N, M, X, A, T>(
+    binomial_logit_glm_lpmf_row, binomial_logit_glm_lupmf_row <N, M, X, A, B, T>(
         n: N,
         trials: M,
         x: &[X],
         alpha: A,
-        beta: &[T],
+        beta: &[B],
     ) -> Result<T>
-    where { N: IntArg, M: IntArg, X: Lift<T> + Copy, A: Arg, A::Elem: Lift<T>, T: Real }
+    where {
+        N: IntArg,
+        M: IntArg,
+        X: Lift<T> + Copy,
+        A: Arg,
+        A::Elem: Lift<T>,
+        B: Lift<T> + Copy,
+        T: Real,
+        (X, A, B): Broadcast<3, Out = T>,
+    }
     base(binomial_logit_glm_lpmf, binomial_logit_glm_lupmf) |base| {
         let rows = broadcast_len(
             "binomial_logit_glm_lpmf",
@@ -358,11 +383,11 @@ propto_pair! {
 propto_pair! {
     /// [`neg_binomial_2_log_glm_lpmf`] with `row_vector x`: every observation uses the predictors
     /// `x`. The number of observations is the common length of `y`, `alpha`, and `phi`.
-    neg_binomial_2_log_glm_lpmf_row, neg_binomial_2_log_glm_lupmf_row <N, X, A, T, P>(
+    neg_binomial_2_log_glm_lpmf_row, neg_binomial_2_log_glm_lupmf_row <N, X, A, B, T, P>(
         y: N,
         x: &[X],
         alpha: A,
-        beta: &[T],
+        beta: &[B],
         phi: P,
     ) -> Result<T>
     where {
@@ -371,8 +396,10 @@ propto_pair! {
         A: Arg,
         A::Elem: Lift<T>,
         T: Real,
+        B: Lift<T> + Copy,
         P: Arg,
         P::Elem: Lift<T>,
+        (X, A, B, P): Broadcast<4, Out = T>,
     }
     base(neg_binomial_2_log_glm_lpmf, neg_binomial_2_log_glm_lupmf) |base| {
         let n = broadcast_len(
@@ -385,11 +412,11 @@ propto_pair! {
 
 propto_pair! {
     /// [`normal_id_glm_lpdf`] with `real y`: the scalar response is used for every row of `x`.
-    normal_id_glm_lpdf_scalar_y, normal_id_glm_lupdf_scalar_y <Y, X, A, T, S>(
+    normal_id_glm_lpdf_scalar_y, normal_id_glm_lupdf_scalar_y <Y, X, A, B, T, S>(
         y: Y,
         x: &Matrix<X>,
         alpha: A,
-        beta: &[T],
+        beta: &[B],
         sigma: S,
     ) -> Result<T>
     where {
@@ -398,8 +425,11 @@ propto_pair! {
         A: Arg,
         A::Elem: Lift<T>,
         T: Real,
+        B: Lift<T> + Copy,
         S: Arg,
         S::Elem: Lift<T>,
+        (Y, X, A, B, S): Broadcast<5, Out = T>,
+        (T, X, A, B, S): Broadcast<5, Out = T>,
     }
     base(normal_id_glm_lpdf, normal_id_glm_lupdf) |base| {
         base(&vec![y; x.nrows()][..], x, alpha, beta, sigma)
@@ -410,11 +440,11 @@ propto_pair! {
     /// [`normal_id_glm_lpdf`] with `row_vector x`: every observation uses the predictors `x`. `y` is a
     /// scalar or a vector; the number of observations is the common length of `y`, `alpha`, and
     /// `sigma`.
-    normal_id_glm_lpdf_row, normal_id_glm_lupdf_row <Y, X, A, T, S>(
+    normal_id_glm_lpdf_row, normal_id_glm_lupdf_row <Y, X, A, B, T, S>(
         y: Y,
         x: &[X],
         alpha: A,
-        beta: &[T],
+        beta: &[B],
         sigma: S,
     ) -> Result<T>
     where {
@@ -424,8 +454,11 @@ propto_pair! {
         A: Arg,
         A::Elem: Lift<T>,
         T: Real,
+        B: Lift<T> + Copy,
         S: Arg,
         S::Elem: Lift<T>,
+        (Y, X, A, B, S): Broadcast<5, Out = T>,
+        (T, X, A, B, S): Broadcast<5, Out = T>,
     }
     base(normal_id_glm_lpdf, normal_id_glm_lupdf) |base| {
         let n = broadcast_len(
@@ -452,11 +485,11 @@ propto_pair! {
     ///
     /// As [`normal_id_glm_lpdf`], and [`Error::DimensionMismatch`] when a vector `y` does not have
     /// one element per entry of `x`.
-    normal_id_glm_lpdf_vector_x, normal_id_glm_lupdf_vector_x <Y, X, A, T, S>(
+    normal_id_glm_lpdf_vector_x, normal_id_glm_lupdf_vector_x <Y, X, A, B, T, S>(
         y: Y,
         x: &[X],
         alpha: A,
-        beta: &[T],
+        beta: &[B],
         sigma: S,
     ) -> Result<T>
     where {
@@ -466,8 +499,11 @@ propto_pair! {
         A: Arg,
         A::Elem: Lift<T>,
         T: Real,
+        B: Lift<T> + Copy,
         S: Arg,
         S::Elem: Lift<T>,
+        (Y, X, A, B, S): Broadcast<5, Out = T>,
+        (T, X, A, B, S): Broadcast<5, Out = T>,
     }
     base(normal_id_glm_lpdf, normal_id_glm_lupdf) |base| {
         let n = broadcast_len("normal_id_glm_lpdf", &[y.arg_len(), Some(x.len())])?;
@@ -485,13 +521,20 @@ propto_pair! {
 propto_pair! {
     /// [`categorical_logit_glm_lpmf`] with `row_vector x`: every observation uses the predictors `x`.
     /// The number of observations is the length of `y`, or one for a scalar `y`.
-    categorical_logit_glm_lpmf_row, categorical_logit_glm_lupmf_row <N, X, A, T>(
+    categorical_logit_glm_lpmf_row, categorical_logit_glm_lupmf_row <N, X, A, B, T>(
         y: N,
         x: &[X],
         alpha: &[A],
-        beta: &Matrix<T>,
+        beta: &Matrix<B>,
     ) -> Result<T>
-    where { N: IntArg, X: Lift<T> + Copy, A: Lift<T> + Copy, T: Real }
+    where {
+        N: IntArg,
+        X: Lift<T> + Copy,
+        A: Lift<T> + Copy,
+        B: Lift<T> + Copy,
+        T: Real,
+        (X, A, B): Broadcast<3, Out = T>,
+    }
     base(categorical_logit_glm_lpmf, categorical_logit_glm_lupmf) |base| {
         let n = y.int_len().unwrap_or(1);
         base(y, &repeat_row(x, n), alpha, beta)
@@ -501,13 +544,20 @@ propto_pair! {
 propto_pair! {
     /// [`ordered_logistic_glm_lpmf`] with `row_vector x`: every observation uses the predictors `x`.
     /// The number of observations is the length of `y`, or one for a scalar `y`.
-    ordered_logistic_glm_lpmf_row, ordered_logistic_glm_lupmf_row <N, X, T, C>(
+    ordered_logistic_glm_lpmf_row, ordered_logistic_glm_lupmf_row <N, X, B, T, C>(
         y: N,
         x: &[X],
-        beta: &[T],
+        beta: &[B],
         cuts: &[C],
     ) -> Result<T>
-    where { N: IntArg, X: Lift<T> + Copy, T: Real, C: Lift<T> + Copy }
+    where {
+        N: IntArg,
+        X: Lift<T> + Copy,
+        B: Lift<T> + Copy,
+        T: Real,
+        C: Lift<T> + Copy,
+        (X, B, C): Broadcast<3, Out = T>,
+    }
     base(ordered_logistic_glm_lpmf, ordered_logistic_glm_lupmf) |base| {
         let n = y.int_len().unwrap_or(1);
         base(y, &repeat_row(x, n), beta, cuts)

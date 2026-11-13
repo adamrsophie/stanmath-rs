@@ -106,9 +106,9 @@ equals that of the full function. Every kernel groups its terms as Stan does, an
 Stan Math 5.4.0, probed with one argument a variable at a time. Stan's grouping is not always the
 finest one: the lognormal keeps its constant `-ln(2 pi) / 2`, the log-logistic keeps `(beta - 1) ln
 y` while `alpha` is a parameter, the beta negative binomial drops only `-ln Gamma(n + 1)`, and the
-Yule-Simon drops `ln Gamma(n)`. The seven GLMs have `propto` forms that match Stan's values; since
-`beta` fixes their scalar type, a GLM whose `phi` or `sigma` is a parameter treats `beta` as one
-too.
+Yule-Simon drops `ln Gamma(n)`. The seven GLMs have `propto` forms that match Stan's values. Their
+result type is the promotion of every argument's, as in Stan, so `beta` can be data while `x`,
+`alpha`, `phi`, or `sigma` is a parameter, and data `beta` stays data under `propto`.
 
 The multivariate densities, the Dirichlet, categorical, multinomial, Dirichlet multinomial,
 ordered, Poisson binomial, hypergeometric, and discrete range masses, and the five and seven
