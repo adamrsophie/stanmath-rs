@@ -12,7 +12,7 @@ use stanmath_rs_core::{Error, Matrix, Result};
 
 use crate::device::{Arg, DeviceBuffer, launch};
 
-const FUNCTION: &str = "cholesky_decompose";
+pub(crate) const FUNCTION: &str = "cholesky_decompose";
 
 /// Stan's tolerance for symmetry.
 const SYMMETRY_TOL: f64 = 1e-8;
@@ -33,11 +33,11 @@ __kernel void update(__global double* a, const ulong n, const ulong j) {
 }
 ";
 
-/// The lower Cholesky factor of the `n` by `n` column-major `a`, on the device.
-fn device_factor(a: &[f64], n: usize) -> Result<Vec<f64>> {
-    let buffer = DeviceBuffer::from_slice(a)?;
+/// Overwrites the lower triangle of the `n` by `n` column-major `buffer` with its Cholesky
+/// factor; the upper triangle is left as it was.
+pub(crate) fn factor_in_place(buffer: &DeviceBuffer, n: usize) -> Result<()> {
     for j in 0..n {
-        let args = [Arg::Buffer(&buffer), Arg::Size(n), Arg::Size(j)];
+        let args = [Arg::Buffer(buffer), Arg::Size(n), Arg::Size(j)];
         launch(
             FUNCTION,
             "cholesky",
@@ -55,6 +55,13 @@ fn device_factor(a: &[f64], n: usize) -> Result<Vec<f64>> {
             &[n - j, n - j],
         )?;
     }
+    Ok(())
+}
+
+/// The lower Cholesky factor of the `n` by `n` column-major `a`, on the device.
+fn device_factor(a: &[f64], n: usize) -> Result<Vec<f64>> {
+    let buffer = DeviceBuffer::from_slice(a)?;
+    factor_in_place(&buffer, n)?;
     let mut l = buffer.to_vec()?;
     for j in 0..n {
         if !(l[j + j * n] > 0.0) {

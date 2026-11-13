@@ -106,7 +106,7 @@ unary_table! {
     InvPhi "inv_Phi" f::inv_Phi, "inv_Phi(x)", "2.5066282746310002 * exp(0.5 * y * y)";
 }
 
-fn source(op: Unary) -> String {
+pub(crate) fn source(op: Unary) -> String {
     let (value, deriv) = op.expressions();
     format!(
         "{PRELUDE}__kernel void value(__global const double* xs, __global double* ys) {{
@@ -275,7 +275,7 @@ binary_table! {
         "1.0 / (1.0 + exp(x)) + 1.0 / expm1(x - y)", "-1.0 / (1.0 + exp(-y)) - 1.0 / expm1(x - y)";
 }
 
-fn binary_source(op: Binary) -> String {
+pub(crate) fn binary_source(op: Binary) -> String {
     let (value, da, db) = op.expressions();
     format!(
         "{PRELUDE}__kernel void value(__global const double* xs, __global const double* ys, __global double* zs) {{

@@ -11,6 +11,7 @@ mod device;
 mod elementwise;
 mod glm;
 mod gp;
+mod matrix_cl;
 mod special;
 mod tri;
 
