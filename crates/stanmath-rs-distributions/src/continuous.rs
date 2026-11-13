@@ -558,8 +558,20 @@ impl Kernel<0, 3> for Beta {
         if keep.term(&[0, 2]) {
             lp += multiply_log(b - 1.0, ln_1my);
         }
-        if keep.term(&[1, 2]) {
+        if keep.term(&[1]) && keep.term(&[2]) {
             lp -= lbeta(a, b);
+        } else {
+            // ln B(a, b) = ln Γ(a) + ln Γ(b) - ln Γ(a + b), with each term kept by its own
+            // arguments as in Stan.
+            if keep.term(&[1]) {
+                lp -= lgamma(a);
+            }
+            if keep.term(&[2]) {
+                lp -= lgamma(b);
+            }
+            if keep.term(&[1, 2]) {
+                lp += lgamma(a + b);
+            }
         }
         lp
     }

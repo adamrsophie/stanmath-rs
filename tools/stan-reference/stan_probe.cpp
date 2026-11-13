@@ -98,6 +98,15 @@ int main() {
   probe1("empty_y.ordered_logistic_bad_cuts", [&] { return ordered_logistic_lpmf(none_int, eta0, cuts_bad); });
   probe1("empty_y.ordered_probit_bad_cuts", [&] { return ordered_probit_lpmf(none_int, eta0, cuts_bad); });
   probe1("empty_y.categorical_bad_theta", [&] { return categorical_lpmf(none_int, theta_bad); });
+  M beta23(2, 3);
+  beta23 << 0.1, -0.2, 0.3, 0.4, 0.0, -0.1;
+  V alpha3_nan(3);
+  alpha3_nan << nan, 0.0, 0.1;
+  probe1("empty_y.binomial_logit_glm_nan_alpha", [&] { return binomial_logit_glm_lpmf(none_int, none_int, x0, nan, beta2); });
+  probe1("empty_y.neg_binomial_2_log_glm_bad_phi", [&] { return neg_binomial_2_log_glm_lpmf(none_int, x0, 0.0, beta2, -1.0); });
+  probe1("empty_y.neg_binomial_2_log_glm_nan_alpha", [&] { return neg_binomial_2_log_glm_lpmf(none_int, x0, nan, beta2, 1.0); });
+  probe1("empty_y.categorical_logit_glm_nan_alpha", [&] { return categorical_logit_glm_lpmf(none_int, x0, alpha3_nan, beta23); });
+  probe1("empty_y.ordered_logistic_glm_bad_cuts", [&] { return ordered_logistic_glm_lpmf(none_int, x0, beta2, cuts_bad); });
   probe1("empty_y.discrete_range_reversed", [&] { return discrete_range_lpmf(none_int, 5, 2); });
   probe1("scalar_y.discrete_range_reversed", [&] { return discrete_range_lpmf(3, 5, 2); });
 
@@ -124,6 +133,28 @@ int main() {
   probe1("propto.binomial.full", [&] { return binomial_lpmf<false>(4, 10, 0.3); });
   probe1("propto.student_t.var_mu", [&] { return with_var(0.2, [&](const var& m) { return student_t_lpdf<true>(1.1, 4.0, m, 1.5); }); });
   probe1("propto.student_t.full", [&] { return student_t_lpdf<false>(1.1, 4.0, 0.2, 1.5); });
+  probe1("propto.std_normal.var_y", [&] { return with_var(0.4, [&](const var& y) { return std_normal_lpdf<true>(y); }); });
+  probe1("propto.cauchy.var_sigma", [&] { return with_var(1.3, [&](const var& s) { return cauchy_lpdf<true>(0.5, -0.2, s); }); });
+  probe1("propto.cauchy.var_mu", [&] { return with_var(-0.2, [&](const var& m) { return cauchy_lpdf<true>(0.5, m, 1.3); }); });
+  probe1("propto.logistic.var_mu", [&] { return with_var(0.1, [&](const var& m) { return logistic_lpdf<true>(0.5, m, 0.8); }); });
+  probe1("propto.exponential.var_y", [&] { return with_var(0.7, [&](const var& y) { return exponential_lpdf<true>(y, 1.9); }); });
+  probe1("propto.exponential.var_beta", [&] { return with_var(1.9, [&](const var& b) { return exponential_lpdf<true>(0.7, b); }); });
+  probe1("propto.inv_gamma.var_beta", [&] { return with_var(0.8, [&](const var& b) { return inv_gamma_lpdf<true>(1.2, 2.5, b); }); });
+  probe1("propto.inv_gamma.var_alpha", [&] { return with_var(2.5, [&](const var& a) { return inv_gamma_lpdf<true>(1.2, a, 0.8); }); });
+  probe1("propto.beta.var_a", [&] { return with_var(2.0, [&](const var& a) { return beta_lpdf<true>(0.3, a, 3.5); }); });
+  probe1("propto.beta.var_y", [&] { return with_var(0.3, [&](const var& y) { return beta_lpdf<true>(y, 2.0, 3.5); }); });
+  probe1("propto.lognormal.var_y", [&] { return with_var(1.4, [&](const var& y) { return lognormal_lpdf<true>(y, 0.2, 0.6); }); });
+  probe1("propto.lognormal.var_sigma", [&] { return with_var(0.6, [&](const var& s) { return lognormal_lpdf<true>(1.4, 0.2, s); }); });
+  probe1("propto.uniform.var_y", [&] { return with_var(0.4, [&](const var& y) { return uniform_lpdf<true>(y, 0.1, 1.5); }); });
+  probe1("propto.uniform.var_alpha", [&] { return with_var(0.1, [&](const var& a) { return uniform_lpdf<true>(0.4, a, 1.5); }); });
+  probe1("propto.poisson_log.var_alpha", [&] { return with_var(0.8, [&](const var& a) { return poisson_log_lpmf<true>(3, a); }); });
+  probe1("propto.binomial_logit.var_alpha", [&] { return with_var(-0.4, [&](const var& a) { return binomial_logit_lpmf<true>(4, 10, a); }); });
+  probe1("propto.neg_binomial_2.var_mu", [&] { return with_var(2.0, [&](const var& m) { return neg_binomial_2_lpmf<true>(3, m, 1.5); }); });
+  probe1("propto.neg_binomial_2.var_phi", [&] { return with_var(1.5, [&](const var& p) { return neg_binomial_2_lpmf<true>(3, 2.0, p); }); });
+  probe1("propto.neg_binomial_2_log.var_eta", [&] { return with_var(0.6, [&](const var& e) { return neg_binomial_2_log_lpmf<true>(3, e, 1.5); }); });
+  probe1("propto.weibull.var_alpha", [&] { return with_var(1.5, [&](const var& a) { return weibull_lpdf<true>(1.2, a, 0.9); }); });
+  probe1("propto.gumbel.var_mu", [&] { return with_var(1.0, [&](const var& m) { return gumbel_lpdf<true>(0.5, m, 2.0); }); });
+  probe1("propto.bernoulli_logit.var_alpha", [&] { return with_var(0.3, [&](const var& a) { return bernoulli_logit_lpmf<true>(1, a); }); });
 
   // normal_id_glm with a vector x.
   V y(3);
