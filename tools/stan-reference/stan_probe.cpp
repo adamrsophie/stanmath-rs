@@ -82,6 +82,48 @@ int main() {
   probe1("empty_y.pareto_y_below_min", [&] { return pareto_lpdf(none, 2.0, 1.5); });
   probe1("scalar_y.pareto_y_below_min", [&] { return pareto_lpdf(1.0, 2.0, 1.5); });
   probe1("empty_y.wiener_tau_above_y", [&] { return wiener_lpdf(none, 1.5, 2.0, 0.5, 0.3); });
+  const M x0(0, 2);
+  V beta2(2);
+  beta2 << 0.4, -0.3;
+  V beta2_nan(2);
+  beta2_nan << nan, 0.1;
+  V cuts_bad(2);
+  cuts_bad << 1.0, 0.0;
+  V eta0(0);
+  V theta_bad(2);
+  theta_bad << 0.5, 0.6;
+  probe1("empty_y.poisson_log_glm_nan_alpha", [&] { return poisson_log_glm_lpmf(none_int, x0, nan, beta2); });
+  probe1("empty_y.bernoulli_logit_glm_nan_beta", [&] { return bernoulli_logit_glm_lpmf(none_int, x0, 0.0, beta2_nan); });
+  probe1("empty_y.normal_id_glm_bad_sigma", [&] { return normal_id_glm_lpdf(V(0), x0, 0.0, beta2, -1.0); });
+  probe1("empty_y.ordered_logistic_bad_cuts", [&] { return ordered_logistic_lpmf(none_int, eta0, cuts_bad); });
+  probe1("empty_y.ordered_probit_bad_cuts", [&] { return ordered_probit_lpmf(none_int, eta0, cuts_bad); });
+  probe1("empty_y.categorical_bad_theta", [&] { return categorical_lpmf(none_int, theta_bad); });
+  probe1("empty_y.discrete_range_reversed", [&] { return discrete_range_lpmf(none_int, 5, 2); });
+  probe1("scalar_y.discrete_range_reversed", [&] { return discrete_range_lpmf(3, 5, 2); });
+
+  // propto: which terms are dropped, by which arguments are autodiff variables.
+  const std::vector<double> yp = {1.0, 2.5, -0.5, 3.0};
+  const std::vector<int> np = {2, 0, 5};
+  const auto with_var = [](double v, const std::function<var(const var&)>& f) {
+    const var x = v;
+    const double out = f(x).val();
+    recover_memory();
+    return out;
+  };
+  probe1("propto.normal.all_data", [&] { return normal_lpdf<true>(yp, 0.7, 1.3); });
+  probe1("propto.normal.var_mu", [&] { return with_var(0.7, [&](const var& m) { return normal_lpdf<true>(yp, m, 1.3); }); });
+  probe1("propto.normal.var_sigma", [&] { return with_var(1.3, [&](const var& s) { return normal_lpdf<true>(yp, 0.7, s); }); });
+  probe1("propto.normal.full", [&] { return normal_lpdf<false>(yp, 0.7, 1.3); });
+  probe1("propto.poisson.var_lambda", [&] { return with_var(2.2, [&](const var& l) { return poisson_lpmf<true>(np, l); }); });
+  probe1("propto.poisson.full", [&] { return poisson_lpmf<false>(np, 2.2); });
+  probe1("propto.gamma.var_alpha", [&] { return with_var(2.5, [&](const var& a) { return gamma_lpdf<true>(1.7, a, 0.8); }); });
+  probe1("propto.gamma.var_beta", [&] { return with_var(0.8, [&](const var& b) { return gamma_lpdf<true>(1.7, 2.5, b); }); });
+  probe1("propto.gamma.var_y", [&] { return with_var(1.7, [&](const var& y) { return gamma_lpdf<true>(y, 2.5, 0.8); }); });
+  probe1("propto.gamma.full", [&] { return gamma_lpdf<false>(1.7, 2.5, 0.8); });
+  probe1("propto.binomial.var_theta", [&] { return with_var(0.3, [&](const var& t) { return binomial_lpmf<true>(4, 10, t); }); });
+  probe1("propto.binomial.full", [&] { return binomial_lpmf<false>(4, 10, 0.3); });
+  probe1("propto.student_t.var_mu", [&] { return with_var(0.2, [&](const var& m) { return student_t_lpdf<true>(1.1, 4.0, m, 1.5); }); });
+  probe1("propto.student_t.full", [&] { return student_t_lpdf<false>(1.1, 4.0, 0.2, 1.5); });
 
   // normal_id_glm with a vector x.
   V y(3);

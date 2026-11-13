@@ -111,6 +111,9 @@ such as `y > tau` for `wiener_lpdf`, apply only when both are present.
 Deliberate differences:
 
 * `beta_lpdf` and `weibull_lpdf` use `0 ln 0 = 0`, so for example `beta_lpdf(0 | 1, b)` is finite.
+* The GLMs, `ordered_logistic`, `ordered_probit`, `categorical`, and `hypergeometric` still
+  return zero for an empty response without validating the other arguments. Stan's behavior for
+  these is being checked.
 
 ## Linear algebra
 
