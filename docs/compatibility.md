@@ -281,6 +281,11 @@ deeper array forms share the recursive impl) and requires the scalar transform o
 for `_jacobian`, the summed log Jacobian. `tests/signatures_qf.rs` covers the 256 broadcast forms of
 `student_t_qf` through `apply_broadcast4`.
 
+`tests/signatures_containers.rs`, written by `tools/reference/gen_containers.py`, calls 302
+signatures of `dims`, `num_elements`, `size`, `rep_array`, `reverse`, `append_array`, `head`,
+`tail`, and `segment` over every element type, complex ones included, and checks the shape of each
+result (239 deeper array forms run the same generic code).
+
 The scalar sweep also fixed four conventions to match Stan: `fmax` and `fmin` return the second argument
 on ties (and take its derivative); `beta(a, b)` with a nonpositive argument is
 `|Γ(a) Γ(b) / Γ(a + b)|`; `log_falling_factorial` and `log_rising_factorial` reject `x <= 0`; and
