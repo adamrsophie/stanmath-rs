@@ -96,6 +96,7 @@ def main():
     total = 0
     names = 0
     deep = [0]
+    int_matrix = []
     for name in sorted(sigs):
         if name.endswith("_rng") or name.startswith(("lower_bound", "upper_bound")) or name in OPERATORS:
             continue
@@ -119,6 +120,17 @@ def main():
                 continue
             cont = [x for x in ra if x[0] not in ("f64", "i64")]
             if any(c[0].replace("i64", "f64") != cont[0][0].replace("i64", "f64") for c in cont):
+                # Stan pairs an int array with matrices two levels shallower: element [i, j] of
+                # each two dimensional int array goes with entry (i, j) of its matrix.
+                d = int_matrix_depth(a)
+                if d is None:
+                    continue
+                if d > 1:
+                    deep[0] += 1
+                    ledger.record("deep", name, a)
+                    continue
+                ledger.record("called", name, a)
+                int_matrix.append((name, a, d))
                 continue
             if max(x[0].count("Vec<") for x in ra) > MAX_DEPTH:
                 deep[0] += 1
@@ -126,6 +138,10 @@ def main():
                 continue
             calls.setdefault(tuple(x[0] for x in ra), []).append(a)
             ledger.record("called", name, a)
+        for nm, a, d in int_matrix:
+            if nm == name:
+                total += 1
+                body.append(call_int_matrix(name, a, d, is_int))
         if not calls:
             continue
         names += 1
@@ -139,6 +155,48 @@ def main():
     out += DEEP
     open("crates/stanmath-rs/tests/signatures_elementwise.rs", "w").write(out)
     print(total, "signatures,", names, "functions,", len(body), "Rust shapes;", deep[0], "deeper")
+
+
+def int_matrix_depth(args):
+    """The array depth of the matrices when args pair an int array with matrices two levels
+    shallower, else None."""
+    if len(args) != 2:
+        return None
+    dims = []
+    for t in args:
+        m = re.fullmatch(r"array\[(,*)\] (int|matrix)", t)
+        dims.append((len(m.group(1)) + 1, m.group(2)) if m else (0, t))
+    ints = [d for d, b in dims if b == "int"]
+    mats = [d for d, b in dims if b == "matrix"]
+    if len(ints) == 1 and len(mats) == 1 and ints[0] == mats[0] + 2:
+        return mats[0]
+    return None
+
+
+def call_int_matrix(name, args, d, is_int):
+    """A call pairing int arrays with matrices through to_matrix_from_int_array_2d."""
+    label = f"{name}({', '.join(args)})"
+    p_int = 0 if args[0].endswith("int") else 1
+    ints = "vec![vec![1_i64, 2], vec![3, 0]]"
+    mats = "Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4])"
+    if d == 1:
+        ints = f"vec![{ints}, vec![vec![2_i64, 0], vec![1, 3]]]"
+        mats = f"vec![{mats}, Matrix::from_column_major(2, 2, vec![0.9, 1.6, 0.5, 2.4])]"
+        conv = "a.iter().map(|m| to_matrix_from_int_array_2d::<f64>(m).unwrap()).collect::<Vec<_>>()"
+        pairs = ("(0..2).flat_map(|k| (0..2).flat_map(move |j| (0..2).map(move |i| (k, i, j))))"
+                 ".map(|(k, i, j)| (a[k][i][j], b[k][(i, j)]))")
+    else:
+        conv = "to_matrix_from_int_array_2d::<f64>(&a).unwrap()"
+        pairs = "(0..2).flat_map(|j| (0..2).map(move |i| (i, j))).map(|(i, j)| (a[i][j], b[(i, j)]))"
+    n_arg = "n as _" if is_int[p_int] else "n as f64"
+    call_args = f"{n_arg}, v" if p_int == 0 else f"v, {n_arg}"
+    return (
+        f"    {{\n        let a = {ints};\n        let b = {mats};\n"
+        f"        let ai = {conv};\n"
+        f"        let got = leaves(&apply_scalar_binary(&ai, &b, |n, v| eval({name}({call_args}))).unwrap());\n"
+        f"        let want: Vec<f64> = {pairs}.map(|(n, v)| eval({name}({call_args}))).collect();\n"
+        f"        compare(\"{label}\", got, want, &mut failures);\n    }}\n"
+    )
 
 
 def arg(p, leaf, is_int):
@@ -220,7 +278,9 @@ HEADER = """//! Every vectorized form of a scalar function of one or two argumen
 //! shape and return the scalar function of every element; the scalar functions are compared with
 //! Stan Math by `stan_reference_scalar.rs`. The other {deep} signatures nest arrays more than {depth}
 //! `Vec` levels deep; they go through the same recursive impl, which `deep_arrays` checks to depth 8.
-//! `add`, `subtract`, `multiply`, `elt_multiply`, and `elt_divide` are Rust's operators.
+//! `add`, `subtract`, `multiply`, `elt_multiply`, and `elt_divide` are Rust's operators. An int
+//! array paired with matrices two levels shallower (`ldexp(matrix, array[,] int)`) goes through
+//! `to_matrix_from_int_array_2d`: Stan pairs element `[i, j]` with entry `(i, j)`.
 #![allow(
     clippy::too_many_lines,
     clippy::unreadable_literal,
@@ -228,7 +288,8 @@ HEADER = """//! Every vectorized form of a scalar function of one or two argumen
     clippy::unnecessary_cast,
     clippy::approx_constant,
     clippy::redundant_closure,
-    clippy::type_complexity
+    clippy::type_complexity,
+    clippy::useless_vec
 )]
 
 use stanmath_rs::prelude::*;

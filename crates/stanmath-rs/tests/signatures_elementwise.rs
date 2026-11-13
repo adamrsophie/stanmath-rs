@@ -1,12 +1,14 @@
 //! Every vectorized form of a scalar function of one or two arguments in the Stan language,
 //! called through `apply_scalar_unary` and `apply_scalar_binary`.
 //!
-//! Written by `tools/reference/gen_elementwise.py` from the CmdStan 2.40.0 signature dump: 2844
-//! Stan signatures of 106 functions in 1651 Rust shapes. Each call must keep the container's
+//! Written by `tools/reference/gen_elementwise.py` from the CmdStan 2.40.0 signature dump: 2862
+//! Stan signatures of 106 functions in 1669 Rust shapes. Each call must keep the container's
 //! shape and return the scalar function of every element; the scalar functions are compared with
-//! Stan Math by `stan_reference_scalar.rs`. The other 3763 signatures nest arrays more than 3
+//! Stan Math by `stan_reference_scalar.rs`. The other 3817 signatures nest arrays more than 3
 //! `Vec` levels deep; they go through the same recursive impl, which `deep_arrays` checks to depth 8.
-//! `add`, `subtract`, `multiply`, `elt_multiply`, and `elt_divide` are Rust's operators.
+//! `add`, `subtract`, `multiply`, `elt_multiply`, and `elt_divide` are Rust's operators. An int
+//! array paired with matrices two levels shallower (`ldexp(matrix, array[,] int)`) goes through
+//! `to_matrix_from_int_array_2d`: Stan pairs element `[i, j]` with entry `(i, j)`.
 #![allow(
     clippy::too_many_lines,
     clippy::unreadable_literal,
@@ -14,7 +16,8 @@
     clippy::unnecessary_cast,
     clippy::approx_constant,
     clippy::redundant_closure,
-    clippy::type_complexity
+    clippy::type_complexity,
+    clippy::useless_vec
 )]
 
 use stanmath_rs::prelude::*;
@@ -2249,6 +2252,53 @@ fn elementwise_signatures() {
         );
     }
     {
+        let a = vec![vec![1_i64, 2], vec![3, 0]];
+        let b = Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]);
+        let ai = to_matrix_from_int_array_2d::<f64>(&a).unwrap();
+        let got = leaves(
+            &apply_scalar_binary(&ai, &b, |n, v| eval(bessel_first_kind(n as _, v))).unwrap(),
+        );
+        let want: Vec<f64> = (0..2)
+            .flat_map(|j| (0..2).map(move |i| (i, j)))
+            .map(|(i, j)| (a[i][j], b[(i, j)]))
+            .map(|(n, v)| eval(bessel_first_kind(n as _, v)))
+            .collect();
+        compare(
+            "bessel_first_kind(array[,] int, matrix)",
+            got,
+            want,
+            &mut failures,
+        );
+    }
+    {
+        let a = vec![
+            vec![vec![1_i64, 2], vec![3, 0]],
+            vec![vec![2_i64, 0], vec![1, 3]],
+        ];
+        let b = vec![
+            Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]),
+            Matrix::from_column_major(2, 2, vec![0.9, 1.6, 0.5, 2.4]),
+        ];
+        let ai = a
+            .iter()
+            .map(|m| to_matrix_from_int_array_2d::<f64>(m).unwrap())
+            .collect::<Vec<_>>();
+        let got = leaves(
+            &apply_scalar_binary(&ai, &b, |n, v| eval(bessel_first_kind(n as _, v))).unwrap(),
+        );
+        let want: Vec<f64> = (0..2)
+            .flat_map(|k| (0..2).flat_map(move |j| (0..2).map(move |i| (k, i, j))))
+            .map(|(k, i, j)| (a[k][i][j], b[k][(i, j)]))
+            .map(|(n, v)| eval(bessel_first_kind(n as _, v)))
+            .collect();
+        compare(
+            "bessel_first_kind(array[,,] int, array[] matrix)",
+            got,
+            want,
+            &mut failures,
+        );
+    }
+    {
         let a: Vec<Vec<Vec<i64>>> = vec![
             vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
             vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
@@ -2479,6 +2529,53 @@ fn elementwise_signatures() {
             &mut failures,
         );
         assert!(n > 0);
+    }
+    {
+        let a = vec![vec![1_i64, 2], vec![3, 0]];
+        let b = Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]);
+        let ai = to_matrix_from_int_array_2d::<f64>(&a).unwrap();
+        let got = leaves(
+            &apply_scalar_binary(&ai, &b, |n, v| eval(bessel_second_kind(n as _, v))).unwrap(),
+        );
+        let want: Vec<f64> = (0..2)
+            .flat_map(|j| (0..2).map(move |i| (i, j)))
+            .map(|(i, j)| (a[i][j], b[(i, j)]))
+            .map(|(n, v)| eval(bessel_second_kind(n as _, v)))
+            .collect();
+        compare(
+            "bessel_second_kind(array[,] int, matrix)",
+            got,
+            want,
+            &mut failures,
+        );
+    }
+    {
+        let a = vec![
+            vec![vec![1_i64, 2], vec![3, 0]],
+            vec![vec![2_i64, 0], vec![1, 3]],
+        ];
+        let b = vec![
+            Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]),
+            Matrix::from_column_major(2, 2, vec![0.9, 1.6, 0.5, 2.4]),
+        ];
+        let ai = a
+            .iter()
+            .map(|m| to_matrix_from_int_array_2d::<f64>(m).unwrap())
+            .collect::<Vec<_>>();
+        let got = leaves(
+            &apply_scalar_binary(&ai, &b, |n, v| eval(bessel_second_kind(n as _, v))).unwrap(),
+        );
+        let want: Vec<f64> = (0..2)
+            .flat_map(|k| (0..2).flat_map(move |j| (0..2).map(move |i| (k, i, j))))
+            .map(|(k, i, j)| (a[k][i][j], b[k][(i, j)]))
+            .map(|(n, v)| eval(bessel_second_kind(n as _, v)))
+            .collect();
+        compare(
+            "bessel_second_kind(array[,,] int, array[] matrix)",
+            got,
+            want,
+            &mut failures,
+        );
     }
     {
         let a: Vec<Vec<Vec<i64>>> = vec![
@@ -3595,6 +3692,51 @@ fn elementwise_signatures() {
             &mut failures,
         );
         assert!(n > 0);
+    }
+    {
+        let a = vec![vec![1_i64, 2], vec![3, 0]];
+        let b = Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]);
+        let ai = to_matrix_from_int_array_2d::<f64>(&a).unwrap();
+        let got =
+            leaves(&apply_scalar_binary(&ai, &b, |n, v| eval(binary_log_loss(n as _, v))).unwrap());
+        let want: Vec<f64> = (0..2)
+            .flat_map(|j| (0..2).map(move |i| (i, j)))
+            .map(|(i, j)| (a[i][j], b[(i, j)]))
+            .map(|(n, v)| eval(binary_log_loss(n as _, v)))
+            .collect();
+        compare(
+            "binary_log_loss(array[,] int, matrix)",
+            got,
+            want,
+            &mut failures,
+        );
+    }
+    {
+        let a = vec![
+            vec![vec![1_i64, 2], vec![3, 0]],
+            vec![vec![2_i64, 0], vec![1, 3]],
+        ];
+        let b = vec![
+            Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]),
+            Matrix::from_column_major(2, 2, vec![0.9, 1.6, 0.5, 2.4]),
+        ];
+        let ai = a
+            .iter()
+            .map(|m| to_matrix_from_int_array_2d::<f64>(m).unwrap())
+            .collect::<Vec<_>>();
+        let got =
+            leaves(&apply_scalar_binary(&ai, &b, |n, v| eval(binary_log_loss(n as _, v))).unwrap());
+        let want: Vec<f64> = (0..2)
+            .flat_map(|k| (0..2).flat_map(move |j| (0..2).map(move |i| (k, i, j))))
+            .map(|(k, i, j)| (a[k][i][j], b[k][(i, j)]))
+            .map(|(n, v)| eval(binary_log_loss(n as _, v)))
+            .collect();
+        compare(
+            "binary_log_loss(array[,,] int, array[] matrix)",
+            got,
+            want,
+            &mut failures,
+        );
     }
     {
         let a: Vec<Vec<Vec<i64>>> = vec![
@@ -5762,6 +5904,53 @@ fn elementwise_signatures() {
             &mut failures,
         );
         assert!(n > 0);
+    }
+    {
+        let a = vec![vec![1_i64, 2], vec![3, 0]];
+        let b = Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]);
+        let ai = to_matrix_from_int_array_2d::<f64>(&a).unwrap();
+        let got = leaves(
+            &apply_scalar_binary(&ai, &b, |n, v| eval(falling_factorial(v, n as _))).unwrap(),
+        );
+        let want: Vec<f64> = (0..2)
+            .flat_map(|j| (0..2).map(move |i| (i, j)))
+            .map(|(i, j)| (a[i][j], b[(i, j)]))
+            .map(|(n, v)| eval(falling_factorial(v, n as _)))
+            .collect();
+        compare(
+            "falling_factorial(matrix, array[,] int)",
+            got,
+            want,
+            &mut failures,
+        );
+    }
+    {
+        let a = vec![
+            vec![vec![1_i64, 2], vec![3, 0]],
+            vec![vec![2_i64, 0], vec![1, 3]],
+        ];
+        let b = vec![
+            Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]),
+            Matrix::from_column_major(2, 2, vec![0.9, 1.6, 0.5, 2.4]),
+        ];
+        let ai = a
+            .iter()
+            .map(|m| to_matrix_from_int_array_2d::<f64>(m).unwrap())
+            .collect::<Vec<_>>();
+        let got = leaves(
+            &apply_scalar_binary(&ai, &b, |n, v| eval(falling_factorial(v, n as _))).unwrap(),
+        );
+        let want: Vec<f64> = (0..2)
+            .flat_map(|k| (0..2).flat_map(move |j| (0..2).map(move |i| (k, i, j))))
+            .map(|(k, i, j)| (a[k][i][j], b[k][(i, j)]))
+            .map(|(n, v)| eval(falling_factorial(v, n as _)))
+            .collect();
+        compare(
+            "falling_factorial(array[] matrix, array[,,] int)",
+            got,
+            want,
+            &mut failures,
+        );
     }
     {
         let a: Matrix<f64> = Matrix::from_column_major(2, 2, vec![2.575, 2.65, 2.725, 2.8]);
@@ -14815,6 +15004,44 @@ fn elementwise_signatures() {
         assert!(n > 0);
     }
     {
+        let a = vec![vec![1_i64, 2], vec![3, 0]];
+        let b = Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]);
+        let ai = to_matrix_from_int_array_2d::<f64>(&a).unwrap();
+        let got = leaves(&apply_scalar_binary(&ai, &b, |n, v| eval(ldexp(v, n as _))).unwrap());
+        let want: Vec<f64> = (0..2)
+            .flat_map(|j| (0..2).map(move |i| (i, j)))
+            .map(|(i, j)| (a[i][j], b[(i, j)]))
+            .map(|(n, v)| eval(ldexp(v, n as _)))
+            .collect();
+        compare("ldexp(matrix, array[,] int)", got, want, &mut failures);
+    }
+    {
+        let a = vec![
+            vec![vec![1_i64, 2], vec![3, 0]],
+            vec![vec![2_i64, 0], vec![1, 3]],
+        ];
+        let b = vec![
+            Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]),
+            Matrix::from_column_major(2, 2, vec![0.9, 1.6, 0.5, 2.4]),
+        ];
+        let ai = a
+            .iter()
+            .map(|m| to_matrix_from_int_array_2d::<f64>(m).unwrap())
+            .collect::<Vec<_>>();
+        let got = leaves(&apply_scalar_binary(&ai, &b, |n, v| eval(ldexp(v, n as _))).unwrap());
+        let want: Vec<f64> = (0..2)
+            .flat_map(|k| (0..2).flat_map(move |j| (0..2).map(move |i| (k, i, j))))
+            .map(|(k, i, j)| (a[k][i][j], b[k][(i, j)]))
+            .map(|(n, v)| eval(ldexp(v, n as _)))
+            .collect();
+        compare(
+            "ldexp(array[] matrix, array[,,] int)",
+            got,
+            want,
+            &mut failures,
+        );
+    }
+    {
         let a: Matrix<f64> = Matrix::from_column_major(2, 2, vec![1.545, 1.59, 1.635, 1.68]);
         let b: i64 = 2_i64;
         let got = apply_scalar_unary(&a, |a| eval(ldexp(a as f64, b as _)));
@@ -15192,6 +15419,44 @@ fn elementwise_signatures() {
             "lgamma(Vec<i64>)",
             leaves(&got),
             leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let a = vec![vec![1_i64, 2], vec![3, 0]];
+        let b = Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]);
+        let ai = to_matrix_from_int_array_2d::<f64>(&a).unwrap();
+        let got = leaves(&apply_scalar_binary(&ai, &b, |n, v| eval(lmgamma(n as _, v))).unwrap());
+        let want: Vec<f64> = (0..2)
+            .flat_map(|j| (0..2).map(move |i| (i, j)))
+            .map(|(i, j)| (a[i][j], b[(i, j)]))
+            .map(|(n, v)| eval(lmgamma(n as _, v)))
+            .collect();
+        compare("lmgamma(array[,] int, matrix)", got, want, &mut failures);
+    }
+    {
+        let a = vec![
+            vec![vec![1_i64, 2], vec![3, 0]],
+            vec![vec![2_i64, 0], vec![1, 3]],
+        ];
+        let b = vec![
+            Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]),
+            Matrix::from_column_major(2, 2, vec![0.9, 1.6, 0.5, 2.4]),
+        ];
+        let ai = a
+            .iter()
+            .map(|m| to_matrix_from_int_array_2d::<f64>(m).unwrap())
+            .collect::<Vec<_>>();
+        let got = leaves(&apply_scalar_binary(&ai, &b, |n, v| eval(lmgamma(n as _, v))).unwrap());
+        let want: Vec<f64> = (0..2)
+            .flat_map(|k| (0..2).flat_map(move |j| (0..2).map(move |i| (k, i, j))))
+            .map(|(k, i, j)| (a[k][i][j], b[k][(i, j)]))
+            .map(|(n, v)| eval(lmgamma(n as _, v)))
+            .collect();
+        compare(
+            "lmgamma(array[,,] int, array[] matrix)",
+            got,
+            want,
             &mut failures,
         );
     }
@@ -23685,6 +23950,55 @@ fn elementwise_signatures() {
         );
     }
     {
+        let a = vec![vec![1_i64, 2], vec![3, 0]];
+        let b = Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]);
+        let ai = to_matrix_from_int_array_2d::<f64>(&a).unwrap();
+        let got = leaves(
+            &apply_scalar_binary(&ai, &b, |n, v| eval(modified_bessel_first_kind(n as _, v)))
+                .unwrap(),
+        );
+        let want: Vec<f64> = (0..2)
+            .flat_map(|j| (0..2).map(move |i| (i, j)))
+            .map(|(i, j)| (a[i][j], b[(i, j)]))
+            .map(|(n, v)| eval(modified_bessel_first_kind(n as _, v)))
+            .collect();
+        compare(
+            "modified_bessel_first_kind(array[,] int, matrix)",
+            got,
+            want,
+            &mut failures,
+        );
+    }
+    {
+        let a = vec![
+            vec![vec![1_i64, 2], vec![3, 0]],
+            vec![vec![2_i64, 0], vec![1, 3]],
+        ];
+        let b = vec![
+            Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]),
+            Matrix::from_column_major(2, 2, vec![0.9, 1.6, 0.5, 2.4]),
+        ];
+        let ai = a
+            .iter()
+            .map(|m| to_matrix_from_int_array_2d::<f64>(m).unwrap())
+            .collect::<Vec<_>>();
+        let got = leaves(
+            &apply_scalar_binary(&ai, &b, |n, v| eval(modified_bessel_first_kind(n as _, v)))
+                .unwrap(),
+        );
+        let want: Vec<f64> = (0..2)
+            .flat_map(|k| (0..2).flat_map(move |j| (0..2).map(move |i| (k, i, j))))
+            .map(|(k, i, j)| (a[k][i][j], b[k][(i, j)]))
+            .map(|(n, v)| eval(modified_bessel_first_kind(n as _, v)))
+            .collect();
+        compare(
+            "modified_bessel_first_kind(array[,,] int, array[] matrix)",
+            got,
+            want,
+            &mut failures,
+        );
+    }
+    {
         let a: Vec<Vec<Vec<i64>>> = vec![
             vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
             vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
@@ -23915,6 +24229,55 @@ fn elementwise_signatures() {
             &mut failures,
         );
         assert!(n > 0);
+    }
+    {
+        let a = vec![vec![1_i64, 2], vec![3, 0]];
+        let b = Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]);
+        let ai = to_matrix_from_int_array_2d::<f64>(&a).unwrap();
+        let got = leaves(
+            &apply_scalar_binary(&ai, &b, |n, v| eval(modified_bessel_second_kind(n as _, v)))
+                .unwrap(),
+        );
+        let want: Vec<f64> = (0..2)
+            .flat_map(|j| (0..2).map(move |i| (i, j)))
+            .map(|(i, j)| (a[i][j], b[(i, j)]))
+            .map(|(n, v)| eval(modified_bessel_second_kind(n as _, v)))
+            .collect();
+        compare(
+            "modified_bessel_second_kind(array[,] int, matrix)",
+            got,
+            want,
+            &mut failures,
+        );
+    }
+    {
+        let a = vec![
+            vec![vec![1_i64, 2], vec![3, 0]],
+            vec![vec![2_i64, 0], vec![1, 3]],
+        ];
+        let b = vec![
+            Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]),
+            Matrix::from_column_major(2, 2, vec![0.9, 1.6, 0.5, 2.4]),
+        ];
+        let ai = a
+            .iter()
+            .map(|m| to_matrix_from_int_array_2d::<f64>(m).unwrap())
+            .collect::<Vec<_>>();
+        let got = leaves(
+            &apply_scalar_binary(&ai, &b, |n, v| eval(modified_bessel_second_kind(n as _, v)))
+                .unwrap(),
+        );
+        let want: Vec<f64> = (0..2)
+            .flat_map(|k| (0..2).flat_map(move |j| (0..2).map(move |i| (k, i, j))))
+            .map(|(k, i, j)| (a[k][i][j], b[k][(i, j)]))
+            .map(|(n, v)| eval(modified_bessel_second_kind(n as _, v)))
+            .collect();
+        compare(
+            "modified_bessel_second_kind(array[,,] int, array[] matrix)",
+            got,
+            want,
+            &mut failures,
+        );
     }
     {
         let a: Vec<Vec<Vec<i64>>> = vec![
@@ -25637,6 +26000,53 @@ fn elementwise_signatures() {
             &mut failures,
         );
         assert!(n > 0);
+    }
+    {
+        let a = vec![vec![1_i64, 2], vec![3, 0]];
+        let b = Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]);
+        let ai = to_matrix_from_int_array_2d::<f64>(&a).unwrap();
+        let got = leaves(
+            &apply_scalar_binary(&ai, &b, |n, v| eval(rising_factorial(v, n as _))).unwrap(),
+        );
+        let want: Vec<f64> = (0..2)
+            .flat_map(|j| (0..2).map(move |i| (i, j)))
+            .map(|(i, j)| (a[i][j], b[(i, j)]))
+            .map(|(n, v)| eval(rising_factorial(v, n as _)))
+            .collect();
+        compare(
+            "rising_factorial(matrix, array[,] int)",
+            got,
+            want,
+            &mut failures,
+        );
+    }
+    {
+        let a = vec![
+            vec![vec![1_i64, 2], vec![3, 0]],
+            vec![vec![2_i64, 0], vec![1, 3]],
+        ];
+        let b = vec![
+            Matrix::from_column_major(2, 2, vec![1.3, 0.7, 2.1, 0.4]),
+            Matrix::from_column_major(2, 2, vec![0.9, 1.6, 0.5, 2.4]),
+        ];
+        let ai = a
+            .iter()
+            .map(|m| to_matrix_from_int_array_2d::<f64>(m).unwrap())
+            .collect::<Vec<_>>();
+        let got = leaves(
+            &apply_scalar_binary(&ai, &b, |n, v| eval(rising_factorial(v, n as _))).unwrap(),
+        );
+        let want: Vec<f64> = (0..2)
+            .flat_map(|k| (0..2).flat_map(move |j| (0..2).map(move |i| (k, i, j))))
+            .map(|(k, i, j)| (a[k][i][j], b[k][(i, j)]))
+            .map(|(n, v)| eval(rising_factorial(v, n as _)))
+            .collect();
+        compare(
+            "rising_factorial(array[] matrix, array[,,] int)",
+            got,
+            want,
+            &mut failures,
+        );
     }
     {
         let a: Matrix<f64> = Matrix::from_column_major(2, 2, vec![2.575, 2.65, 2.725, 2.8]);
