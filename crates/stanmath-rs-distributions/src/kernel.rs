@@ -7,6 +7,11 @@
 //! whole sum as a single n-ary operation, so a reverse-mode log likelihood over `n` observations
 //! costs one tape node with one edge per non-constant argument element, as with Stan's
 //! `operands_and_partials`.
+//!
+//! [`sum_kernel_propto`] is the `propto` form (Stan's `_lupdf` and `_lupmf`): it may drop every
+//! term that depends only on data, so it is zero when all arguments are data. A kernel opts in by
+//! overriding [`Kernel::eval_propto`]; the default keeps every term, which is also valid, since
+//! the `propto` value is defined only up to a constant.
 
 use core::marker::PhantomData;
 
@@ -24,6 +29,40 @@ pub(crate) trait Kernel<const M: usize, const N: usize> {
 
     /// Log density of one element; writes `d/dx[j]` into `grad[j]` when `grad` is given.
     fn eval<S: Real>(ints: [i64; M], x: [S; N], grad: Option<&mut [S; N]>) -> S;
+
+    /// [`Kernel::eval`] keeping only the terms that `keep` asks for. The partials with respect to
+    /// arguments that are not data must be exact; the others are not used.
+    fn eval_propto<S: Real>(
+        ints: [i64; M],
+        x: [S; N],
+        grad: Option<&mut [S; N]>,
+        _keep: Keep<N>,
+    ) -> S {
+        Self::eval(ints, x, grad)
+    }
+}
+
+/// Which terms of a log density to keep: all of them, or (for `propto`) those that depend on at
+/// least one argument that is not data.
+#[derive(Clone, Copy)]
+pub(crate) struct Keep<const N: usize> {
+    propto: bool,
+    data: [bool; N],
+}
+
+impl<const N: usize> Keep<N> {
+    /// Keeps every term.
+    pub(crate) const ALL: Self = Keep {
+        propto: false,
+        data: [false; N],
+    };
+
+    /// True when a term that depends on the arguments `deps` is kept. With `deps` empty this asks
+    /// about a constant, which `propto` always drops.
+    #[inline]
+    pub(crate) fn term(&self, deps: &[usize]) -> bool {
+        !self.propto || deps.iter().any(|&j| !self.data[j])
+    }
 }
 
 /// The sum of a kernel over `n` broadcast elements, as an [`NaryFn`].
@@ -35,6 +74,7 @@ struct KernelSum<K, const M: usize, const N: usize> {
     offset: [usize; N],
     scalar: [bool; N],
     ints: Vec<[i64; M]>,
+    keep: Keep<N>,
     _kernel: PhantomData<K>,
 }
 
@@ -53,14 +93,14 @@ impl<K: Kernel<M, N>, const M: usize, const N: usize> KernelSum<K, M, N> {
 impl<K: Kernel<M, N>, const M: usize, const N: usize> NaryFn for KernelSum<K, M, N> {
     fn value(&self, x: &[f64]) -> f64 {
         (0..self.n)
-            .map(|i| K::eval(self.ints[i], self.gather(x, i), None))
+            .map(|i| K::eval_propto(self.ints[i], self.gather(x, i), None, self.keep))
             .sum()
     }
 
     fn partials<S: Real>(&self, x: &[S], _y: S, needed: &[bool], out: &mut [S]) {
         let mut g = [S::zero(); N];
         for i in 0..self.n {
-            K::eval(self.ints[i], self.gather(x, i), Some(&mut g));
+            K::eval_propto(self.ints[i], self.gather(x, i), Some(&mut g), self.keep);
             for (j, gj) in g.iter().enumerate() {
                 let k = self.index(j, i);
                 if needed[k] {
@@ -74,7 +114,7 @@ impl<K: Kernel<M, N>, const M: usize, const N: usize> NaryFn for KernelSum<K, M,
         let mut g = [0.0; N];
         let mut total = 0.0;
         for i in 0..self.n {
-            total += K::eval(self.ints[i], self.gather(x, i), Some(&mut g));
+            total += K::eval_propto(self.ints[i], self.gather(x, i), Some(&mut g), self.keep);
             for (j, gj) in g.iter().enumerate() {
                 let k = self.index(j, i);
                 if needed[k] {
@@ -90,6 +130,31 @@ impl<K: Kernel<M, N>, const M: usize, const N: usize> NaryFn for KernelSum<K, M,
 pub(crate) fn sum_kernel<K, A, const M: usize, const N: usize>(
     ints: [&dyn IntArg; M],
     args: A,
+) -> Result<Promoted<A, N>>
+where
+    K: Kernel<M, N>,
+    A: Broadcast<N>,
+{
+    sum_kernel_keep::<K, A, M, N>(ints, args, false)
+}
+
+/// [`sum_kernel`] up to terms that depend only on data (Stan's `propto`). Zero when every argument
+/// is data; the integer arguments always are.
+pub(crate) fn sum_kernel_propto<K, A, const M: usize, const N: usize>(
+    ints: [&dyn IntArg; M],
+    args: A,
+) -> Result<Promoted<A, N>>
+where
+    K: Kernel<M, N>,
+    A: Broadcast<N>,
+{
+    sum_kernel_keep::<K, A, M, N>(ints, args, true)
+}
+
+fn sum_kernel_keep<K, A, const M: usize, const N: usize>(
+    ints: [&dyn IntArg; M],
+    args: A,
+    propto: bool,
 ) -> Result<Promoted<A, N>>
 where
     K: Kernel<M, N>,
@@ -122,6 +187,10 @@ where
         )?;
         return Ok(Promoted::<A, N>::zero());
     }
+    let data = args.data();
+    if propto && data.iter().all(|&d| d) {
+        return Ok(Promoted::<A, N>::zero());
+    }
     let mut offset = [0; N];
     let mut operands = Vec::with_capacity(columns.iter().map(Vec::len).sum());
     for j in 0..N {
@@ -133,6 +202,7 @@ where
         offset,
         scalar,
         ints: int_rows,
+        keep: Keep { propto, data },
         _kernel: PhantomData,
     };
     Ok(Promoted::<A, N>::map_nary(&operands, &f))

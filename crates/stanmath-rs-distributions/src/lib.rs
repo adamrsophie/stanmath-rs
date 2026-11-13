@@ -64,31 +64,38 @@ mod yule_simon;
 pub use cdf::*;
 pub use cdf_plain::*;
 pub use continuous::{
-    beta_lpdf, cauchy_lpdf, exponential_lpdf, gamma_lpdf, inv_gamma_lpdf, logistic_lpdf,
-    lognormal_lpdf, normal_lpdf, std_normal_lpdf, student_t_lpdf, uniform_lpdf, weibull_lpdf,
+    beta_lpdf, beta_lupdf, cauchy_lpdf, cauchy_lupdf, exponential_lpdf, exponential_lupdf,
+    gamma_lpdf, gamma_lupdf, inv_gamma_lpdf, inv_gamma_lupdf, logistic_lpdf, logistic_lupdf,
+    lognormal_lpdf, lognormal_lupdf, normal_lpdf, normal_lupdf, std_normal_lpdf, std_normal_lupdf,
+    student_t_lpdf, student_t_lupdf, uniform_lpdf, uniform_lupdf, weibull_lpdf, weibull_lupdf,
 };
 pub use continuous_extra::{
-    beta_proportion_lccdf, beta_proportion_lcdf, beta_proportion_lpdf, chi_square_lccdf,
-    chi_square_lcdf, chi_square_lpdf, double_exponential_lccdf, double_exponential_lcdf,
-    double_exponential_lpdf, exp_mod_normal_lccdf, exp_mod_normal_lcdf, exp_mod_normal_lpdf,
-    frechet_lccdf, frechet_lcdf, frechet_lpdf, gumbel_lccdf, gumbel_lcdf, gumbel_lpdf,
-    inv_chi_square_lccdf, inv_chi_square_lcdf, inv_chi_square_lpdf, loglogistic_lccdf,
-    loglogistic_lcdf, loglogistic_lpdf, pareto_lccdf, pareto_lcdf, pareto_lpdf,
-    pareto_type_2_lccdf, pareto_type_2_lcdf, pareto_type_2_lpdf, rayleigh_lccdf, rayleigh_lcdf,
-    rayleigh_lpdf, scaled_inv_chi_square_lccdf, scaled_inv_chi_square_lcdf,
-    scaled_inv_chi_square_lpdf, skew_double_exponential_lccdf, skew_double_exponential_lcdf,
-    skew_double_exponential_lpdf, skew_normal_lccdf, skew_normal_lcdf, skew_normal_lpdf,
-    von_mises_lccdf, von_mises_lcdf, von_mises_lpdf, wiener_lpdf,
+    beta_proportion_lccdf, beta_proportion_lcdf, beta_proportion_lpdf, beta_proportion_lupdf,
+    chi_square_lccdf, chi_square_lcdf, chi_square_lpdf, chi_square_lupdf, double_exponential_lccdf,
+    double_exponential_lcdf, double_exponential_lpdf, double_exponential_lupdf,
+    exp_mod_normal_lccdf, exp_mod_normal_lcdf, exp_mod_normal_lpdf, exp_mod_normal_lupdf,
+    frechet_lccdf, frechet_lcdf, frechet_lpdf, frechet_lupdf, gumbel_lccdf, gumbel_lcdf,
+    gumbel_lpdf, gumbel_lupdf, inv_chi_square_lccdf, inv_chi_square_lcdf, inv_chi_square_lpdf,
+    inv_chi_square_lupdf, loglogistic_lccdf, loglogistic_lcdf, loglogistic_lpdf, loglogistic_lupdf,
+    pareto_lccdf, pareto_lcdf, pareto_lpdf, pareto_lupdf, pareto_type_2_lccdf, pareto_type_2_lcdf,
+    pareto_type_2_lpdf, pareto_type_2_lupdf, rayleigh_lccdf, rayleigh_lcdf, rayleigh_lpdf,
+    rayleigh_lupdf, scaled_inv_chi_square_lccdf, scaled_inv_chi_square_lcdf,
+    scaled_inv_chi_square_lpdf, scaled_inv_chi_square_lupdf, skew_double_exponential_lccdf,
+    skew_double_exponential_lcdf, skew_double_exponential_lpdf, skew_double_exponential_lupdf,
+    skew_normal_lccdf, skew_normal_lcdf, skew_normal_lpdf, skew_normal_lupdf, von_mises_lccdf,
+    von_mises_lcdf, von_mises_lpdf, von_mises_lupdf, wiener_lpdf, wiener_lupdf,
 };
 pub use discrete::{
-    bernoulli_logit_lpmf, bernoulli_lpmf, binomial_logit_lpmf, binomial_lpmf,
-    categorical_logit_lpmf, categorical_lpmf, neg_binomial_2_log_lpmf, neg_binomial_2_lpmf,
-    poisson_log_lpmf, poisson_lpmf,
+    bernoulli_logit_lpmf, bernoulli_logit_lupmf, bernoulli_lpmf, bernoulli_lupmf,
+    binomial_logit_lpmf, binomial_logit_lupmf, binomial_lpmf, binomial_lupmf,
+    categorical_logit_lpmf, categorical_lpmf, neg_binomial_2_log_lpmf, neg_binomial_2_log_lupmf,
+    neg_binomial_2_lpmf, neg_binomial_2_lupmf, poisson_log_lpmf, poisson_log_lupmf, poisson_lpmf,
+    poisson_lupmf,
 };
 pub use discrete_extra::*;
 pub use glm::*;
 pub use hmm::*;
-pub use misc_dist::{normal_sufficient_lpdf, student_t_qf};
+pub use misc_dist::{normal_sufficient_lpdf, normal_sufficient_lupdf, student_t_qf};
 pub use multivariate::{
     dirichlet_lpdf, lkj_corr_cholesky_lpdf, multi_normal_cholesky_lpdf, multi_normal_lpdf,
 };
@@ -112,4 +119,6 @@ pub use wiener_full::{
     wiener_lccdf_unnorm, wiener_lcdf_unnorm, wiener4_lccdf_unnorm, wiener4_lcdf_unnorm,
     wiener5_lpdf,
 };
-pub use yule_simon::{yule_simon_cdf, yule_simon_lccdf, yule_simon_lcdf, yule_simon_lpmf};
+pub use yule_simon::{
+    yule_simon_cdf, yule_simon_lccdf, yule_simon_lcdf, yule_simon_lpmf, yule_simon_lupmf,
+};

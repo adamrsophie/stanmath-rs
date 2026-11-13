@@ -12,7 +12,7 @@ use stanmath_rs_autodiff::{Broadcast, IntArg, Promoted, Real, broadcast_len};
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::{obs, param};
-use crate::kernel::{Kernel, sum_kernel};
+use crate::kernel::{Keep, Kernel, sum_kernel, sum_kernel_propto};
 
 /// `ln (N choose n)` for integers.
 #[inline]
@@ -55,6 +55,16 @@ where
     sum_kernel::<Bernoulli, _, 1, 1>([&n], (theta,))
 }
 
+/// [`bernoulli_lpmf`] without the terms that depend only on data (Stan's `bernoulli_lupmf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn bernoulli_lupmf<N, T>(n: N, theta: T) -> Result<Promoted<(T,), 1>>
+where
+    N: IntArg,
+    (T,): Broadcast<1>,
+{
+    sum_kernel_propto::<Bernoulli, _, 1, 1>([&n], (theta,))
+}
+
 pub(crate) struct BernoulliLogit;
 
 impl Kernel<1, 1> for BernoulliLogit {
@@ -91,6 +101,16 @@ where
     sum_kernel::<BernoulliLogit, _, 1, 1>([&n], (alpha,))
 }
 
+/// [`bernoulli_logit_lpmf`] without the terms that depend only on data (Stan's `bernoulli_logit_lupmf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn bernoulli_logit_lupmf<N, A>(n: N, alpha: A) -> Result<Promoted<(A,), 1>>
+where
+    N: IntArg,
+    (A,): Broadcast<1>,
+{
+    sum_kernel_propto::<BernoulliLogit, _, 1, 1>([&n], (alpha,))
+}
+
 /// `N >= 0` and `n` in `[0, N]`, each checked when present.
 fn check_trials(f: &'static str, n: Option<i64>, big_n: Option<i64>) -> Result<()> {
     if let Some(big_n) = big_n {
@@ -114,9 +134,22 @@ impl Kernel<2, 1> for Binomial {
         param::probability(Self::NAME, "theta", theta)
     }
 
-    fn eval<S: Real>([n, big_n]: [i64; 2], [theta]: [S; 1], grad: Option<&mut [S; 1]>) -> S {
+    fn eval<S: Real>(ints: [i64; 2], x: [S; 1], grad: Option<&mut [S; 1]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        [n, big_n]: [i64; 2],
+        [theta]: [S; 1],
+        grad: Option<&mut [S; 1]>,
+        keep: Keep<1>,
+    ) -> S {
         let (nf, mf) = (n as f64, (big_n - n) as f64);
-        let mut lp = S::from_f64(lchoose_int(big_n, n));
+        let mut lp = if keep.term(&[]) {
+            S::from_f64(lchoose_int(big_n, n))
+        } else {
+            S::zero()
+        };
         let mut d = S::zero();
         if n > 0 {
             lp += theta.ln() * nf;
@@ -143,6 +176,17 @@ where
     sum_kernel::<Binomial, _, 2, 1>([&n, &trials], (theta,))
 }
 
+/// [`binomial_lpmf`] without the terms that depend only on data (Stan's `binomial_lupmf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn binomial_lupmf<N, M, T>(n: N, trials: M, theta: T) -> Result<Promoted<(T,), 1>>
+where
+    N: IntArg,
+    M: IntArg,
+    (T,): Broadcast<1>,
+{
+    sum_kernel_propto::<Binomial, _, 2, 1>([&n, &trials], (theta,))
+}
+
 pub(crate) struct BinomialLogit;
 
 impl Kernel<2, 1> for BinomialLogit {
@@ -153,12 +197,26 @@ impl Kernel<2, 1> for BinomialLogit {
         param::finite(Self::NAME, "alpha", alpha)
     }
 
-    fn eval<S: Real>([n, big_n]: [i64; 2], [alpha]: [S; 1], grad: Option<&mut [S; 1]>) -> S {
+    fn eval<S: Real>(ints: [i64; 2], x: [S; 1], grad: Option<&mut [S; 1]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        [n, big_n]: [i64; 2],
+        [alpha]: [S; 1],
+        grad: Option<&mut [S; 1]>,
+        keep: Keep<1>,
+    ) -> S {
         let (nf, mf) = (n as f64, (big_n - n) as f64);
         if let Some(g) = grad {
             g[0] = inv_logit(-alpha) * nf - inv_logit(alpha) * mf;
         }
-        S::from_f64(lchoose_int(big_n, n)) + log_inv_logit(alpha) * nf + log1m_inv_logit(alpha) * mf
+        let lp = log_inv_logit(alpha) * nf + log1m_inv_logit(alpha) * mf;
+        if keep.term(&[]) {
+            lp + lchoose_int(big_n, n)
+        } else {
+            lp
+        }
     }
 }
 
@@ -172,6 +230,17 @@ where
     sum_kernel::<BinomialLogit, _, 2, 1>([&n, &trials], (alpha,))
 }
 
+/// [`binomial_logit_lpmf`] without the terms that depend only on data (Stan's `binomial_logit_lupmf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn binomial_logit_lupmf<N, M, A>(n: N, trials: M, alpha: A) -> Result<Promoted<(A,), 1>>
+where
+    N: IntArg,
+    M: IntArg,
+    (A,): Broadcast<1>,
+{
+    sum_kernel_propto::<BinomialLogit, _, 2, 1>([&n, &trials], (alpha,))
+}
+
 pub(crate) struct Poisson;
 
 impl Kernel<1, 1> for Poisson {
@@ -182,7 +251,16 @@ impl Kernel<1, 1> for Poisson {
         param::nonnegative(Self::NAME, "lambda", lambda)
     }
 
-    fn eval<S: Real>([n]: [i64; 1], [lambda]: [S; 1], grad: Option<&mut [S; 1]>) -> S {
+    fn eval<S: Real>(ints: [i64; 1], x: [S; 1], grad: Option<&mut [S; 1]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        [n]: [i64; 1],
+        [lambda]: [S; 1],
+        grad: Option<&mut [S; 1]>,
+        keep: Keep<1>,
+    ) -> S {
         let nf = n as f64;
         let lv = lambda.value();
         if lv == f64::INFINITY || (lv == 0.0 && n > 0) {
@@ -199,7 +277,12 @@ impl Kernel<1, 1> for Poisson {
             };
         }
         let log_term = if n == 0 { S::zero() } else { lambda.ln() * nf };
-        log_term - lambda - lgamma(nf + 1.0)
+        let lp = log_term - lambda;
+        if keep.term(&[]) {
+            lp - lgamma(nf + 1.0)
+        } else {
+            lp
+        }
     }
 }
 
@@ -215,6 +298,16 @@ where
     sum_kernel::<Poisson, _, 1, 1>([&n], (lambda,))
 }
 
+/// [`poisson_lpmf`] without the terms that depend only on data (Stan's `poisson_lupmf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn poisson_lupmf<N, L>(n: N, lambda: L) -> Result<Promoted<(L,), 1>>
+where
+    N: IntArg,
+    (L,): Broadcast<1>,
+{
+    sum_kernel_propto::<Poisson, _, 1, 1>([&n], (lambda,))
+}
+
 pub(crate) struct PoissonLog;
 
 impl Kernel<1, 1> for PoissonLog {
@@ -225,7 +318,16 @@ impl Kernel<1, 1> for PoissonLog {
         param::not_nan(Self::NAME, "alpha", alpha)
     }
 
-    fn eval<S: Real>([n]: [i64; 1], [alpha]: [S; 1], grad: Option<&mut [S; 1]>) -> S {
+    fn eval<S: Real>(ints: [i64; 1], x: [S; 1], grad: Option<&mut [S; 1]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        [n]: [i64; 1],
+        [alpha]: [S; 1],
+        grad: Option<&mut [S; 1]>,
+        keep: Keep<1>,
+    ) -> S {
         let nf = n as f64;
         let av = alpha.value();
         if av == f64::INFINITY || (av == f64::NEG_INFINITY && n > 0) {
@@ -244,7 +346,12 @@ impl Kernel<1, 1> for PoissonLog {
         if let Some(g) = grad {
             g[0] = -rate + nf;
         }
-        alpha * nf - rate - lgamma(nf + 1.0)
+        let lp = alpha * nf - rate;
+        if keep.term(&[]) {
+            lp - lgamma(nf + 1.0)
+        } else {
+            lp
+        }
     }
 }
 
@@ -255,6 +362,16 @@ where
     (A,): Broadcast<1>,
 {
     sum_kernel::<PoissonLog, _, 1, 1>([&n], (alpha,))
+}
+
+/// [`poisson_log_lpmf`] without the terms that depend only on data (Stan's `poisson_log_lupmf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn poisson_log_lupmf<N, A>(n: N, alpha: A) -> Result<Promoted<(A,), 1>>
+where
+    N: IntArg,
+    (A,): Broadcast<1>,
+{
+    sum_kernel_propto::<PoissonLog, _, 1, 1>([&n], (alpha,))
 }
 
 /// Shared part of the negative binomial kernels:
@@ -275,7 +392,16 @@ impl Kernel<1, 2> for NegBinomial2 {
         param::positive_finite(Self::NAME, "phi", phi)
     }
 
-    fn eval<S: Real>([n]: [i64; 1], [mu, phi]: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+    fn eval<S: Real>(ints: [i64; 1], x: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        [n]: [i64; 1],
+        [mu, phi]: [S; 2],
+        grad: Option<&mut [S; 2]>,
+        keep: Keep<2>,
+    ) -> S {
         let nf = n as f64;
         let mu_phi = mu + phi;
         let log1p_ratio = (mu / phi).ln_1p(); // ln((mu + phi) / phi)
@@ -283,12 +409,17 @@ impl Kernel<1, 2> for NegBinomial2 {
             g[0] = mu.recip() * nf - (phi + nf) / mu_phi;
             g[1] = -digamma_diff(phi, S::from_f64(nf)) - log1p_ratio + (mu - nf) / mu_phi;
         }
-        let log_mu_term = if n == 0 {
-            S::zero()
-        } else {
-            (mu.ln() - mu_phi.ln()) * nf
-        };
-        neg_binomial_coef(nf, phi) + log_mu_term - phi * log1p_ratio
+        let mut lp = -(phi * log1p_ratio);
+        if n > 0 {
+            if keep.term(&[0]) {
+                lp += mu.ln() * nf;
+            }
+            lp -= mu_phi.ln() * nf;
+        }
+        if keep.term(&[1]) {
+            lp += neg_binomial_coef(nf, phi);
+        }
+        lp
     }
 }
 
@@ -302,6 +433,16 @@ where
     (M, P): Broadcast<2>,
 {
     sum_kernel::<NegBinomial2, _, 1, 2>([&n], (mu, phi))
+}
+
+/// [`neg_binomial_2_lpmf`] without the terms that depend only on data (Stan's `neg_binomial_2_lupmf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn neg_binomial_2_lupmf<N, M, P>(n: N, mu: M, phi: P) -> Result<Promoted<(M, P), 2>>
+where
+    N: IntArg,
+    (M, P): Broadcast<2>,
+{
+    sum_kernel_propto::<NegBinomial2, _, 1, 2>([&n], (mu, phi))
 }
 
 pub(crate) struct NegBinomial2Log;
@@ -337,6 +478,16 @@ where
     (E, P): Broadcast<2>,
 {
     sum_kernel::<NegBinomial2Log, _, 1, 2>([&n], (eta, phi))
+}
+
+/// [`neg_binomial_2_log_lpmf`] without the terms that depend only on data (Stan's `neg_binomial_2_log_lupmf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn neg_binomial_2_log_lupmf<N, E, P>(n: N, eta: E, phi: P) -> Result<Promoted<(E, P), 2>>
+where
+    N: IntArg,
+    (E, P): Broadcast<2>,
+{
+    sum_kernel_propto::<NegBinomial2Log, _, 1, 2>([&n], (eta, phi))
 }
 
 /// Tolerance for checking that probabilities sum to one, as in Stan's `check_simplex`.

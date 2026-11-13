@@ -6,7 +6,7 @@ use stanmath_rs_core::special::HALF_LN_2PI;
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::{obs, param};
-use crate::kernel::{Kernel, sum_kernel};
+use crate::kernel::{Kernel, sum_kernel, sum_kernel_propto};
 
 pub(crate) struct NormalSufficient;
 
@@ -66,6 +66,22 @@ where
     (Y, Q, M, G): Broadcast<4>,
 {
     sum_kernel::<NormalSufficient, _, 1, 4>([&n_obs], (y_bar, s_squared, mu, sigma))
+}
+
+/// [`normal_sufficient_lpdf`] without the terms that depend only on data (Stan's `normal_sufficient_lupdf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn normal_sufficient_lupdf<Y, Q, N, M, G>(
+    y_bar: Y,
+    s_squared: Q,
+    n_obs: N,
+    mu: M,
+    sigma: G,
+) -> Result<Promoted<(Y, Q, M, G), 4>>
+where
+    N: IntArg,
+    (Y, Q, M, G): Broadcast<4>,
+{
+    sum_kernel_propto::<NormalSufficient, _, 1, 4>([&n_obs], (y_bar, s_squared, mu, sigma))
 }
 
 /// Quantile function of the Student t distribution with `nu` degrees of freedom, location `mu`,

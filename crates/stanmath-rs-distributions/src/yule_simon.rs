@@ -13,7 +13,7 @@ use stanmath_rs_autodiff::{Broadcast, IntArg, Promoted, Real};
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::param;
-use crate::kernel::{Kernel, sum_kernel};
+use crate::kernel::{Kernel, sum_kernel, sum_kernel_propto};
 
 fn check_yule_simon(f: &'static str, n: Option<i64>, alpha: Option<f64>) -> Result<()> {
     if let Some(n) = n.filter(|&n| n < 1) {
@@ -94,6 +94,16 @@ where
     (A,): Broadcast<1>,
 {
     sum_kernel::<YuleSimon, _, 1, 1>([&n], (alpha,))
+}
+
+/// [`yule_simon_lpmf`] without the terms that depend only on data (Stan's `yule_simon_lupmf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn yule_simon_lupmf<N, A>(n: N, alpha: A) -> Result<Promoted<(A,), 1>>
+where
+    N: IntArg,
+    (A,): Broadcast<1>,
+{
+    sum_kernel_propto::<YuleSimon, _, 1, 1>([&n], (alpha,))
 }
 
 /// Yule-Simon log CDF `ln(1 - n B(n, α + 1))`; arguments as for [`yule_simon_lpmf`].

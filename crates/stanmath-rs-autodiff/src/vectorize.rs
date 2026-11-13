@@ -50,6 +50,9 @@ pub trait Promote<B> {
 
 /// Conversion of an element into the promoted scalar type `T`.
 pub trait Lift<T> {
+    /// True when the element is data (`f64`), so that it carries no derivative. Stan's `propto`
+    /// drops the terms of a density that depend only on data.
+    const DATA: bool = false;
     /// Converts `self` into `T`.
     fn lift(self) -> T;
 }
@@ -71,6 +74,7 @@ impl<T: Real> Promote<Dual<T>> for Dual<T> {
 }
 
 impl<T: Real> Lift<T> for f64 {
+    const DATA: bool = true;
     #[inline]
     fn lift(self) -> T {
         T::from_f64(self)
@@ -258,6 +262,8 @@ pub trait Broadcast<const N: usize> {
     /// Values of the scalar arguments, `None` for sequences. Stan validates scalar arguments even
     /// when a sequence argument is empty, and this is what it validates.
     fn scalar_values(&self) -> [Option<f64>; N];
+    /// Which arguments are data (have `f64` elements); see [`Lift::DATA`].
+    fn data(&self) -> [bool; N];
     /// Broadcast length; see [`broadcast_len`].
     fn broadcast_len(&self, function: &'static str) -> Result<usize> {
         broadcast_len(function, &self.lens())
@@ -298,6 +304,9 @@ where
     fn scalar_values(&self) -> [Option<f64>; 1] {
         [scalar_value::<_, Self::Out>(&self.0)]
     }
+    fn data(&self) -> [bool; 1] {
+        [<A::Elem as Lift<Self::Out>>::DATA]
+    }
 }
 
 // The where clauses for each arity are spelled out by hand so that the promoted type of every
@@ -320,6 +329,12 @@ where
         [
             scalar_value::<_, Self::Out>(&self.0),
             scalar_value::<_, Self::Out>(&self.1),
+        ]
+    }
+    fn data(&self) -> [bool; 2] {
+        [
+            <A::Elem as Lift<Self::Out>>::DATA,
+            <B::Elem as Lift<Self::Out>>::DATA,
         ]
     }
 }
@@ -353,6 +368,13 @@ where
             scalar_value::<_, Self::Out>(&self.0),
             scalar_value::<_, Self::Out>(&self.1),
             scalar_value::<_, Self::Out>(&self.2),
+        ]
+    }
+    fn data(&self) -> [bool; 3] {
+        [
+            <A::Elem as Lift<Self::Out>>::DATA,
+            <B::Elem as Lift<Self::Out>>::DATA,
+            <C::Elem as Lift<Self::Out>>::DATA,
         ]
     }
 }
@@ -391,6 +413,14 @@ where
             scalar_value::<_, Self::Out>(&self.1),
             scalar_value::<_, Self::Out>(&self.2),
             scalar_value::<_, Self::Out>(&self.3),
+        ]
+    }
+    fn data(&self) -> [bool; 4] {
+        [
+            <A::Elem as Lift<Self::Out>>::DATA,
+            <B::Elem as Lift<Self::Out>>::DATA,
+            <C::Elem as Lift<Self::Out>>::DATA,
+            <D::Elem as Lift<Self::Out>>::DATA,
         ]
     }
 }
@@ -434,6 +464,15 @@ where
             scalar_value::<_, Self::Out>(&self.2),
             scalar_value::<_, Self::Out>(&self.3),
             scalar_value::<_, Self::Out>(&self.4),
+        ]
+    }
+    fn data(&self) -> [bool; 5] {
+        [
+            <A::Elem as Lift<Self::Out>>::DATA,
+            <B::Elem as Lift<Self::Out>>::DATA,
+            <C::Elem as Lift<Self::Out>>::DATA,
+            <D::Elem as Lift<Self::Out>>::DATA,
+            <E::Elem as Lift<Self::Out>>::DATA,
         ]
     }
 }

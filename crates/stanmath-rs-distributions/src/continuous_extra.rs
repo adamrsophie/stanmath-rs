@@ -61,13 +61,26 @@ fn log_upper<T: Real>(lower: impl FnOnce() -> T, upper: impl FnOnce() -> T) -> T
 
 /// A vectorized log density over kernel `$kernel` with `$n` real arguments.
 macro_rules! lpdf {
-    ($(#[$doc:meta])* $name:ident, $kernel:ty, $n:literal, ($($arg:ident: $ty:ident),+)) => {
+    ($(#[$doc:meta])* $name:ident, $lupdf:ident, $kernel:ty, $n:literal,
+     ($($arg:ident: $ty:ident),+)) => {
         $(#[$doc])*
         pub fn $name<$($ty),+>($($arg: $ty),+) -> Result<Promoted<($($ty,)+), $n>>
         where
             ($($ty,)+): Broadcast<$n>,
         {
             sum_kernel::<$kernel, _, 0, $n>([], ($($arg,)+))
+        }
+
+        #[doc = concat!(
+            "[`", stringify!($name), "`] without the terms that depend only on data (Stan's `",
+            stringify!($lupdf), "`, the `propto` form): zero when every argument is data, and ",
+            "with the same derivatives."
+        )]
+        pub fn $lupdf<$($ty),+>($($arg: $ty),+) -> Result<Promoted<($($ty,)+), $n>>
+        where
+            ($($ty,)+): Broadcast<$n>,
+        {
+            sum_kernel_propto::<$kernel, _, 0, $n>([], ($($arg,)+))
         }
     };
 }
@@ -139,7 +152,7 @@ lpdf!(
     /// `2 / omega phi(z) Phi(alpha z)` with `z = (y - xi) / omega`.
     ///
     /// Requires `y` not NaN, `xi` and `alpha` finite, `omega > 0`.
-    skew_normal_lpdf, SkewNormal, 4, (y: Y, xi: X, omega: O, alpha: A)
+    skew_normal_lpdf, skew_normal_lupdf, SkewNormal, 4, (y: Y, xi: X, omega: O, alpha: A)
 );
 
 /// `F = Phi(z) - 2 T(z, alpha)` and `1 - F = Phi(-z) + 2 T(z, alpha)`, with Owen's T.
@@ -212,7 +225,7 @@ lpdf!(
     /// Double exponential (Laplace) log density with location `mu` and scale `sigma`.
     ///
     /// Requires `y` and `mu` finite, `sigma` positive finite.
-    double_exponential_lpdf, DoubleExponential, 3, (y: Y, mu: M, sigma: S)
+    double_exponential_lpdf, double_exponential_lupdf, DoubleExponential, 3, (y: Y, mu: M, sigma: S)
 );
 
 fn double_exponential_lower<T: Real>([y, mu, sigma]: [T; 3]) -> T {
@@ -277,7 +290,7 @@ lpdf!(
     /// `exp(kappa cos(y - mu)) / (2 pi I0(kappa))`.
     ///
     /// Requires `y` and `mu` finite, `kappa` nonnegative finite. The density is periodic in `y`.
-    von_mises_lpdf, VonMises, 3, (y: Y, mu: M, kappa: K)
+    von_mises_lpdf, von_mises_lupdf, VonMises, 3, (y: Y, mu: M, kappa: K)
 );
 
 /// An antiderivative of the von Mises density centered at zero, valid for every real `theta`:
@@ -384,7 +397,7 @@ lpdf!(
     /// Rayleigh log density with scale `sigma`.
     ///
     /// Requires `y` positive and `sigma` positive finite.
-    rayleigh_lpdf, Rayleigh, 2, (y: Y, sigma: S)
+    rayleigh_lpdf, rayleigh_lupdf, Rayleigh, 2, (y: Y, sigma: S)
 );
 
 fn rayleigh_lower<T: Real>([y, sigma]: [T; 2]) -> T {
@@ -438,7 +451,7 @@ lpdf!(
     /// Pareto log density with minimum `y_min` and shape `alpha`.
     ///
     /// Requires `y` not NaN, `y_min` and `alpha` positive finite; `y < y_min` gives `-inf`.
-    pareto_lpdf, Pareto, 3, (y: Y, y_min: M, alpha: A)
+    pareto_lpdf, pareto_lupdf, Pareto, 3, (y: Y, y_min: M, alpha: A)
 );
 
 fn check_pareto_cdf(f: &'static str, [y, y_min, alpha]: [Option<f64>; 3]) -> Result<()> {
@@ -517,7 +530,7 @@ lpdf!(
     /// `(alpha / lambda) (1 + (y - mu) / lambda)^(-(alpha + 1))`.
     ///
     /// Requires `y >= mu`, `mu` finite, `lambda` and `alpha` positive finite.
-    pareto_type_2_lpdf, ParetoType2, 4, (y: Y, mu: M, lambda: L, alpha: A)
+    pareto_type_2_lpdf, pareto_type_2_lupdf, ParetoType2, 4, (y: Y, mu: M, lambda: L, alpha: A)
 );
 
 fn pareto_type_2_lower<T: Real>([y, mu, lambda, alpha]: [T; 4]) -> T {
@@ -572,7 +585,7 @@ lpdf!(
     /// Frechet log density with shape `alpha` and scale `sigma`.
     ///
     /// Requires `y > 0`, `alpha` and `sigma` positive finite.
-    frechet_lpdf, Frechet, 3, (y: Y, alpha: A, sigma: S)
+    frechet_lpdf, frechet_lupdf, Frechet, 3, (y: Y, alpha: A, sigma: S)
 );
 
 fn frechet_lower<T: Real>([y, alpha, sigma]: [T; 3]) -> T {
@@ -629,7 +642,7 @@ lpdf!(
     /// Gumbel log density with location `mu` and scale `beta`.
     ///
     /// Requires `y` not NaN, `mu` finite, `beta > 0`.
-    gumbel_lpdf, Gumbel, 3, (y: Y, mu: M, beta: B)
+    gumbel_lpdf, gumbel_lupdf, Gumbel, 3, (y: Y, mu: M, beta: B)
 );
 
 fn gumbel_lower<T: Real>([y, mu, beta]: [T; 3]) -> T {
@@ -682,7 +695,7 @@ lpdf!(
     /// Chi-square log density with `nu` degrees of freedom.
     ///
     /// Requires `y >= 0` and `nu` positive finite.
-    chi_square_lpdf, ChiSquare, 2, (y: Y, nu: N)
+    chi_square_lpdf, chi_square_lupdf, ChiSquare, 2, (y: Y, nu: N)
 );
 
 fn chi_square_lower<T: Real>([y, nu]: [T; 2]) -> T {
@@ -737,7 +750,7 @@ lpdf!(
     /// Inverse chi-square log density with `nu` degrees of freedom.
     ///
     /// Requires `y` not NaN and `nu` positive finite; `y <= 0` gives `-inf`.
-    inv_chi_square_lpdf, InvChiSquare, 2, (y: Y, nu: N)
+    inv_chi_square_lpdf, inv_chi_square_lupdf, InvChiSquare, 2, (y: Y, nu: N)
 );
 
 fn check_inv_chi_square_cdf(f: &'static str, [y, nu]: [Option<f64>; 2]) -> Result<()> {
@@ -812,7 +825,7 @@ lpdf!(
     /// Scaled inverse chi-square log density with `nu` degrees of freedom and scale `s`.
     ///
     /// Requires `y` not NaN, `nu` and `s` positive finite; `y <= 0` gives `-inf`.
-    scaled_inv_chi_square_lpdf, ScaledInvChiSquare, 3, (y: Y, nu: N, s: S)
+    scaled_inv_chi_square_lpdf, scaled_inv_chi_square_lupdf, ScaledInvChiSquare, 3, (y: Y, nu: N, s: S)
 );
 
 fn check_scaled_inv_chi_square_cdf(f: &'static str, [y, nu, s]: [Option<f64>; 3]) -> Result<()> {
@@ -891,7 +904,7 @@ lpdf!(
     /// plus an independent exponential with rate `lambda`.
     ///
     /// Requires `y` not NaN, `mu` finite, `sigma` and `lambda` positive finite.
-    exp_mod_normal_lpdf, ExpModNormal, 4, (y: Y, mu: M, sigma: S, lambda: L)
+    exp_mod_normal_lpdf, exp_mod_normal_lupdf, ExpModNormal, 4, (y: Y, mu: M, sigma: S, lambda: L)
 );
 
 /// `ln Phi(u)` and `ln(exp(-lambda (y - mu) + lambda^2 sigma^2 / 2) Phi(u - lambda sigma))`, with
@@ -984,7 +997,7 @@ lpdf!(
     /// `tau`: `2 tau (1 - tau) / sigma exp(-2 / sigma ((1 - tau) (mu - y)^+ + tau (y - mu)^+))`.
     ///
     /// Requires `y` and `mu` finite, `sigma` positive finite, `tau` in `[0, 1]`.
-    skew_double_exponential_lpdf, SkewDoubleExponential, 4, (y: Y, mu: M, sigma: S, tau: T)
+    skew_double_exponential_lpdf, skew_double_exponential_lupdf, SkewDoubleExponential, 4, (y: Y, mu: M, sigma: S, tau: T)
 );
 
 fn skew_double_exponential_lower<T: Real>([y, mu, sigma, tau]: [T; 4]) -> T {
@@ -1058,7 +1071,7 @@ lpdf!(
     /// `(beta / alpha) (y / alpha)^(beta - 1) / (1 + (y / alpha)^beta)^2`.
     ///
     /// Requires `y`, `alpha`, and `beta` positive finite.
-    loglogistic_lpdf, LogLogistic, 3, (y: Y, alpha: A, beta: B)
+    loglogistic_lpdf, loglogistic_lupdf, LogLogistic, 3, (y: Y, alpha: A, beta: B)
 );
 
 fn loglogistic_lower<T: Real>([y, alpha, beta]: [T; 3]) -> T {
@@ -1124,7 +1137,7 @@ lpdf!(
     /// `beta(mu kappa, (1 - mu) kappa)`.
     ///
     /// Requires `y` in `[0, 1]`, `mu` in `(0, 1)`, `kappa` positive finite.
-    beta_proportion_lpdf, BetaProportion, 3, (y: Y, mu: M, kappa: K)
+    beta_proportion_lpdf, beta_proportion_lupdf, BetaProportion, 3, (y: Y, mu: M, kappa: K)
 );
 
 fn beta_proportion_lower<T: Real>([y, mu, kappa]: [T; 3]) -> T {
@@ -1262,5 +1275,5 @@ lpdf!(
     /// Requires `y > tau`, `y` and `alpha` positive finite, `tau` nonnegative finite, `beta` in
     /// `(0, 1)`, `delta` finite. The series is truncated at an absolute error of about `1e-12` in
     /// the standardized density (Navarro and Fuss 2009).
-    wiener_lpdf, Wiener, 5, (y: Y, alpha: A, tau: T, beta: B, delta: D)
+    wiener_lpdf, wiener_lupdf, Wiener, 5, (y: Y, alpha: A, tau: T, beta: B, delta: D)
 );

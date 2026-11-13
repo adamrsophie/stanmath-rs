@@ -96,6 +96,20 @@ the full density.
 | `lkj_corr`, `multi_normal_prec`, `multi_student_t`, `wishart`, `inv_wishart`, Gaussian processes | | | | planned |
 | remaining Stan distributions (`skew_normal`, `von_mises`, `wiener`, `beta_binomial`, `ordered_logistic`, ...) | | | | planned |
 
+### `propto`
+
+Stan's `propto` template flag, which the language exposes as `_lupdf` and `_lupmf`, is a separate
+function in stanmath-rs: `normal_lupdf`, `poisson_lupmf`, and so on, for every density built on a
+fused kernel. An argument is data when its elements are `f64`; `Var` and `Dual` arguments are
+parameters. A `propto` function is zero when every argument is data, and otherwise drops the terms
+that depend only on data, so its gradient equals that of the full function. The normal, Student's
+t, Cauchy, logistic, exponential, gamma, inverse gamma, beta, lognormal, uniform, binomial,
+Poisson, and negative binomial (mean and dispersion) kernels drop their terms as Stan does; the
+values were checked against Stan Math 5.4.0 for normal, Poisson, gamma, binomial, and Student's
+t. The other kernels keep every term when any argument is a parameter, which differs from Stan's
+value by a constant only. Multivariate densities, the GLMs, and the full Wiener model have no
+`propto` form yet.
+
 ### Boundary conventions
 
 stanmath-rs follows Stan's checks: the same arguments are validated, with the same requirements.

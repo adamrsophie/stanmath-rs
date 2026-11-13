@@ -14,7 +14,7 @@ use stanmath_rs_autodiff::{Arg, Broadcast, Dual, IntArg, Lift, Promoted, Real, b
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::{obs, param};
-use crate::kernel::{Kernel, sum_kernel, sum_terms};
+use crate::kernel::{Kernel, sum_kernel, sum_kernel_propto, sum_terms};
 
 /// Tolerance for simplex checks, as Stan's `CONSTRAINT_TOLERANCE`.
 const SIMPLEX_TOL: f64 = 1e-8;
@@ -126,6 +126,22 @@ where
     (A, B): Broadcast<2>,
 {
     sum_kernel::<BetaBinomial, _, 2, 2>([&n, &trials], (alpha, beta))
+}
+
+/// [`beta_binomial_lpmf`] without the terms that depend only on data (Stan's `beta_binomial_lupmf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn beta_binomial_lupmf<N, M, A, B>(
+    n: N,
+    trials: M,
+    alpha: A,
+    beta: B,
+) -> Result<Promoted<(A, B), 2>>
+where
+    N: IntArg,
+    M: IntArg,
+    (A, B): Broadcast<2>,
+{
+    sum_kernel_propto::<BetaBinomial, _, 2, 2>([&n, &trials], (alpha, beta))
 }
 
 /// `ln sum_{k in ks} P(k)` for the beta binomial distribution.
@@ -304,6 +320,16 @@ where
     sum_kernel::<NegBinomial, _, 1, 2>([&n], (alpha, beta))
 }
 
+/// [`neg_binomial_lpmf`] without the terms that depend only on data (Stan's `neg_binomial_lupmf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn neg_binomial_lupmf<N, A, B>(n: N, alpha: A, beta: B) -> Result<Promoted<(A, B), 2>>
+where
+    N: IntArg,
+    (A, B): Broadcast<2>,
+{
+    sum_kernel_propto::<NegBinomial, _, 1, 2>([&n], (alpha, beta))
+}
+
 /// Negative binomial (shape, inverse scale) log CDF `ln I_{β/(1+β)}(α, n + 1)`.
 pub fn neg_binomial_lcdf<N, A, B>(n: N, alpha: A, beta: B) -> Result<Promoted<(A, B), 2>>
 where
@@ -400,6 +426,21 @@ where
     (R, A, B): Broadcast<3>,
 {
     sum_kernel::<BetaNegBinomial, _, 1, 3>([&n], (r, alpha, beta))
+}
+
+/// [`beta_neg_binomial_lpmf`] without the terms that depend only on data (Stan's `beta_neg_binomial_lupmf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn beta_neg_binomial_lupmf<N, R, A, B>(
+    n: N,
+    r: R,
+    alpha: A,
+    beta: B,
+) -> Result<Promoted<(R, A, B), 3>>
+where
+    N: IntArg,
+    (R, A, B): Broadcast<3>,
+{
+    sum_kernel_propto::<BetaNegBinomial, _, 1, 3>([&n], (r, alpha, beta))
 }
 
 /// `ln P(X <= n)` of the beta negative binomial by summation of the mass function.

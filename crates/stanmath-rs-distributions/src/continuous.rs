@@ -13,7 +13,7 @@ use stanmath_rs_core::Result;
 use stanmath_rs_core::special::{HALF_LN_2PI, LN_PI};
 
 use crate::check::{obs, param};
-use crate::kernel::{Kernel, sum_kernel};
+use crate::kernel::{Keep, Kernel, sum_kernel, sum_kernel_propto};
 
 /// `(a - 1) ln y` with the convention `0 * ln 0 = 0`.
 #[inline]
@@ -36,7 +36,16 @@ impl Kernel<0, 3> for Normal {
         param::positive(Self::NAME, "sigma", sigma)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, mu, sigma]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, mu, sigma]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         let inv_sigma = sigma.recip();
         let z = (y - mu) * inv_sigma;
         if let Some(g) = grad {
@@ -45,7 +54,14 @@ impl Kernel<0, 3> for Normal {
             g[1] = dz;
             g[2] = (z.square() - 1.0) * inv_sigma;
         }
-        -(z.square() * 0.5) - sigma.ln() - HALF_LN_2PI
+        let mut lp = -(z.square() * 0.5);
+        if keep.term(&[2]) {
+            lp -= sigma.ln();
+        }
+        if keep.term(&[]) {
+            lp -= HALF_LN_2PI;
+        }
+        lp
     }
 }
 
@@ -66,6 +82,15 @@ where
     sum_kernel::<Normal, _, 0, 3>([], (y, mu, sigma))
 }
 
+/// [`normal_lpdf`] without the terms that depend only on data (Stan's `normal_lupdf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn normal_lupdf<Y, M, S>(y: Y, mu: M, sigma: S) -> Result<Promoted<(Y, M, S), 3>>
+where
+    (Y, M, S): Broadcast<3>,
+{
+    sum_kernel_propto::<Normal, _, 0, 3>([], (y, mu, sigma))
+}
+
 pub(crate) struct StdNormal;
 
 impl Kernel<0, 1> for StdNormal {
@@ -75,11 +100,24 @@ impl Kernel<0, 1> for StdNormal {
         obs::not_nan(Self::NAME, "y", y)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y]: [S; 1], grad: Option<&mut [S; 1]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 1], grad: Option<&mut [S; 1]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y]: [S; 1],
+        grad: Option<&mut [S; 1]>,
+        keep: Keep<1>,
+    ) -> S {
         if let Some(g) = grad {
             g[0] = -y;
         }
-        -(y.square() * 0.5) - HALF_LN_2PI
+        let mut lp = -(y.square() * 0.5);
+        if keep.term(&[]) {
+            lp -= HALF_LN_2PI;
+        }
+        lp
     }
 }
 
@@ -89,6 +127,15 @@ where
     (Y,): Broadcast<1>,
 {
     sum_kernel::<StdNormal, _, 0, 1>([], (y,))
+}
+
+/// [`std_normal_lpdf`] without the terms that depend only on data (Stan's `std_normal_lupdf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn std_normal_lupdf<Y>(y: Y) -> Result<Promoted<(Y,), 1>>
+where
+    (Y,): Broadcast<1>,
+{
+    sum_kernel_propto::<StdNormal, _, 0, 1>([], (y,))
 }
 
 pub(crate) struct StudentT;
@@ -103,7 +150,16 @@ impl Kernel<0, 4> for StudentT {
         param::positive_finite(Self::NAME, "sigma", sigma)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, nu, mu, sigma]: [S; 4], grad: Option<&mut [S; 4]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 4], grad: Option<&mut [S; 4]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, nu, mu, sigma]: [S; 4],
+        grad: Option<&mut [S; 4]>,
+        keep: Keep<4>,
+    ) -> S {
         let half_nu = nu * 0.5;
         let z = (y - mu) / sigma;
         let r = z.square() / nu;
@@ -125,7 +181,18 @@ impl Kernel<0, 4> for StudentT {
         }
         // ln Γ((nu + 1) / 2) - ln Γ(nu / 2) - ln(pi) / 2 = -ln B(nu / 2, 1 / 2), which does not
         // cancel for large nu.
-        -lbeta(half_nu, S::from_f64(0.5)) - nu.ln() * 0.5 - sigma.ln() - (half_nu + 0.5) * log1p_r
+        let mut lp = -((half_nu + 0.5) * log1p_r);
+        if keep.term(&[1]) {
+            lp -= lbeta(half_nu, S::from_f64(0.5)) + nu.ln() * 0.5;
+            if !keep.term(&[]) {
+                // -ln B(nu / 2, 1 / 2) contains the constant -ln(pi) / 2, which propto drops.
+                lp += LN_PI * 0.5;
+            }
+        }
+        if keep.term(&[3]) {
+            lp -= sigma.ln();
+        }
+        lp
     }
 }
 
@@ -139,6 +206,20 @@ where
     sum_kernel::<StudentT, _, 0, 4>([], (y, nu, mu, sigma))
 }
 
+/// [`student_t_lpdf`] without the terms that depend only on data (Stan's `student_t_lupdf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn student_t_lupdf<Y, N, M, S>(
+    y: Y,
+    nu: N,
+    mu: M,
+    sigma: S,
+) -> Result<Promoted<(Y, N, M, S), 4>>
+where
+    (Y, N, M, S): Broadcast<4>,
+{
+    sum_kernel_propto::<StudentT, _, 0, 4>([], (y, nu, mu, sigma))
+}
+
 pub(crate) struct Cauchy;
 
 impl Kernel<0, 3> for Cauchy {
@@ -150,7 +231,16 @@ impl Kernel<0, 3> for Cauchy {
         param::positive_finite(Self::NAME, "sigma", sigma)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, mu, sigma]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, mu, sigma]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         let z = (y - mu) / sigma;
         let z2 = z.square();
         if let Some(g) = grad {
@@ -159,7 +249,14 @@ impl Kernel<0, 3> for Cauchy {
             g[1] = -dy;
             g[2] = (z2 - 1.0) / (sigma * (z2 + 1.0));
         }
-        -sigma.ln() - log1p(z2) - LN_PI
+        let mut lp = -log1p(z2);
+        if keep.term(&[2]) {
+            lp -= sigma.ln();
+        }
+        if keep.term(&[]) {
+            lp -= LN_PI;
+        }
+        lp
     }
 }
 
@@ -173,6 +270,15 @@ where
     sum_kernel::<Cauchy, _, 0, 3>([], (y, mu, sigma))
 }
 
+/// [`cauchy_lpdf`] without the terms that depend only on data (Stan's `cauchy_lupdf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn cauchy_lupdf<Y, M, S>(y: Y, mu: M, sigma: S) -> Result<Promoted<(Y, M, S), 3>>
+where
+    (Y, M, S): Broadcast<3>,
+{
+    sum_kernel_propto::<Cauchy, _, 0, 3>([], (y, mu, sigma))
+}
+
 pub(crate) struct Logistic;
 
 impl Kernel<0, 3> for Logistic {
@@ -184,7 +290,16 @@ impl Kernel<0, 3> for Logistic {
         param::positive_finite(Self::NAME, "sigma", sigma)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, mu, sigma]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, mu, sigma]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         let inv_sigma = sigma.recip();
         let z = (y - mu) * inv_sigma;
         if let Some(g) = grad {
@@ -194,7 +309,11 @@ impl Kernel<0, 3> for Logistic {
             g[1] = -(gz * inv_sigma);
             g[2] = -(gz * z + 1.0) * inv_sigma;
         }
-        -z - sigma.ln() - log1p_exp(-z) * 2.0
+        let mut lp = -z - log1p_exp(-z) * 2.0;
+        if keep.term(&[2]) {
+            lp -= sigma.ln();
+        }
+        lp
     }
 }
 
@@ -208,6 +327,15 @@ where
     sum_kernel::<Logistic, _, 0, 3>([], (y, mu, sigma))
 }
 
+/// [`logistic_lpdf`] without the terms that depend only on data (Stan's `logistic_lupdf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn logistic_lupdf<Y, M, S>(y: Y, mu: M, sigma: S) -> Result<Promoted<(Y, M, S), 3>>
+where
+    (Y, M, S): Broadcast<3>,
+{
+    sum_kernel_propto::<Logistic, _, 0, 3>([], (y, mu, sigma))
+}
+
 pub(crate) struct Exponential;
 
 impl Kernel<0, 2> for Exponential {
@@ -218,12 +346,25 @@ impl Kernel<0, 2> for Exponential {
         param::positive_finite(Self::NAME, "beta", beta)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, beta]: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, beta]: [S; 2],
+        grad: Option<&mut [S; 2]>,
+        keep: Keep<2>,
+    ) -> S {
         if let Some(g) = grad {
             g[0] = -beta;
             g[1] = beta.recip() - y;
         }
-        beta.ln() - beta * y
+        let mut lp = -(beta * y);
+        if keep.term(&[1]) {
+            lp += beta.ln();
+        }
+        lp
     }
 }
 
@@ -237,6 +378,15 @@ where
     sum_kernel::<Exponential, _, 0, 2>([], (y, beta))
 }
 
+/// [`exponential_lpdf`] without the terms that depend only on data (Stan's `exponential_lupdf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn exponential_lupdf<Y, B>(y: Y, beta: B) -> Result<Promoted<(Y, B), 2>>
+where
+    (Y, B): Broadcast<2>,
+{
+    sum_kernel_propto::<Exponential, _, 0, 2>([], (y, beta))
+}
+
 pub(crate) struct Gamma;
 
 impl Kernel<0, 3> for Gamma {
@@ -248,7 +398,16 @@ impl Kernel<0, 3> for Gamma {
         param::positive_finite(Self::NAME, "beta", beta)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, alpha, beta]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, alpha, beta]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         let ln_y = y.ln();
         let ln_beta = beta.ln();
         if let Some(g) = grad {
@@ -256,7 +415,20 @@ impl Kernel<0, 3> for Gamma {
             g[1] = ln_beta - digamma(alpha) + ln_y;
             g[2] = alpha / beta - y;
         }
-        alpha * ln_beta - lgamma(alpha) + (alpha - 1.0) * ln_y - beta * y
+        let mut lp = S::zero();
+        if keep.term(&[1, 2]) {
+            lp += alpha * ln_beta;
+        }
+        if keep.term(&[1]) {
+            lp -= lgamma(alpha);
+        }
+        if keep.term(&[0, 1]) {
+            lp += (alpha - 1.0) * ln_y;
+        }
+        if keep.term(&[0, 2]) {
+            lp -= beta * y;
+        }
+        lp
     }
 }
 
@@ -271,6 +443,15 @@ where
     sum_kernel::<Gamma, _, 0, 3>([], (y, alpha, beta))
 }
 
+/// [`gamma_lpdf`] without the terms that depend only on data (Stan's `gamma_lupdf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn gamma_lupdf<Y, A, B>(y: Y, alpha: A, beta: B) -> Result<Promoted<(Y, A, B), 3>>
+where
+    (Y, A, B): Broadcast<3>,
+{
+    sum_kernel_propto::<Gamma, _, 0, 3>([], (y, alpha, beta))
+}
+
 pub(crate) struct InvGamma;
 
 impl Kernel<0, 3> for InvGamma {
@@ -282,7 +463,16 @@ impl Kernel<0, 3> for InvGamma {
         param::positive_finite(Self::NAME, "beta", beta)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, alpha, beta]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, alpha, beta]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         if y.value() <= 0.0 {
             if let Some(g) = grad {
                 *g = [S::zero(); 3];
@@ -297,7 +487,20 @@ impl Kernel<0, 3> for InvGamma {
             g[1] = ln_beta - digamma(alpha) - ln_y;
             g[2] = alpha / beta - inv_y;
         }
-        alpha * ln_beta - lgamma(alpha) - (alpha + 1.0) * ln_y - beta * inv_y
+        let mut lp = S::zero();
+        if keep.term(&[1, 2]) {
+            lp += alpha * ln_beta;
+        }
+        if keep.term(&[1]) {
+            lp -= lgamma(alpha);
+        }
+        if keep.term(&[0, 1]) {
+            lp -= (alpha + 1.0) * ln_y;
+        }
+        if keep.term(&[0, 2]) {
+            lp -= beta * inv_y;
+        }
+        lp
     }
 }
 
@@ -311,6 +514,15 @@ where
     sum_kernel::<InvGamma, _, 0, 3>([], (y, alpha, beta))
 }
 
+/// [`inv_gamma_lpdf`] without the terms that depend only on data (Stan's `inv_gamma_lupdf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn inv_gamma_lupdf<Y, A, B>(y: Y, alpha: A, beta: B) -> Result<Promoted<(Y, A, B), 3>>
+where
+    (Y, A, B): Broadcast<3>,
+{
+    sum_kernel_propto::<InvGamma, _, 0, 3>([], (y, alpha, beta))
+}
+
 pub(crate) struct Beta;
 
 impl Kernel<0, 3> for Beta {
@@ -322,7 +534,16 @@ impl Kernel<0, 3> for Beta {
         obs::unit_interval(Self::NAME, "y", y)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, a, b]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, a, b]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         let ln_y = y.ln();
         let ln_1my = log1m(y);
         if let Some(g) = grad {
@@ -330,7 +551,17 @@ impl Kernel<0, 3> for Beta {
             g[1] = ln_y - digamma_diff(a, b);
             g[2] = ln_1my - digamma_diff(b, a);
         }
-        multiply_log(a - 1.0, ln_y) + multiply_log(b - 1.0, ln_1my) - lbeta(a, b)
+        let mut lp = S::zero();
+        if keep.term(&[0, 1]) {
+            lp += multiply_log(a - 1.0, ln_y);
+        }
+        if keep.term(&[0, 2]) {
+            lp += multiply_log(b - 1.0, ln_1my);
+        }
+        if keep.term(&[1, 2]) {
+            lp -= lbeta(a, b);
+        }
+        lp
     }
 }
 
@@ -345,6 +576,15 @@ where
     sum_kernel::<Beta, _, 0, 3>([], (y, alpha, beta))
 }
 
+/// [`beta_lpdf`] without the terms that depend only on data (Stan's `beta_lupdf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn beta_lupdf<Y, A, B>(y: Y, alpha: A, beta: B) -> Result<Promoted<(Y, A, B), 3>>
+where
+    (Y, A, B): Broadcast<3>,
+{
+    sum_kernel_propto::<Beta, _, 0, 3>([], (y, alpha, beta))
+}
+
 pub(crate) struct LogNormal;
 
 impl Kernel<0, 3> for LogNormal {
@@ -356,7 +596,16 @@ impl Kernel<0, 3> for LogNormal {
         param::positive_finite(Self::NAME, "sigma", sigma)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, mu, sigma]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, mu, sigma]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         if y.value() == 0.0 {
             if let Some(g) = grad {
                 *g = [S::zero(); 3];
@@ -371,7 +620,17 @@ impl Kernel<0, 3> for LogNormal {
             g[1] = z * inv_sigma;
             g[2] = (z.square() - 1.0) * inv_sigma;
         }
-        -(z.square() * 0.5) - sigma.ln() - HALF_LN_2PI - ln_y
+        let mut lp = -(z.square() * 0.5);
+        if keep.term(&[2]) {
+            lp -= sigma.ln();
+        }
+        if keep.term(&[]) {
+            lp -= HALF_LN_2PI;
+        }
+        if keep.term(&[0]) {
+            lp -= ln_y;
+        }
+        lp
     }
 }
 
@@ -383,6 +642,15 @@ where
     (Y, M, S): Broadcast<3>,
 {
     sum_kernel::<LogNormal, _, 0, 3>([], (y, mu, sigma))
+}
+
+/// [`lognormal_lpdf`] without the terms that depend only on data (Stan's `lognormal_lupdf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn lognormal_lupdf<Y, M, S>(y: Y, mu: M, sigma: S) -> Result<Promoted<(Y, M, S), 3>>
+where
+    (Y, M, S): Broadcast<3>,
+{
+    sum_kernel_propto::<LogNormal, _, 0, 3>([], (y, mu, sigma))
 }
 
 pub(crate) struct Uniform;
@@ -405,7 +673,16 @@ impl Kernel<0, 3> for Uniform {
         }
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, alpha, beta]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, alpha, beta]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         let inside = y.value() >= alpha.value() && y.value() <= beta.value();
         let width = beta - alpha;
         if let Some(g) = grad {
@@ -417,7 +694,11 @@ impl Kernel<0, 3> for Uniform {
             }
         }
         if inside {
-            -width.ln()
+            if keep.term(&[1, 2]) {
+                -width.ln()
+            } else {
+                S::zero()
+            }
         } else {
             S::from_f64(f64::NEG_INFINITY)
         }
@@ -433,6 +714,15 @@ where
     (Y, A, B): Broadcast<3>,
 {
     sum_kernel::<Uniform, _, 0, 3>([], (y, alpha, beta))
+}
+
+/// [`uniform_lpdf`] without the terms that depend only on data (Stan's `uniform_lupdf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn uniform_lupdf<Y, A, B>(y: Y, alpha: A, beta: B) -> Result<Promoted<(Y, A, B), 3>>
+where
+    (Y, A, B): Broadcast<3>,
+{
+    sum_kernel_propto::<Uniform, _, 0, 3>([], (y, alpha, beta))
 }
 
 pub(crate) struct Weibull;
@@ -472,4 +762,13 @@ where
     (Y, A, S): Broadcast<3>,
 {
     sum_kernel::<Weibull, _, 0, 3>([], (y, alpha, sigma))
+}
+
+/// [`weibull_lpdf`] without the terms that depend only on data (Stan's `weibull_lupdf`, the
+/// `propto` form): zero when every argument is data, and with the same derivatives.
+pub fn weibull_lupdf<Y, A, S>(y: Y, alpha: A, sigma: S) -> Result<Promoted<(Y, A, S), 3>>
+where
+    (Y, A, S): Broadcast<3>,
+{
+    sum_kernel_propto::<Weibull, _, 0, 3>([], (y, alpha, sigma))
 }
