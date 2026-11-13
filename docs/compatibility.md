@@ -107,13 +107,15 @@ stanmath-rs does the same.
 When a sequence argument is empty, the result is zero, but the scalar arguments are still
 validated, as in Stan: `normal_lpdf([] | 0, -1)` is an error. Checks that relate two arguments,
 such as `y > tau` for `wiener_lpdf`, apply only when both are present.
+A few functions follow Stan in returning zero for an empty response before any other check:
+`poisson_log_glm`, `bernoulli_logit_glm`, and `ordered_logistic`. `ordered_probit`,
+`categorical`, and `normal_id_glm` check their other arguments first, also as in Stan.
+`binomial_logit_glm`, `neg_binomial_2_log_glm`, `categorical_logit_glm`, and
+`ordered_logistic_glm` have not yet been compared with Stan for an empty response.
 
 Deliberate differences:
 
 * `beta_lpdf` and `weibull_lpdf` use `0 ln 0 = 0`, so for example `beta_lpdf(0 | 1, b)` is finite.
-* The GLMs, `ordered_logistic`, `ordered_probit`, `categorical`, and `hypergeometric` still
-  return zero for an empty response without validating the other arguments. Stan's behavior for
-  these is being checked.
 
 ## Linear algebra
 

@@ -11,6 +11,7 @@ use stanmath_rs_autodiff::{Arg, IntArg, Lift, Real, broadcast_len};
 use stanmath_rs_core::{Error, Matrix, Result};
 use stanmath_rs_linalg::{multiply, multiply_vector};
 
+use crate::check::param;
 use crate::continuous::normal_lpdf;
 use crate::discrete::{
     bernoulli_logit_lpmf, binomial_logit_lpmf, neg_binomial_2_log_lpmf, poisson_log_lpmf,
@@ -116,6 +117,10 @@ where
 {
     const F: &str = "poisson_log_glm_lpmf";
     check_rows(F, y.int_len(), x.nrows())?;
+    if x.nrows() == 0 {
+        // Stan returns zero before checking alpha and beta (checked against Stan Math 5.4.0).
+        return Ok(T::zero());
+    }
     let eta = linear_predictor(F, x, &alpha, beta)?;
     poisson_log_lpmf(y, &eta[..])
 }
@@ -131,6 +136,10 @@ where
 {
     const F: &str = "bernoulli_logit_glm_lpmf";
     check_rows(F, y.int_len(), x.nrows())?;
+    if x.nrows() == 0 {
+        // Stan returns zero before checking alpha and beta (checked against Stan Math 5.4.0).
+        return Ok(T::zero());
+    }
     let eta = linear_predictor(F, x, &alpha, beta)?;
     bernoulli_logit_lpmf(y, &eta[..])
 }
@@ -203,6 +212,10 @@ where
 {
     const F: &str = "normal_id_glm_lpdf";
     check_rows(F, Some(y.len()), x.nrows())?;
+    // Stan checks a scalar sigma even with no rows (checked against Stan Math 5.4.0).
+    if let Some(s) = sigma.arg_scalar() {
+        param::positive_finite(F, "sigma", Lift::<T>::lift(s).value())?;
+    }
     let mu = linear_predictor(F, x, &alpha, beta)?;
     let y: Vec<T> = y.iter().map(|&v| v.lift()).collect();
     let sigma: Vec<T> = broadcast_arg(F, "sigma", &sigma, x.nrows())?;

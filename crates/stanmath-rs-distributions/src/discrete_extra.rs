@@ -745,7 +745,13 @@ where
     E::Elem: Lift<T>,
     T: Real,
 {
-    ordered_sum("ordered_logistic_lpmf", y, eta, c, ordered_logistic_term)
+    const F: &str = "ordered_logistic_lpmf";
+    // Stan returns zero for an empty response before checking the cutpoints, unlike
+    // ordered_probit (checked against Stan Math 5.4.0).
+    if broadcast_len(F, &[y.int_len(), eta.arg_len()])? == 0 {
+        return Ok(T::zero());
+    }
+    ordered_sum(F, y, eta, c, ordered_logistic_term)
 }
 
 /// Ordered probit log mass: as [`ordered_logistic_lpmf`] with the standard normal CDF in place of

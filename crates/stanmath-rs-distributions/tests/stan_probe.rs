@@ -99,3 +99,30 @@ fn cdf_supports_at_zero() {
     assert_eq!(loglogistic_cdf(0.0, 1.0, 2.0).unwrap(), 0.0);
     assert!(loglogistic_cdf(-0.5, 1.0, 2.0).is_err());
 }
+
+#[test]
+fn empty_responses_of_the_glm_ordered_and_categorical_families() {
+    let none_int: &[i64] = &[];
+    let none: &[f64] = &[];
+    let x0 = Matrix::<f64>::zeros(0, 2);
+    let beta = [0.4, -0.3];
+    // Stan returns zero here before checking the other arguments.
+    assert_eq!(
+        poisson_log_glm_lpmf(none_int, &x0, f64::NAN, &beta).unwrap(),
+        0.0
+    );
+    assert_eq!(
+        bernoulli_logit_glm_lpmf(none_int, &x0, 0.0, &[f64::NAN, 0.1]).unwrap(),
+        0.0
+    );
+    assert_eq!(
+        ordered_logistic_lpmf(none_int, none, &[1.0, 0.0]).unwrap(),
+        0.0
+    );
+    // These validate the other arguments first.
+    assert!(normal_id_glm_lpdf(none, &x0, 0.0, &beta, -1.0).is_err());
+    assert!(ordered_probit_lpmf(none_int, none, &[1.0, 0.0]).is_err());
+    assert!(categorical_lpmf(none_int, &[0.5, 0.6]).is_err());
+    assert!(discrete_range_lpmf(none_int, 5i64, 2i64).is_err());
+    assert!(discrete_range_lpmf(3i64, 5i64, 2i64).is_err());
+}
