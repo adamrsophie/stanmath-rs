@@ -194,3 +194,73 @@ fn builtin_poisson_matches_the_user_likelihood() {
         assert!(close(*a, *b, 1e-7), "parameter {j}: {a} vs {b}");
     }
 }
+
+/// Stan's probe covariance: `gp_exp_quad_cov(x, alpha, rho)` plus `1e-8` on the diagonal, at
+/// `x = [0, 0.5, 1.2]`, with `phi = [alpha, rho]`.
+struct ProbeCov;
+
+impl LaplaceCovariance for ProbeCov {
+    fn covariance<S: Real>(&self, phi: &[S]) -> Result<Matrix<S>> {
+        const PX: [f64; 3] = [0.0, 0.5, 1.2];
+        let (a, rho) = (phi[0], phi[1]);
+        Ok(Matrix::from_fn(3, 3, |i, j| {
+            let d = PX[i] - PX[j];
+            let k = a * a * (-(S::from_f64(d * d) / (rho * rho * 2.0))).exp();
+            if i == j { k + 1e-8 } else { k }
+        }))
+    }
+}
+
+/// Values from `tools/stan-reference/stan_probe.cpp` against Stan Math 5.4.0, called as stanc 2.40
+/// calls them (one based `y_index` there, zero based here). The `_lupmf` forms equal the `_lpmf`
+/// forms in Stan, whether or not an argument is a parameter.
+#[test]
+fn builtin_laplace_marginals_match_stan() {
+    let phi = [1.2, 0.7];
+    let index = [0usize, 1, 2];
+    let m = [0.0; 3];
+    let poisson = [1i64, 0, 3];
+    let bernoulli = [1i64, 0, 1];
+    let cases = [
+        (
+            "poisson_log",
+            laplace_marginal_poisson_log_lpmf(&poisson, &index, &m, &ProbeCov, &phi).unwrap(),
+            laplace_marginal_poisson_log_lupmf(&poisson, &index, &m, &ProbeCov, &phi).unwrap(),
+            -5.2519293722403537,
+        ),
+        (
+            "bernoulli_logit",
+            laplace_marginal_bernoulli_logit_lpmf(&bernoulli, &index, &m, &ProbeCov, &phi).unwrap(),
+            laplace_marginal_bernoulli_logit_lupmf(&bernoulli, &index, &m, &ProbeCov, &phi)
+                .unwrap(),
+            -2.4047765826747565,
+        ),
+    ];
+    let permuted =
+        laplace_marginal_poisson_log_lpmf(&poisson, &[2, 0, 1], &m, &ProbeCov, &phi).unwrap();
+    assert!(
+        close(permuted, -5.5979215135734739, 1e-7),
+        "permuted: {permuted}"
+    );
+    for (name, lpmf, lupmf, want) in cases {
+        assert!(close(lpmf, want, 1e-7), "{name}: {lpmf} vs {want}");
+        assert_eq!(lpmf, lupmf, "{name}");
+    }
+}
+
+#[test]
+fn laplace_options_match_stan_defaults() {
+    // generate_laplace_options(3) in Stan Math 5.4.0: (zeros(3), 1.49012e-08, 500, 1, 1000, 1).
+    let o = generate_laplace_options(3);
+    assert_eq!(o.theta_init.as_deref(), Some(&[0.0; 3][..]));
+    assert!(close(o.tolerance, 1.49012e-08, 1e-5));
+    assert_eq!(
+        (
+            o.max_num_steps,
+            o.solver,
+            o.max_steps_line_search,
+            o.allow_fallback
+        ),
+        (500, 1, 1000, true)
+    );
+}

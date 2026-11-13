@@ -50,7 +50,9 @@ pub trait LaplaceCovariance {
     fn covariance<S: Real>(&self, phi: &[S]) -> Result<Matrix<S>>;
 }
 
-/// Control parameters of the mode search, the `_tol` arguments of Stan's Laplace functions.
+/// Control parameters of the mode search: the options tuple of Stan's `_tol` Laplace functions,
+/// `(theta_init, tol, max_steps, solver, max_steps_linesearch, allow_fallback)`, plus the Hessian
+/// block size, which Stan passes as its own argument.
 #[derive(Clone, Debug)]
 pub struct LaplaceOptions {
     /// Starting value of the mode search; `None` starts at zero.
@@ -65,6 +67,13 @@ pub struct LaplaceOptions {
     pub hessian_block_size: usize,
     /// Maximum number of step halvings in each Newton iteration.
     pub max_steps_line_search: usize,
+    /// Stan's choice of decomposition for the Newton step, 1, 2, or 3. Every Newton step here
+    /// solves `(I + W K) a = W theta + g` by elimination with pivoting, which serves all three
+    /// cases, so the value is only checked.
+    pub solver: u8,
+    /// Whether Stan may fall back to the next solver when the chosen one fails. Checked only,
+    /// as [`LaplaceOptions::solver`].
+    pub allow_fallback: bool,
 }
 
 impl Default for LaplaceOptions {
@@ -75,6 +84,8 @@ impl Default for LaplaceOptions {
             max_num_steps: 500,
             hessian_block_size: 1,
             max_steps_line_search: 1000,
+            solver: 1,
+            allow_fallback: true,
         }
     }
 }
@@ -474,6 +485,14 @@ fn check_options(function: &'static str, o: &LaplaceOptions) -> Result<()> {
     if o.max_num_steps == 0 {
         return Err(Error::parameter(function, "max_num_steps", 0.0, "positive"));
     }
+    if !(1..=3).contains(&o.solver) {
+        return Err(Error::parameter(
+            function,
+            "solver",
+            f64::from(o.solver),
+            "1, 2, or 3",
+        ));
+    }
     if o.hessian_block_size == 0 {
         return Err(Error::parameter(
             function,
@@ -865,4 +884,105 @@ pub fn laplace_marginal_tol_bernoulli_logit_lpmf<T: Real, K: LaplaceCovariance>(
     const F: &str = "laplace_marginal_bernoulli_logit_lpmf";
     let (model, params) = Builtin::new(F, Family::BernoulliLogit, y, y_index, m, None)?;
     marginal(F, &model, &params, covariance, phi, options)
+}
+
+/// [`laplace_marginal_poisson_log_lpmf`] under its `_lupmf` name. Stan keeps every term of the Laplace marginals, constants
+/// included, so the two are equal.
+///
+/// # Errors
+///
+/// As [`laplace_marginal_poisson_log_lpmf`].
+pub fn laplace_marginal_poisson_log_lupmf<T: Real, K: LaplaceCovariance>(
+    y: &[i64],
+    y_index: &[usize],
+    m: &[T],
+    covariance: &K,
+    phi: &[T],
+) -> Result<T> {
+    laplace_marginal_poisson_log_lpmf(y, y_index, m, covariance, phi)
+}
+
+/// [`laplace_marginal_tol_poisson_log_lpmf`] under its `_lupmf` name. Stan keeps every term of the Laplace marginals, constants
+/// included, so the two are equal.
+///
+/// # Errors
+///
+/// As [`laplace_marginal_tol_poisson_log_lpmf`].
+pub fn laplace_marginal_tol_poisson_log_lupmf<T: Real, K: LaplaceCovariance>(
+    y: &[i64],
+    y_index: &[usize],
+    m: &[T],
+    covariance: &K,
+    phi: &[T],
+    options: &LaplaceOptions,
+) -> Result<T> {
+    laplace_marginal_tol_poisson_log_lpmf(y, y_index, m, covariance, phi, options)
+}
+
+/// [`laplace_marginal_bernoulli_logit_lpmf`] under its `_lupmf` name. Stan keeps every term of the Laplace marginals, constants
+/// included, so the two are equal.
+///
+/// # Errors
+///
+/// As [`laplace_marginal_bernoulli_logit_lpmf`].
+pub fn laplace_marginal_bernoulli_logit_lupmf<T: Real, K: LaplaceCovariance>(
+    y: &[i64],
+    y_index: &[usize],
+    m: &[T],
+    covariance: &K,
+    phi: &[T],
+) -> Result<T> {
+    laplace_marginal_bernoulli_logit_lpmf(y, y_index, m, covariance, phi)
+}
+
+/// [`laplace_marginal_tol_bernoulli_logit_lpmf`] under its `_lupmf` name. Stan keeps every term of the Laplace marginals, constants
+/// included, so the two are equal.
+///
+/// # Errors
+///
+/// As [`laplace_marginal_tol_bernoulli_logit_lpmf`].
+pub fn laplace_marginal_tol_bernoulli_logit_lupmf<T: Real, K: LaplaceCovariance>(
+    y: &[i64],
+    y_index: &[usize],
+    m: &[T],
+    covariance: &K,
+    phi: &[T],
+    options: &LaplaceOptions,
+) -> Result<T> {
+    laplace_marginal_tol_bernoulli_logit_lpmf(y, y_index, m, covariance, phi, options)
+}
+
+/// [`laplace_marginal_neg_binomial_2_log_lpmf`] under its `_lupmf` name. Stan keeps every term of the Laplace marginals, constants
+/// included, so the two are equal.
+///
+/// # Errors
+///
+/// As [`laplace_marginal_neg_binomial_2_log_lpmf`].
+pub fn laplace_marginal_neg_binomial_2_log_lupmf<T: Real, K: LaplaceCovariance>(
+    y: &[i64],
+    y_index: &[usize],
+    eta: T,
+    m: &[T],
+    covariance: &K,
+    phi: &[T],
+) -> Result<T> {
+    laplace_marginal_neg_binomial_2_log_lpmf(y, y_index, eta, m, covariance, phi)
+}
+
+/// [`laplace_marginal_tol_neg_binomial_2_log_lpmf`] under its `_lupmf` name. Stan keeps every term of the Laplace marginals, constants
+/// included, so the two are equal.
+///
+/// # Errors
+///
+/// As [`laplace_marginal_tol_neg_binomial_2_log_lpmf`].
+pub fn laplace_marginal_tol_neg_binomial_2_log_lupmf<T: Real, K: LaplaceCovariance>(
+    y: &[i64],
+    y_index: &[usize],
+    eta: T,
+    m: &[T],
+    covariance: &K,
+    phi: &[T],
+    options: &LaplaceOptions,
+) -> Result<T> {
+    laplace_marginal_tol_neg_binomial_2_log_lpmf(y, y_index, eta, m, covariance, phi, options)
 }

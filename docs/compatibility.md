@@ -143,6 +143,11 @@ Deliberate differences:
 * `matrix_normal_prec_lpdf` of an `N` by `P` matrix weights `ln det Sigma` by `P / 2` and
   `ln det D` by `N / 2`, as the matrix normal density does. Stan Math 5.4.0 swaps the two weights,
   so the values differ unless `N = P` or `ln det Sigma = ln det D`.
+* The built in Laplace marginals (`laplace_marginal_*_lpmf`) use every observation. Stan Math
+  5.4.0 uses only the first `m.size()` of them: with `y_index` longer than `m`, later observations
+  do not change its value. The `_lupmf` forms equal the `_lpmf` forms, as in Stan, which keeps the
+  constants. The negative binomial takes a scalar `eta`, as the Functions Reference documents;
+  stanc 2.40 types it as a vector, and Stan Math 5.4.0 rejected every vector length probed.
 
 ## Linear algebra
 
