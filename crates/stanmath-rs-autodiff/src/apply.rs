@@ -21,6 +21,7 @@ use stanmath_rs_core::{Error, Matrix, Result};
 use crate::dual::Dual;
 use crate::real::Real;
 use crate::tape::Var;
+use crate::vectorize::{Arg, broadcast_len};
 
 /// A scalar or a container of scalars, nested to any depth: `Vec` for Stan's arrays, vectors,
 /// and row vectors, and [`Matrix`] for its matrices.
@@ -141,3 +142,41 @@ pub fn apply_scalar_binary<C: ScalarContainer, U>(
 ) -> Result<C::Mapped<U>> {
     a.zip_scalars(b, &mut f)
 }
+
+macro_rules! apply_broadcast {
+    ($(#[$doc:meta])* $name:ident, $($a:ident: $A:ident),+) => {
+        $(#[$doc])*
+        ///
+        /// # Errors
+        ///
+        /// [`Error::DimensionMismatch`] when two sequences differ in length, or the first error `f`
+        /// returns.
+        pub fn $name<$($A: Arg,)+ U>(
+            function: &'static str,
+            $($a: $A,)+
+            mut f: impl FnMut($($A::Elem),+) -> Result<U>,
+        ) -> Result<Vec<U>> {
+            let n = broadcast_len(function, &[$($a.arg_len()),+])?;
+            (0..n).map(|i| f($($a.arg_at(i)),+)).collect()
+        }
+    };
+}
+
+apply_broadcast!(
+    /// `f` at each index of one argument that may be a scalar or a slice: Stan's vectorized `_rng`
+    /// functions and other broadcasting signatures. Scalars broadcast; the result has the common
+    /// length of the slices, or one element when every argument is a scalar.
+    apply_broadcast1, a: A
+);
+apply_broadcast!(
+    /// [`apply_broadcast1`] for two arguments.
+    apply_broadcast2, a: A, b: B
+);
+apply_broadcast!(
+    /// [`apply_broadcast1`] for three arguments.
+    apply_broadcast3, a: A, b: B, c: C
+);
+apply_broadcast!(
+    /// [`apply_broadcast1`] for four arguments.
+    apply_broadcast4, a: A, b: B, c: C, d: D
+);

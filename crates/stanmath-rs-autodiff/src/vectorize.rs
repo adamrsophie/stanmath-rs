@@ -143,6 +143,18 @@ impl<T: Real> Arg for Dual<T> {
     }
 }
 
+impl Arg for i64 {
+    type Elem = i64;
+    #[inline]
+    fn arg_len(&self) -> Option<usize> {
+        None
+    }
+    #[inline]
+    fn arg_at(&self, _: usize) -> i64 {
+        *self
+    }
+}
+
 impl<E: Copy> Arg for &[E] {
     type Elem = E;
     #[inline]

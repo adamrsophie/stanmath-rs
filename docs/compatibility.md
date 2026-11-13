@@ -268,6 +268,11 @@ calls every elementwise signature of 94 functions this way (2563 signatures up t
 levels, and a depth 8 check for the 3345 deeper ones, which share one recursive impl). `add`,
 `subtract`, `multiply`, `elt_multiply`, and `elt_divide` are Rust's operators.
 
+The vectorized `_rng` signatures go through `apply_broadcast1` to `apply_broadcast4`, which apply a
+scalar sampler at each index of scalar or slice arguments. `tests/signatures_rng.rs`, written by
+`tools/reference/gen_rng.py`, calls all 1995 of them (124 Rust shapes) and requires the draws to
+equal the scalar sampler's, in order from the same seed.
+
 The scalar sweep also fixed four conventions to match Stan: `fmax` and `fmin` return the second argument
 on ties (and take its derivative); `beta(a, b)` with a nonpositive argument is
 `|Γ(a) Γ(b) / Γ(a + b)|`; `log_falling_factorial` and `log_rising_factorial` reject `x <= 0`; and
