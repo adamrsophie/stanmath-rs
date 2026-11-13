@@ -14,7 +14,9 @@ use stanmath_rs_autodiff::{Arg, Broadcast, Dual, IntArg, Lift, Promoted, Real, b
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::{obs, param};
-use crate::kernel::{Kernel, sum_kernel, sum_kernel_propto, sum_terms};
+use crate::kernel::{
+    Kernel, drop_if_data, is_param, keep, sum_kernel, sum_kernel_propto, sum_terms,
+};
 
 /// Tolerance for simplex checks, as Stan's `CONSTRAINT_TOLERANCE`.
 const SIMPLEX_TOL: f64 = 1e-8;
@@ -268,6 +270,19 @@ where
         lp += lchoose_int(a, k) + lchoose_int(b, big_n - k) - lchoose_int(a + b, big_n);
     }
     Ok(lp)
+}
+
+/// [`hypergeometric_lpmf`] without the terms that depend only on data (Stan's
+/// `hypergeometric_lupmf`): every argument is an integer, so this is zero once the arguments pass
+/// the checks.
+pub fn hypergeometric_lupmf<N, D, A, B>(n: N, draws: D, successes: A, failures: B) -> Result<f64>
+where
+    N: IntArg,
+    D: IntArg,
+    A: IntArg,
+    B: IntArg,
+{
+    hypergeometric_lpmf(n, draws, successes, failures).map(|_| 0.0)
 }
 
 // Negative binomial (shape, rate)
@@ -547,6 +562,18 @@ where
     Ok(lp)
 }
 
+/// [`discrete_range_lpmf`] without the terms that depend only on data (Stan's
+/// `discrete_range_lupmf`): every argument is an integer, so this is zero once the arguments pass
+/// the checks.
+pub fn discrete_range_lupmf<Y, L, U>(y: Y, lower: L, upper: U) -> Result<f64>
+where
+    Y: IntArg,
+    L: IntArg,
+    U: IntArg,
+{
+    discrete_range_lpmf(y, lower, upper).map(|_| 0.0)
+}
+
 /// Discrete range log CDF `ln P(Y <= y)`.
 pub fn discrete_range_lcdf<Y, L, U>(y: Y, lower: L, upper: U) -> Result<f64>
 where
@@ -662,6 +689,17 @@ where
     T: Real,
 {
     poisson_binomial_sum("poisson_binomial_lpmf", y, theta, |v, lp| lp[v as usize])
+}
+
+/// [`poisson_binomial_lpmf`] without the terms that depend only on data (Stan's
+/// `poisson_binomial_lupmf`). No term depends only on data, so this is zero when `theta` is data
+/// and the full value otherwise.
+pub fn poisson_binomial_lupmf<N, T>(y: N, theta: &[T]) -> Result<T>
+where
+    N: IntArg,
+    T: Real,
+{
+    drop_if_data(poisson_binomial_lpmf(y, theta))
 }
 
 /// Poisson binomial log CDF `ln P(Y <= y)`.
@@ -795,6 +833,19 @@ where
     ordered_sum(F, y, eta, c, ordered_logistic_term)
 }
 
+/// [`ordered_logistic_lpmf`] without the terms that depend only on data (Stan's `ordered_logistic_lupmf`). No
+/// term depends only on data, so this is zero when every argument is data and the full value
+/// otherwise.
+pub fn ordered_logistic_lupmf<N, E, T>(y: N, eta: E, c: &[T]) -> Result<T>
+where
+    N: IntArg,
+    E: Arg,
+    E::Elem: Lift<T>,
+    T: Real,
+{
+    drop_if_data(ordered_logistic_lpmf(y, eta, c))
+}
+
 /// Ordered probit log mass: as [`ordered_logistic_lpmf`] with the standard normal CDF in place of
 /// `inv_logit`.
 pub fn ordered_probit_lpmf<N, E, T>(y: N, eta: E, c: &[T]) -> Result<T>
@@ -805,6 +856,19 @@ where
     T: Real,
 {
     ordered_sum("ordered_probit_lpmf", y, eta, c, ordered_probit_term)
+}
+
+/// [`ordered_probit_lpmf`] without the terms that depend only on data (Stan's `ordered_probit_lupmf`). No
+/// term depends only on data, so this is zero when every argument is data and the full value
+/// otherwise.
+pub fn ordered_probit_lupmf<N, E, T>(y: N, eta: E, c: &[T]) -> Result<T>
+where
+    N: IntArg,
+    E: Arg,
+    E::Elem: Lift<T>,
+    T: Real,
+{
+    drop_if_data(ordered_probit_lpmf(y, eta, c))
 }
 
 // Multinomial family
@@ -833,8 +897,14 @@ fn multinomial_counts(
     Ok((total, coef))
 }
 
-/// Multinomial log mass of counts `ns` with category probabilities `theta` (a simplex).
-pub fn multinomial_lpmf<T: Real>(ns: &[i64], theta: &[T]) -> Result<T> {
+propto_pair! {
+    /// Multinomial log mass of counts `ns` with category probabilities `theta` (a simplex).
+    multinomial_lpmf, multinomial_lupmf <T>(ns: &[i64], theta: &[T]) -> Result<T>
+    where { T: Real }
+    |propto| { multinomial_with(ns, theta, propto) }
+}
+
+fn multinomial_with<T: Real>(ns: &[i64], theta: &[T], propto: bool) -> Result<T> {
     const F: &str = "multinomial_lpmf";
     let sum: f64 = theta.iter().map(Real::value).sum();
     if theta.iter().any(|t| t.is_nan() || t.value() < 0.0) || (sum - 1.0).abs() > SIMPLEX_TOL {
@@ -846,17 +916,28 @@ pub fn multinomial_lpmf<T: Real>(ns: &[i64], theta: &[T]) -> Result<T> {
         ));
     }
     let (_, coef) = multinomial_counts(F, ns, theta.len(), "theta")?;
-    let mut lp = T::from_f64(coef);
-    for (&n, &t) in ns.iter().zip(theta) {
-        if n > 0 {
-            lp += t.ln() * n as f64;
+    let mut lp = T::zero();
+    if keep(propto, &[]) {
+        lp += coef;
+    }
+    if keep(propto, &[is_param::<T, T>()]) {
+        for (&n, &t) in ns.iter().zip(theta) {
+            if n > 0 {
+                lp += t.ln() * n as f64;
+            }
         }
     }
     Ok(lp)
 }
 
-/// Multinomial log mass with probabilities `softmax(gamma)`, stable for any finite `gamma`.
-pub fn multinomial_logit_lpmf<T: Real>(ns: &[i64], gamma: &[T]) -> Result<T> {
+propto_pair! {
+    /// Multinomial log mass with probabilities `softmax(gamma)`, stable for any finite `gamma`.
+    multinomial_logit_lpmf, multinomial_logit_lupmf <T>(ns: &[i64], gamma: &[T]) -> Result<T>
+    where { T: Real }
+    |propto| { multinomial_logit_with(ns, gamma, propto) }
+}
+
+fn multinomial_logit_with<T: Real>(ns: &[i64], gamma: &[T], propto: bool) -> Result<T> {
     const F: &str = "multinomial_logit_lpmf";
     if let Some(g) = gamma.iter().find(|g| !g.is_finite()) {
         return Err(Error::parameter(F, "gamma", g.value(), "finite"));
@@ -865,20 +946,33 @@ pub fn multinomial_logit_lpmf<T: Real>(ns: &[i64], gamma: &[T]) -> Result<T> {
     if total == 0 {
         return Ok(T::zero());
     }
-    let mut lp = T::from_f64(coef) - log_sum_exp_slice(gamma) * total as f64;
-    for (&n, &g) in ns.iter().zip(gamma) {
-        if n > 0 {
-            lp += g * n as f64;
+    let mut lp = T::zero();
+    if keep(propto, &[]) {
+        lp += coef;
+    }
+    if keep(propto, &[is_param::<T, T>()]) {
+        lp -= log_sum_exp_slice(gamma) * total as f64;
+        for (&n, &g) in ns.iter().zip(gamma) {
+            if n > 0 {
+                lp += g * n as f64;
+            }
         }
     }
     Ok(lp)
 }
 
-/// Dirichlet multinomial log mass of counts `ns` with concentrations `alpha`:
-/// `N! Γ(α₀) / Γ(N + α₀) prod_k Γ(n_k + α_k) / (n_k! Γ(α_k))`, `α₀ = sum α`.
-///
-/// Requires `alpha` positive finite and nonnegative counts. Zero total count gives 0.
-pub fn dirichlet_multinomial_lpmf<T: Real>(ns: &[i64], alpha: &[T]) -> Result<T> {
+propto_pair! {
+    /// Dirichlet multinomial log mass of counts `ns` with concentrations `alpha`:
+    /// `N! Γ(α₀) / Γ(N + α₀) prod_k Γ(n_k + α_k) / (n_k! Γ(α_k))`, `α₀ = sum α`.
+    ///
+    /// Requires `alpha` positive finite and nonnegative counts. Zero total count gives 0.
+    dirichlet_multinomial_lpmf, dirichlet_multinomial_lupmf <T>(ns: &[i64], alpha: &[T])
+        -> Result<T>
+    where { T: Real }
+    |propto| { dirichlet_multinomial_with(ns, alpha, propto) }
+}
+
+fn dirichlet_multinomial_with<T: Real>(ns: &[i64], alpha: &[T], propto: bool) -> Result<T> {
     const F: &str = "dirichlet_multinomial_lpmf";
     if let Some(a) = alpha.iter().find(|a| !(a.value() > 0.0 && a.is_finite())) {
         return Err(Error::parameter(F, "alpha", a.value(), "positive finite"));
@@ -888,12 +982,23 @@ pub fn dirichlet_multinomial_lpmf<T: Real>(ns: &[i64], alpha: &[T]) -> Result<T>
         return Ok(T::zero());
     }
     // N! Γ(α₀) / Γ(N + α₀) = N B(α₀, N) and Γ(n + α) / (n! Γ(α)) = 1 / (n B(α, n)).
-    let alpha0: T = alpha.iter().copied().sum();
-    let mut lp = lbeta(alpha0, T::from_f64(total as f64)) + (total as f64).ln();
-    for (&n, &a) in ns.iter().zip(alpha) {
-        if n > 0 {
-            lp -= lbeta(a, T::from_f64(n as f64)) + (n as f64).ln();
+    let (pa, counts) = (is_param::<T, T>(), keep(propto, &[]));
+    let mut lp = T::zero();
+    if keep(propto, &[pa]) {
+        let alpha0: T = alpha.iter().copied().sum();
+        lp += lbeta(alpha0, T::from_f64(total as f64));
+        for (&n, &a) in ns.iter().zip(alpha) {
+            if n > 0 {
+                lp -= lbeta(a, T::from_f64(n as f64));
+            }
         }
+    }
+    if counts {
+        lp += (total as f64).ln()
+            - ns.iter()
+                .filter(|&&n| n > 0)
+                .map(|&n| (n as f64).ln())
+                .sum::<f64>();
     }
     Ok(lp)
 }

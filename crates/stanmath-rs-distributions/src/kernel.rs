@@ -15,7 +15,7 @@
 
 use core::marker::PhantomData;
 
-use stanmath_rs_autodiff::{Broadcast, IntArg, NaryFn, Promoted, Real, broadcast_len};
+use stanmath_rs_autodiff::{Broadcast, IntArg, Lift, NaryFn, Promoted, Real, broadcast_len};
 use stanmath_rs_core::Result;
 
 /// The log density of one observation with `M` integer and `N` real arguments.
@@ -136,6 +136,23 @@ where
     A: Broadcast<N>,
 {
     sum_kernel_keep::<K, A, M, N>(ints, args, false, None)
+}
+
+/// Stan's `include_summand`: whether a term that depends on the arguments flagged in `params`
+/// survives. Under `propto`, only terms that depend on a parameter do.
+pub(crate) fn keep(propto: bool, params: &[bool]) -> bool {
+    !propto || params.iter().any(|&p| p)
+}
+
+/// Whether an argument of element type `E`, lifted to `T`, is a parameter rather than data.
+pub(crate) fn is_param<T, E: Lift<T>>() -> bool {
+    !E::DATA
+}
+
+/// The `propto` form of a density with no term that depends only on data: zero when the scalar
+/// type `T` is data, since then every argument is.
+pub(crate) fn drop_if_data<T: Real>(lp: Result<T>) -> Result<T> {
+    lp.map(|v| if is_param::<T, T>() { v } else { T::zero() })
 }
 
 /// [`sum_kernel`] up to terms that depend only on data (Stan's `propto`). Zero when every argument

@@ -9,6 +9,8 @@ use stanmath_rs_core::special::{HALF_LN_2PI, LN_PI};
 use stanmath_rs_core::{Error, Matrix, Result};
 use stanmath_rs_linalg::{cholesky_decompose, mdivide_left_tri_low};
 
+use crate::kernel::{is_param, keep};
+
 /// Tolerance for simplex checks, as Stan's `CONSTRAINT_TOLERANCE`.
 const TOL: f64 = 1e-8;
 
@@ -28,11 +30,17 @@ fn check_vector_sizes(function: &'static str, k: usize, lens: &[(&str, usize)]) 
     Ok(())
 }
 
-/// Dirichlet log density of a simplex `theta` with concentrations `alpha`.
-///
-/// Requires `alpha` positive finite and `theta` nonnegative summing to one within `1e-8`. Uses
-/// `0 ln 0 = 0`.
-pub fn dirichlet_lpdf<T: Real, A: Lift<T> + Copy>(theta: &[T], alpha: &[A]) -> Result<T> {
+propto_pair! {
+    /// Dirichlet log density of a simplex `theta` with concentrations `alpha`.
+    ///
+    /// Requires `alpha` positive finite and `theta` nonnegative summing to one within `1e-8`.
+    /// Uses `0 ln 0 = 0`.
+    dirichlet_lpdf, dirichlet_lupdf <T, A>(theta: &[T], alpha: &[A]) -> Result<T>
+    where { T: Real, A: Lift<T> + Copy }
+    |propto| { dirichlet_with(theta, alpha, propto) }
+}
+
+fn dirichlet_with<T: Real, A: Lift<T> + Copy>(theta: &[T], alpha: &[A], propto: bool) -> Result<T> {
     const F: &str = "dirichlet_lpdf";
     check_vector_sizes(F, theta.len(), &[("alpha", alpha.len())])?;
     let alpha: Vec<T> = lift_all(alpha);
@@ -45,22 +53,34 @@ pub fn dirichlet_lpdf<T: Real, A: Lift<T> + Copy>(theta: &[T], alpha: &[A]) -> R
     if theta.iter().any(|t| t.is_nan() || t.value() < 0.0) || (total - 1.0).abs() > TOL {
         return Err(Error::observation(F, "theta", total, "a simplex"));
     }
-    let mut lp = lgamma(alpha.iter().copied().sum::<T>());
-    for (&t, &a) in theta.iter().zip(&alpha) {
-        lp -= lgamma(a);
-        let am1 = a - 1.0;
-        if !(am1.value() == 0.0 && t.value() == 0.0) {
-            lp += am1 * t.ln();
+    let pa = is_param::<T, A>();
+    let mut lp = T::zero();
+    if keep(propto, &[pa]) {
+        lp += lgamma(alpha.iter().copied().sum::<T>());
+        for &a in &alpha {
+            lp -= lgamma(a);
+        }
+    }
+    if keep(propto, &[is_param::<T, T>(), pa]) {
+        for (&t, &a) in theta.iter().zip(&alpha) {
+            let am1 = a - 1.0;
+            if !(am1.value() == 0.0 && t.value() == 0.0) {
+                lp += am1 * t.ln();
+            }
         }
     }
     Ok(lp)
 }
 
-fn multi_normal_cholesky_core<T: Real>(
+/// The multivariate normal log density with covariance `L Lᵀ`; `params` flags whether `y` and
+/// `mu` are parameters.
+pub(crate) fn multi_normal_cholesky_core<T: Real>(
     function: &'static str,
     y: &[T],
     mu: &[T],
     l: &Matrix<T>,
+    propto: bool,
+    [py, pm]: [bool; 2],
 ) -> Result<T> {
     let k = y.len();
     check_vector_sizes(
@@ -81,31 +101,52 @@ fn multi_normal_cholesky_core<T: Real>(
     if k == 0 {
         return Ok(T::zero());
     }
-    let diff: Vec<T> = y.iter().zip(mu).map(|(&a, &b)| a - b).collect();
-    let z = mdivide_left_tri_low(l, &Matrix::column_vector(diff))?;
-    let half_sq: T = z.as_slice().iter().map(|v| v.square()).sum::<T>() * 0.5;
-    let log_det: T = (0..k).map(|i| l[(i, i)].ln()).sum();
-    Ok(-half_sq - log_det - HALF_LN_2PI * k as f64)
+    let pl = is_param::<T, T>();
+    let mut lp = T::zero();
+    if keep(propto, &[py, pm, pl]) {
+        let diff: Vec<T> = y.iter().zip(mu).map(|(&a, &b)| a - b).collect();
+        let z = mdivide_left_tri_low(l, &Matrix::column_vector(diff))?;
+        lp -= z.as_slice().iter().map(|v| v.square()).sum::<T>() * 0.5;
+    }
+    if keep(propto, &[pl]) {
+        lp -= (0..k).map(|i| l[(i, i)].ln()).sum::<T>();
+    }
+    if keep(propto, &[]) {
+        lp -= HALF_LN_2PI * k as f64;
+    }
+    Ok(lp)
 }
 
-/// Multivariate normal log density with location `mu` and covariance `L Lᵀ`, given the lower
-/// Cholesky factor `L` (only its lower triangle is read).
-pub fn multi_normal_cholesky_lpdf<T, Y, M>(y: &[Y], mu: &[M], l: &Matrix<T>) -> Result<T>
-where
-    T: Real,
-    Y: Lift<T> + Copy,
-    M: Lift<T> + Copy,
-{
-    multi_normal_cholesky_core("multi_normal_cholesky_lpdf", &lift_all(y), &lift_all(mu), l)
+propto_pair! {
+    /// Multivariate normal log density with location `mu` and covariance `L Lᵀ`, given the lower
+    /// Cholesky factor `L` (only its lower triangle is read).
+    multi_normal_cholesky_lpdf, multi_normal_cholesky_lupdf <T, Y, M>(
+        y: &[Y],
+        mu: &[M],
+        l: &Matrix<T>,
+    ) -> Result<T>
+    where { T: Real, Y: Lift<T> + Copy, M: Lift<T> + Copy }
+    |propto| {
+        let params = [is_param::<T, Y>(), is_param::<T, M>()];
+        let (y, mu) = (lift_all(y), lift_all(mu));
+        multi_normal_cholesky_core("multi_normal_cholesky_lpdf", &y, &mu, l, propto, params)
+    }
 }
 
-/// Multivariate normal log density with location `mu` and covariance `sigma`.
-///
-/// # Errors
-///
-/// [`Error::NotSymmetric`] or [`Error::NotPositiveDefinite`] for an invalid covariance, plus the
-/// argument checks of [`multi_normal_cholesky_lpdf`].
-pub fn multi_normal_lpdf<T, Y, M>(y: &[Y], mu: &[M], sigma: &Matrix<T>) -> Result<T>
+propto_pair! {
+    /// Multivariate normal log density with location `mu` and covariance `sigma`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NotSymmetric`] or [`Error::NotPositiveDefinite`] for an invalid covariance, plus
+    /// the argument checks of [`multi_normal_cholesky_lpdf`].
+    multi_normal_lpdf, multi_normal_lupdf <T, Y, M>(y: &[Y], mu: &[M], sigma: &Matrix<T>)
+        -> Result<T>
+    where { T: Real, Y: Lift<T> + Copy, M: Lift<T> + Copy }
+    |propto| { multi_normal_with(y, mu, sigma, propto) }
+}
+
+fn multi_normal_with<T, Y, M>(y: &[Y], mu: &[M], sigma: &Matrix<T>, propto: bool) -> Result<T>
 where
     T: Real,
     Y: Lift<T> + Copy,
@@ -119,12 +160,13 @@ where
         ));
     }
     let l = cholesky_decompose(sigma)?;
-    multi_normal_cholesky_core(F, &lift_all(y), &lift_all(mu), &l)
+    let params = [is_param::<T, Y>(), is_param::<T, M>()];
+    multi_normal_cholesky_core(F, &lift_all(y), &lift_all(mu), &l, propto, params)
 }
 
 /// Log normalizing constant of the LKJ density, as in Stan Math (Lewandowski, Kurowicka, and Joe
 /// 2009).
-fn lkj_constant<T: Real>(eta: T, k: usize) -> T {
+pub(crate) fn lkj_constant<T: Real>(eta: T, k: usize) -> T {
     let km1 = (k - 1) as f64;
     let mut c = lgamma(eta + 0.5 * km1) * km1;
     for i in 1..k {
@@ -134,12 +176,19 @@ fn lkj_constant<T: Real>(eta: T, k: usize) -> T {
     c
 }
 
-/// LKJ log density of the Cholesky factor `L` of a correlation matrix, with shape `eta`.
-///
-/// `eta = 1` is uniform over correlation matrices. Requires `eta > 0` and `L` lower triangular with
-/// positive diagonal.
-pub fn lkj_corr_cholesky_lpdf<T: Real, E: Lift<T>>(l: &Matrix<T>, eta: E) -> Result<T> {
+propto_pair! {
+    /// LKJ log density of the Cholesky factor `L` of a correlation matrix, with shape `eta`.
+    ///
+    /// `eta = 1` is uniform over correlation matrices. Requires `eta > 0` and `L` lower triangular
+    /// with positive diagonal.
+    lkj_corr_cholesky_lpdf, lkj_corr_cholesky_lupdf <T, E>(l: &Matrix<T>, eta: E) -> Result<T>
+    where { T: Real, E: Lift<T> }
+    |propto| { lkj_corr_cholesky_with(l, eta, propto) }
+}
+
+fn lkj_corr_cholesky_with<T: Real, E: Lift<T>>(l: &Matrix<T>, eta: E, propto: bool) -> Result<T> {
     const F: &str = "lkj_corr_cholesky_lpdf";
+    let pe = is_param::<T, E>();
     let eta: T = eta.lift();
     if !(eta.value() > 0.0) {
         return Err(Error::parameter(F, "eta", eta.value(), "positive"));
@@ -161,10 +210,15 @@ pub fn lkj_corr_cholesky_lpdf<T: Real, E: Lift<T>>(l: &Matrix<T>, eta: E) -> Res
     if k == 0 {
         return Ok(T::zero());
     }
-    let mut lp = lkj_constant(eta, k);
-    for i in 1..k {
-        let coef = (k - i - 1) as f64;
-        lp += l[(i, i)].ln() * (eta * 2.0 - 2.0 + coef);
+    let mut lp = T::zero();
+    if keep(propto, &[pe]) {
+        lp += lkj_constant(eta, k);
+    }
+    if keep(propto, &[is_param::<T, T>(), pe]) {
+        for i in 1..k {
+            let coef = (k - i - 1) as f64;
+            lp += l[(i, i)].ln() * (eta * 2.0 - 2.0 + coef);
+        }
     }
     Ok(lp)
 }

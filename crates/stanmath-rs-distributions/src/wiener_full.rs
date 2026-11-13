@@ -29,7 +29,7 @@
 //! the four parameter `wiener_lpdf`.
 
 // The return types name one generic parameter per Wiener argument; aliases would only hide them.
-#![allow(clippy::type_complexity)]
+#![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
 use core::f64::consts::PI;
 
@@ -68,6 +68,8 @@ pub trait WienerArgs<const N: usize> {
     fn get(&self, i: usize) -> [Self::Out; N];
     /// Values of the scalar arguments, `None` for sequences.
     fn scalar_values(&self) -> [Option<f64>; N];
+    /// Whether each argument is data (`f64`).
+    fn data(&self) -> [bool; N];
 }
 
 /// The common scalar type of a Wiener argument tuple.
@@ -86,6 +88,10 @@ impl<X: Broadcast<5>> WienerArgs<5> for X {
 
     fn scalar_values(&self) -> [Option<f64>; 5] {
         <X as Broadcast<5>>::scalar_values(self)
+    }
+
+    fn data(&self) -> [bool; 5] {
+        <X as Broadcast<5>>::data(self)
     }
 }
 
@@ -125,6 +131,12 @@ where
     fn scalar_values(&self) -> [Option<f64>; 6] {
         let l = <(A, B, C) as Broadcast<3>>::scalar_values(&(self.0, self.1, self.2));
         let r = <(D, E, F) as Broadcast<3>>::scalar_values(&(self.3, self.4, self.5));
+        [l[0], l[1], l[2], r[0], r[1], r[2]]
+    }
+
+    fn data(&self) -> [bool; 6] {
+        let l = <(A, B, C) as Broadcast<3>>::data(&(self.0, self.1, self.2));
+        let r = <(D, E, F) as Broadcast<3>>::data(&(self.3, self.4, self.5));
         [l[0], l[1], l[2], r[0], r[1], r[2]]
     }
 }
@@ -168,13 +180,22 @@ where
         let r = <(E, F, G, H) as Broadcast<4>>::scalar_values(&(self.4, self.5, self.6, self.7));
         [l[0], l[1], l[2], l[3], r[0], r[1], r[2], r[3]]
     }
+
+    fn data(&self) -> [bool; 8] {
+        let l = <(A, B, C, D) as Broadcast<4>>::data(&(self.0, self.1, self.2, self.3));
+        let r = <(E, F, G, H) as Broadcast<4>>::data(&(self.4, self.5, self.6, self.7));
+        [l[0], l[1], l[2], l[3], r[0], r[1], r[2], r[3]]
+    }
 }
 
 /// Sums `term` over broadcast elements after validating each with `check`. With an empty
 /// sequence argument, `check` sees `None` in its place and validates the scalars, as Stan does.
+/// Under `propto` with every argument data, the elements are only checked: no term of the
+/// Wiener densities depends only on data unless all of it does.
 fn sum_elements<X: WienerArgs<N>, const N: usize>(
     function: &'static str,
     args: X,
+    propto: bool,
     check: impl Fn([Option<f64>; N]) -> Result<()>,
     term: impl Fn([X::Out; N]) -> X::Out,
 ) -> Result<X::Out> {
@@ -182,11 +203,14 @@ fn sum_elements<X: WienerArgs<N>, const N: usize>(
     if n == 0 {
         check(args.scalar_values())?;
     }
+    let skip = propto && args.data().iter().all(|&d| d);
     let mut total = <X::Out as Real>::zero();
     for i in 0..n {
         let x = args.get(i);
         check(x.map(|e| Some(e.value())))?;
-        total += term(x);
+        if !skip {
+            total += term(x);
+        }
     }
     Ok(total)
 }
@@ -646,82 +670,89 @@ fn log_cdf_full<T: Real>([y, a, t0, w, v, sv, sw, st0]: [T; 8], tol: f64, comple
 
 // Public functions.
 
-/// Log density of the Wiener diffusion model with normal inter-trial drift variability, at the
-/// upper boundary (Stan's five parameter `wiener_lpdf`): boundary separation `a`, nondecision time
-/// `t0`, relative starting point `w`, mean drift `v`, drift standard deviation `sv`.
-///
-/// The drift distribution is integrated out in closed form, and the series is truncated at a
-/// relative error of about `1e-12`. Requires `y > t0`, `y` and `a` positive finite, `t0` and `sv`
-/// nonnegative finite, `w` in `(0, 1)`, `v` finite.
-pub fn wiener5_lpdf<Y, A, T0, W, V, SV>(
-    y: Y,
-    a: A,
-    t0: T0,
-    w: W,
-    v: V,
-    sv: SV,
-) -> Result<WienerOut<(Y, A, T0, W, V, SV), 6>>
-where
-    (Y, A, T0, W, V, SV): WienerArgs<6>,
-{
-    const F: &str = "wiener5_lpdf";
-    sum_elements(
-        F,
-        (y, a, t0, w, v, sv),
-        |[y, a, t0, w, v, sv]| check_element(F, [y, a, t0, w, v, sv, Some(0.0), Some(0.0)], true),
-        |[y, a, t0, w, v, sv]| log_density_upper(y - t0, a, v, w, sv),
-    )
+propto_pair! {
+    /// Log density of the Wiener diffusion model with normal inter-trial drift variability, at
+    /// the upper boundary (Stan's five parameter `wiener_lpdf`): boundary separation `a`,
+    /// nondecision time `t0`, relative starting point `w`, mean drift `v`, drift standard
+    /// deviation `sv`.
+    ///
+    /// The drift distribution is integrated out in closed form, and the series is truncated at a
+    /// relative error of about `1e-12`. Requires `y > t0`, `y` and `a` positive finite, `t0` and
+    /// `sv` nonnegative finite, `w` in `(0, 1)`, `v` finite.
+    wiener5_lpdf, wiener5_lupdf <Y, A, T0, W, V, SV>(
+        y: Y,
+        a: A,
+        t0: T0,
+        w: W,
+        v: V,
+        sv: SV,
+    ) -> Result<WienerOut<(Y, A, T0, W, V, SV), 6>>
+    where { (Y, A, T0, W, V, SV): WienerArgs<6> }
+    |propto| {
+        const F: &str = "wiener5_lpdf";
+        sum_elements(
+            F,
+            (y, a, t0, w, v, sv),
+            propto,
+            |[y, a, t0, w, v, sv]| {
+                check_element(F, [y, a, t0, w, v, sv, Some(0.0), Some(0.0)], true)
+            },
+            |[y, a, t0, w, v, sv]| log_density_upper(y - t0, a, v, w, sv),
+        )
+    }
 }
 
-/// Log density of the seven parameter Wiener diffusion model at the upper boundary (Stan's seven
-/// parameter `wiener_lpdf`).
-///
-/// As [`wiener5_lpdf`], with the relative starting point uniform on `[w - sw / 2, w + sw / 2]`
-/// and the nondecision time uniform on `[t0, t0 + st0]`. Those two distributions are integrated
-/// numerically to a relative tolerance of `1e-6`; see [`wiener_full_prec_lpdf`]. Further requires
-/// `sw` in `[0, 1)` with `w +/- sw / 2` in `(0, 1)`, and `st0` nonnegative finite.
-#[allow(clippy::too_many_arguments)]
-pub fn wiener_full_lpdf<Y, A, T0, W, V, SV, SW, ST0>(
-    y: Y,
-    a: A,
-    t0: T0,
-    w: W,
-    v: V,
-    sv: SV,
-    sw: SW,
-    st0: ST0,
-) -> Result<WienerOut<(Y, A, T0, W, V, SV, SW, ST0), 8>>
-where
-    (Y, A, T0, W, V, SV, SW, ST0): WienerArgs<8>,
-{
-    wiener_full_prec_lpdf(y, a, t0, w, v, sv, sw, st0, DEFAULT_PRECISION)
+propto_pair! {
+    /// Log density of the seven parameter Wiener diffusion model at the upper boundary (Stan's
+    /// seven parameter `wiener_lpdf`).
+    ///
+    /// As [`wiener5_lpdf`], with the relative starting point uniform on `[w - sw / 2, w + sw / 2]`
+    /// and the nondecision time uniform on `[t0, t0 + st0]`. Those two distributions are
+    /// integrated numerically to a relative tolerance of `1e-6`; see [`wiener_full_prec_lpdf`].
+    /// Further requires `sw` in `[0, 1)` with `w +/- sw / 2` in `(0, 1)`, and `st0` nonnegative
+    /// finite.
+    wiener_full_lpdf, wiener_full_lupdf <Y, A, T0, W, V, SV, SW, ST0>(
+        y: Y,
+        a: A,
+        t0: T0,
+        w: W,
+        v: V,
+        sv: SV,
+        sw: SW,
+        st0: ST0,
+    ) -> Result<WienerOut<(Y, A, T0, W, V, SV, SW, ST0), 8>>
+    where { (Y, A, T0, W, V, SV, SW, ST0): WienerArgs<8> }
+    |propto| { wiener_full_with((y, a, t0, w, v, sv, sw, st0), DEFAULT_PRECISION, propto) }
 }
 
-/// [`wiener_full_lpdf`] with an explicit `precision` (positive finite, Stan's default `1e-4`).
-///
-/// The quadratures use the relative tolerance `min(precision, 1e-6)`. In Stan the argument sets
-/// the accuracy of the derivatives; here the derivatives are exact for the computed approximation,
-/// so `precision` can only tighten it.
-#[allow(clippy::too_many_arguments)]
-pub fn wiener_full_prec_lpdf<Y, A, T0, W, V, SV, SW, ST0>(
-    y: Y,
-    a: A,
-    t0: T0,
-    w: W,
-    v: V,
-    sv: SV,
-    sw: SW,
-    st0: ST0,
-    precision: f64,
-) -> Result<WienerOut<(Y, A, T0, W, V, SV, SW, ST0), 8>>
-where
-    (Y, A, T0, W, V, SV, SW, ST0): WienerArgs<8>,
-{
+propto_pair! {
+    /// [`wiener_full_lpdf`] with an explicit `precision` (positive finite, Stan's default `1e-4`).
+    ///
+    /// The quadratures use the relative tolerance `min(precision, 1e-6)`. In Stan the argument
+    /// sets the accuracy of the derivatives; here the derivatives are exact for the computed
+    /// approximation, so `precision` can only tighten it.
+    wiener_full_prec_lpdf, wiener_full_prec_lupdf <Y, A, T0, W, V, SV, SW, ST0>(
+        y: Y,
+        a: A,
+        t0: T0,
+        w: W,
+        v: V,
+        sv: SV,
+        sw: SW,
+        st0: ST0,
+        precision: f64,
+    ) -> Result<WienerOut<(Y, A, T0, W, V, SV, SW, ST0), 8>>
+    where { (Y, A, T0, W, V, SV, SW, ST0): WienerArgs<8> }
+    |propto| { wiener_full_with((y, a, t0, w, v, sv, sw, st0), precision, propto) }
+}
+
+fn wiener_full_with<X: WienerArgs<8>>(args: X, precision: f64, propto: bool) -> Result<X::Out> {
     const F: &str = "wiener_full_lpdf";
     let tol = tolerance(F, precision)?;
     sum_elements(
         F,
-        (y, a, t0, w, v, sv, sw, st0),
+        args,
+        propto,
         |x| check_element(F, x, true),
         |x| log_density_full(x, tol),
     )
@@ -767,6 +798,7 @@ fn wiener4_tail<X: WienerArgs<5>>(f: &'static str, args: X, complement: bool) ->
     sum_elements(
         f,
         args,
+        false,
         |[y, a, t0, w, v]| {
             check_element(f, [y, a, t0, w, v, Some(0.0), Some(0.0), Some(0.0)], false)
         },
@@ -903,6 +935,7 @@ fn wiener_full_tail<X: WienerArgs<8>>(
     sum_elements(
         f,
         args,
+        false,
         |x| check_element(f, x, false),
         |x| log_cdf_full(x, tol, complement),
     )

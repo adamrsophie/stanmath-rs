@@ -32,6 +32,66 @@
 //! Log densities are fused: the sum over all elements is recorded as one reverse-mode node whose
 //! partials are computed analytically, generically in the scalar type, so Hessians remain exact.
 
+/// Defines a log density `$full` and its `propto` twin `$lup` (Stan's `_lupdf` or `_lupmf`) from
+/// one body. In the body, `$p` is `false` for `$full` and `true` for `$lup`; with `base(f, g)`, the
+/// alias names `f` in `$full` and `g` in `$lup`. Bounds go in the `where` clause.
+macro_rules! propto_pair {
+    (
+        $(#[$doc:meta])*
+        $full:ident, $lup:ident <$($g:ident),*> ($($a:ident: $t:ty),* $(,)?) -> $ret:ty
+        where { $($w:tt)* }
+        |$p:ident| $body:block
+    ) => {
+        $(#[$doc])*
+        pub fn $full<$($g),*>($($a: $t),*) -> $ret
+        where
+            $($w)*
+        {
+            let $p = false;
+            $body
+        }
+
+        #[doc = concat!(
+            "[`", stringify!($full), "`] without the terms that depend only on data (Stan's `",
+            stringify!($lup), "`)."
+        )]
+        pub fn $lup<$($g),*>($($a: $t),*) -> $ret
+        where
+            $($w)*
+        {
+            let $p = true;
+            $body
+        }
+    };
+    (
+        $(#[$doc:meta])*
+        $full:ident, $lup:ident <$($g:ident),*> ($($a:ident: $t:ty),* $(,)?) -> $ret:ty
+        where { $($w:tt)* }
+        base($bf:path, $bl:path) |$alias:ident| $body:block
+    ) => {
+        $(#[$doc])*
+        pub fn $full<$($g),*>($($a: $t),*) -> $ret
+        where
+            $($w)*
+        {
+            let $alias = $bf;
+            $body
+        }
+
+        #[doc = concat!(
+            "[`", stringify!($full), "`] without the terms that depend only on data (Stan's `",
+            stringify!($lup), "`)."
+        )]
+        pub fn $lup<$($g),*>($($a: $t),*) -> $ret
+        where
+            $($w)*
+        {
+            let $alias = $bl;
+            $body
+        }
+    };
+}
+
 mod cdf;
 mod cdf_plain;
 mod check;
@@ -88,16 +148,17 @@ pub use continuous_extra::{
 pub use discrete::{
     bernoulli_logit_lpmf, bernoulli_logit_lupmf, bernoulli_lpmf, bernoulli_lupmf,
     binomial_logit_lpmf, binomial_logit_lupmf, binomial_lpmf, binomial_lupmf,
-    categorical_logit_lpmf, categorical_lpmf, neg_binomial_2_log_lpmf, neg_binomial_2_log_lupmf,
-    neg_binomial_2_lpmf, neg_binomial_2_lupmf, poisson_log_lpmf, poisson_log_lupmf, poisson_lpmf,
-    poisson_lupmf,
+    categorical_logit_lpmf, categorical_logit_lupmf, categorical_lpmf, categorical_lupmf,
+    neg_binomial_2_log_lpmf, neg_binomial_2_log_lupmf, neg_binomial_2_lpmf, neg_binomial_2_lupmf,
+    poisson_log_lpmf, poisson_log_lupmf, poisson_lpmf, poisson_lupmf,
 };
 pub use discrete_extra::*;
 pub use glm::*;
 pub use hmm::*;
 pub use misc_dist::{normal_sufficient_lpdf, normal_sufficient_lupdf, student_t_qf};
 pub use multivariate::{
-    dirichlet_lpdf, lkj_corr_cholesky_lpdf, multi_normal_cholesky_lpdf, multi_normal_lpdf,
+    dirichlet_lpdf, dirichlet_lupdf, lkj_corr_cholesky_lpdf, lkj_corr_cholesky_lupdf,
+    multi_normal_cholesky_lpdf, multi_normal_cholesky_lupdf, multi_normal_lpdf, multi_normal_lupdf,
 };
 pub use multivariate_extra::*;
 pub use overloads::*;
@@ -115,9 +176,9 @@ pub use rng_overloads::*;
 pub use rng_wave2::*;
 pub use wiener_full::{
     WienerArgs, WienerOut, wiener_full_lccdf_unnorm, wiener_full_lcdf_unnorm, wiener_full_lpdf,
-    wiener_full_prec_lccdf_unnorm, wiener_full_prec_lcdf_unnorm, wiener_full_prec_lpdf,
-    wiener_lccdf_unnorm, wiener_lcdf_unnorm, wiener4_lccdf_unnorm, wiener4_lcdf_unnorm,
-    wiener5_lpdf,
+    wiener_full_lupdf, wiener_full_prec_lccdf_unnorm, wiener_full_prec_lcdf_unnorm,
+    wiener_full_prec_lpdf, wiener_full_prec_lupdf, wiener_lccdf_unnorm, wiener_lcdf_unnorm,
+    wiener4_lccdf_unnorm, wiener4_lcdf_unnorm, wiener5_lpdf, wiener5_lupdf,
 };
 pub use yule_simon::{
     yule_simon_cdf, yule_simon_lccdf, yule_simon_lcdf, yule_simon_lpmf, yule_simon_lupmf,

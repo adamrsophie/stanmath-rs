@@ -12,7 +12,7 @@ use stanmath_rs_autodiff::{Broadcast, IntArg, Promoted, Real, broadcast_len};
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::{obs, param};
-use crate::kernel::{Keep, Kernel, sum_kernel, sum_kernel_propto};
+use crate::kernel::{Keep, Kernel, drop_if_data, sum_kernel, sum_kernel_propto};
 
 /// `ln (N choose n)` for integers.
 #[inline]
@@ -588,6 +588,16 @@ where
     Ok(lp)
 }
 
+/// [`categorical_lpmf`] without the terms that depend only on data (Stan's `categorical_lupmf`). No term depends
+/// only on data, so this is zero when `theta` is data and the full value otherwise.
+pub fn categorical_lupmf<N, T>(n: N, theta: &[T]) -> Result<T>
+where
+    N: IntArg,
+    T: Real,
+{
+    drop_if_data(categorical_lpmf(n, theta))
+}
+
 /// Categorical log mass with probabilities `softmax(beta)`, stable for any `beta`.
 pub fn categorical_logit_lpmf<N, T>(n: N, beta: &[T]) -> Result<T>
 where
@@ -608,4 +618,14 @@ where
         lp += beta[n.int_at(i) as usize - 1];
     }
     Ok(lp - lse * len as f64)
+}
+
+/// [`categorical_logit_lpmf`] without the terms that depend only on data (Stan's `categorical_logit_lupmf`). No term depends
+/// only on data, so this is zero when `beta` is data and the full value otherwise.
+pub fn categorical_logit_lupmf<N, T>(n: N, beta: &[T]) -> Result<T>
+where
+    N: IntArg,
+    T: Real,
+{
+    drop_if_data(categorical_logit_lpmf(n, beta))
 }
