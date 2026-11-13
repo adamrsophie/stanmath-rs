@@ -14,6 +14,7 @@ repository = "https://github.com/adamrsophie/stanmath-rs"
 [dependencies]
 stanmath-rs-core = { path = "../../crates/stanmath-rs-core" }
 stanmath-rs-autodiff = { path = "../../crates/stanmath-rs-autodiff" }
+stanmath-rs-linalg = { path = "../../crates/stanmath-rs-linalg" }
 opencl3 = "0.12.4"
 
 [dev-dependencies]

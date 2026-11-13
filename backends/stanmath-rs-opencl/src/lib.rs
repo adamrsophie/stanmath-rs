@@ -5,10 +5,12 @@
 //! (`cl_khr_fp64`). A [`MatrixCl`] is a matrix in device memory, stored column major like
 //! [`Matrix`]; move matrices with [`to_matrix_cl`] and [`from_matrix_cl`].
 
+mod cholesky;
 mod density;
 mod device;
 mod elementwise;
 
+pub use cholesky::cholesky_decompose_on_device;
 pub use density::{Density, lpdf_on_device};
 
 pub use elementwise::{Binary, Unary, binary_on_device, unary_on_device};
