@@ -17,6 +17,11 @@ import re
 import sys
 
 SCALAR = {"int", "real"}
+# Rust operators (+, -, *, /) or, for squared_distance, a reduction rather than an elementwise map.
+OPERATORS = {"add", "subtract", "multiply", "elt_multiply", "elt_divide", "squared_distance"}
+# Arrays nest through one recursive impl (Vec<C> for any container C), so calls stop at this many
+# Vec levels; deep_arrays() checks one function to the deepest level Stan has.
+MAX_DEPTH = 3
 
 
 def rust(t):
@@ -80,8 +85,9 @@ def main():
     body = []
     total = 0
     names = 0
+    deep = [0]
     for name in sorted(sigs):
-        if name.endswith("_rng") or name.startswith(("lower_bound", "upper_bound")):
+        if name.endswith("_rng") or name.startswith(("lower_bound", "upper_bound")) or name in OPERATORS:
             continue
         scalar = [a for a, r in sigs[name] if all(t in SCALAR for t in a) and r in SCALAR]
         if not scalar or len(scalar[0]) not in (1, 2):
@@ -101,6 +107,9 @@ def main():
             cont = [x for x in ra if x[0] not in ("f64", "i64")]
             if any(c[0].replace("i64", "f64") != cont[0][0].replace("i64", "f64") for c in cont):
                 continue
+            if max(x[0].count("Vec<") for x in ra) > MAX_DEPTH:
+                deep[0] += 1
+                continue
             calls.setdefault(tuple(x[0] for x in ra), []).append(a)
         if not calls:
             continue
@@ -108,12 +117,13 @@ def main():
         for shape, stan in sorted(calls.items()):
             total += len(stan)
             body.append(call(name, shape, is_int, reals))
-    out = HEADER.format(total=total, names=names, shapes=len(body))
+    out = HEADER.format(total=total, names=names, shapes=len(body), deep=deep[0], depth=MAX_DEPTH)
     out += "#[test]\nfn elementwise_signatures() {\n    let mut failures = Vec::new();\n"
     out += "".join(body)
     out += '    assert!(failures.is_empty(), "\\n{}", failures.join("\\n"));\n}\n'
+    out += DEEP
     open("crates/stanmath-rs/tests/signatures_elementwise.rs", "w").write(out)
-    print(total, "signatures,", names, "functions,", len(body), "Rust shapes")
+    print(total, "signatures,", names, "functions,", len(body), "Rust shapes;", deep[0], "deeper")
 
 
 def arg(p, leaf, is_int):
@@ -169,14 +179,42 @@ def call(name, shape, is_int, reals):
     return "".join(lines).replace("'", '"')
 
 
+DEEP = """
+#[test]
+fn deep_arrays() {
+    // array[,,,,,,,] real, the deepest array in the signature dump.
+    let mut x = vec![0.5, -1.0];
+    let mut depth8: Vec<Vec<Vec<Vec<Vec<Vec<Vec<Vec<f64>>>>>>>> = Vec::new();
+    for _ in 0..2 {
+        depth8 = vec![vec![vec![vec![vec![vec![vec![x.clone()]]]]]]];
+        x.push(2.0);
+    }
+    let got = apply_scalar_unary(&depth8, exp);
+    let want: Vec<f64> = leaves(&depth8).into_iter().map(f64::exp).collect();
+    assert_eq!(leaves(&got), want);
+    let pairs = apply_scalar_binary(&depth8, &got, |a, b| pow(b, a)).unwrap();
+    assert_eq!(leaves(&pairs).len(), want.len());
+}
+"""
+
 HEADER = """//! Every vectorized form of a scalar function of one or two arguments in the Stan language,
 //! called through `apply_scalar_unary` and `apply_scalar_binary`.
 //!
 //! Written by `tools/reference/gen_elementwise.py` from the CmdStan 2.40.0 signature dump: {total}
 //! Stan signatures of {names} functions in {shapes} Rust shapes. Each call must keep the container's
 //! shape and return the scalar function of every element; the scalar functions are compared with
-//! Stan Math by `stan_reference_scalar.rs`.
-#![allow(clippy::too_many_lines, clippy::unreadable_literal, clippy::cast_precision_loss)]
+//! Stan Math by `stan_reference_scalar.rs`. The other {deep} signatures nest arrays more than {depth}
+//! `Vec` levels deep; they go through the same recursive impl, which `deep_arrays` checks to depth 8.
+//! `add`, `subtract`, `multiply`, `elt_multiply`, and `elt_divide` are Rust's operators.
+#![allow(
+    clippy::too_many_lines,
+    clippy::unreadable_literal,
+    clippy::cast_precision_loss,
+    clippy::unnecessary_cast,
+    clippy::approx_constant,
+    clippy::redundant_closure,
+    clippy::type_complexity
+)]
 
 use stanmath_rs::prelude::*;
 

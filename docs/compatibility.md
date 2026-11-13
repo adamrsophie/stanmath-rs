@@ -261,6 +261,13 @@ and requires each broadcast call to equal the sum (the product for `_cdf`) of th
 value and gradient. `tests/signatures_multivariate.rs` does the same for the `array[] vector` forms
 of the multivariate normal, Student t, Dirichlet, and ordered densities.
 
+Stan vectorizes scalar functions over containers; in Rust, `apply_scalar_unary` and
+`apply_scalar_binary` apply a scalar function over vectors, matrices, and arrays of any depth.
+`crates/stanmath-rs/tests/signatures_elementwise.rs`, written by `tools/reference/gen_elementwise.py`,
+calls every elementwise signature of 94 functions this way (2563 signatures up to three array
+levels, and a depth 8 check for the 3345 deeper ones, which share one recursive impl). `add`,
+`subtract`, `multiply`, `elt_multiply`, and `elt_divide` are Rust's operators.
+
 The scalar sweep also fixed four conventions to match Stan: `fmax` and `fmin` return the second argument
 on ties (and take its derivative); `beta(a, b)` with a nonpositive argument is
 `|Γ(a) Γ(b) / Γ(a + b)|`; `log_falling_factorial` and `log_rising_factorial` reject `x <= 0`; and
