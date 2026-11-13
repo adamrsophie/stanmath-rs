@@ -1,10 +1,10 @@
 //! Every vectorized form of a scalar function of one or two arguments in the Stan language,
 //! called through `apply_scalar_unary` and `apply_scalar_binary`.
 //!
-//! Written by `tools/reference/gen_elementwise.py` from the CmdStan 2.40.0 signature dump: 2563
-//! Stan signatures of 94 functions in 1490 Rust shapes. Each call must keep the container's
+//! Written by `tools/reference/gen_elementwise.py` from the CmdStan 2.40.0 signature dump: 2844
+//! Stan signatures of 106 functions in 1651 Rust shapes. Each call must keep the container's
 //! shape and return the scalar function of every element; the scalar functions are compared with
-//! Stan Math by `stan_reference_scalar.rs`. The other 3345 signatures nest arrays more than 3
+//! Stan Math by `stan_reference_scalar.rs`. The other 3763 signatures nest arrays more than 3
 //! `Vec` levels deep; they go through the same recursive impl, which `deep_arrays` checks to depth 8.
 //! `add`, `subtract`, `multiply`, `elt_multiply`, and `elt_divide` are Rust's operators.
 #![allow(
@@ -2249,6 +2249,470 @@ fn elementwise_signatures() {
         );
     }
     {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![1.339, 1.378], vec![1.417, 1.456]],
+            vec![vec![1.495, 1.534], vec![1.573, 1.612]],
+        ];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(bessel_first_kind(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "bessel_first_kind(Vec<Vec<Vec<i64>>>, Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: f64 = 1.339;
+        let got = apply_scalar_unary(&a, |a| eval(bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_first_kind(Vec<Vec<Vec<i64>>>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: Vec<Vec<f64>> = vec![vec![1.339, 1.378], vec![1.417, 1.456]];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(bessel_first_kind(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "bessel_first_kind(Vec<Vec<i64>>, Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: f64 = 1.339;
+        let got = apply_scalar_unary(&a, |a| eval(bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_first_kind(Vec<Vec<i64>>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: Vec<f64> = vec![1.339, 1.378];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(bessel_first_kind(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "bessel_first_kind(Vec<i64>, Vec<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: f64 = 1.339;
+        let got = apply_scalar_unary(&a, |a| eval(bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_first_kind(Vec<i64>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Matrix<f64> = Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]);
+        let got = apply_scalar_unary(&b, |b| eval(bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_first_kind(i64, Matrix<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Matrix<f64>> = vec![
+            Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]),
+            Matrix::from_column_major(2, 2, vec![1.495, 1.534, 1.573, 1.612]),
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_first_kind(i64, Vec<Matrix<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Matrix<f64>>> = vec![
+            vec![
+                Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]),
+                Matrix::from_column_major(2, 2, vec![1.495, 1.534, 1.573, 1.612]),
+            ],
+            vec![
+                Matrix::from_column_major(2, 2, vec![1.651, 1.69, 1.729, 1.768]),
+                Matrix::from_column_major(2, 2, vec![1.807, 1.846, 1.885, 1.924]),
+            ],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_first_kind(i64, Vec<Vec<Matrix<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Vec<Matrix<f64>>>> = vec![
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]),
+                    Matrix::from_column_major(2, 2, vec![1.495, 1.534, 1.573, 1.612]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![1.651, 1.69, 1.729, 1.768]),
+                    Matrix::from_column_major(2, 2, vec![1.807, 1.846, 1.885, 1.924]),
+                ],
+            ],
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![1.963, 2.002, 2.041, 2.08]),
+                    Matrix::from_column_major(2, 2, vec![2.119, 2.158, 2.197, 2.236]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![2.275, 2.314, 2.353, 2.392]),
+                    Matrix::from_column_major(2, 2, vec![2.431, 2.47, 2.509, 2.548]),
+                ],
+            ],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_first_kind(i64, Vec<Vec<Vec<Matrix<f64>>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![1.339, 1.378], vec![1.417, 1.456]],
+            vec![vec![1.495, 1.534], vec![1.573, 1.612]],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_first_kind(i64, Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<f64>> = vec![vec![1.339, 1.378], vec![1.417, 1.456]];
+        let got = apply_scalar_unary(&b, |b| eval(bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_first_kind(i64, Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<f64> = vec![1.339, 1.378];
+        let got = apply_scalar_unary(&b, |b| eval(bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_first_kind(i64, Vec<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![1.339, 1.378], vec![1.417, 1.456]],
+            vec![vec![1.495, 1.534], vec![1.573, 1.612]],
+        ];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(bessel_second_kind(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "bessel_second_kind(Vec<Vec<Vec<i64>>>, Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: f64 = 1.339;
+        let got = apply_scalar_unary(&a, |a| eval(bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_second_kind(Vec<Vec<Vec<i64>>>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: Vec<Vec<f64>> = vec![vec![1.339, 1.378], vec![1.417, 1.456]];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(bessel_second_kind(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "bessel_second_kind(Vec<Vec<i64>>, Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: f64 = 1.339;
+        let got = apply_scalar_unary(&a, |a| eval(bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_second_kind(Vec<Vec<i64>>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: Vec<f64> = vec![1.339, 1.378];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(bessel_second_kind(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "bessel_second_kind(Vec<i64>, Vec<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: f64 = 1.339;
+        let got = apply_scalar_unary(&a, |a| eval(bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_second_kind(Vec<i64>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Matrix<f64> = Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]);
+        let got = apply_scalar_unary(&b, |b| eval(bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_second_kind(i64, Matrix<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Matrix<f64>> = vec![
+            Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]),
+            Matrix::from_column_major(2, 2, vec![1.495, 1.534, 1.573, 1.612]),
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_second_kind(i64, Vec<Matrix<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Matrix<f64>>> = vec![
+            vec![
+                Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]),
+                Matrix::from_column_major(2, 2, vec![1.495, 1.534, 1.573, 1.612]),
+            ],
+            vec![
+                Matrix::from_column_major(2, 2, vec![1.651, 1.69, 1.729, 1.768]),
+                Matrix::from_column_major(2, 2, vec![1.807, 1.846, 1.885, 1.924]),
+            ],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_second_kind(i64, Vec<Vec<Matrix<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Vec<Matrix<f64>>>> = vec![
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]),
+                    Matrix::from_column_major(2, 2, vec![1.495, 1.534, 1.573, 1.612]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![1.651, 1.69, 1.729, 1.768]),
+                    Matrix::from_column_major(2, 2, vec![1.807, 1.846, 1.885, 1.924]),
+                ],
+            ],
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![1.963, 2.002, 2.041, 2.08]),
+                    Matrix::from_column_major(2, 2, vec![2.119, 2.158, 2.197, 2.236]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![2.275, 2.314, 2.353, 2.392]),
+                    Matrix::from_column_major(2, 2, vec![2.431, 2.47, 2.509, 2.548]),
+                ],
+            ],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_second_kind(i64, Vec<Vec<Vec<Matrix<f64>>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![1.339, 1.378], vec![1.417, 1.456]],
+            vec![vec![1.495, 1.534], vec![1.573, 1.612]],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_second_kind(i64, Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<f64>> = vec![vec![1.339, 1.378], vec![1.417, 1.456]];
+        let got = apply_scalar_unary(&b, |b| eval(bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_second_kind(i64, Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<f64> = vec![1.339, 1.378];
+        let got = apply_scalar_unary(&b, |b| eval(bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "bessel_second_kind(i64, Vec<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
         let a: Matrix<f64> = Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]);
         let b: Matrix<f64> = Matrix::from_column_major(2, 2, vec![0.721, 0.742, 0.763, 0.784]);
         let got = apply_scalar_binary(&a, &b, |a, b| eval(beta(a as f64, b as f64))).unwrap();
@@ -3126,6 +3590,238 @@ fn elementwise_signatures() {
         let n = leaves(&got).len();
         compare(
             "beta(i64, Vec<i64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![0.309, 0.318], vec![0.327, 0.336]],
+            vec![vec![0.345, 0.354], vec![0.363, 0.372]],
+        ];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(binary_log_loss(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "binary_log_loss(Vec<Vec<Vec<i64>>>, Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: f64 = 0.309;
+        let got = apply_scalar_unary(&a, |a| eval(binary_log_loss(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "binary_log_loss(Vec<Vec<Vec<i64>>>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: Vec<Vec<f64>> = vec![vec![0.309, 0.318], vec![0.327, 0.336]];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(binary_log_loss(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "binary_log_loss(Vec<Vec<i64>>, Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: f64 = 0.309;
+        let got = apply_scalar_unary(&a, |a| eval(binary_log_loss(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "binary_log_loss(Vec<Vec<i64>>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: Vec<f64> = vec![0.309, 0.318];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(binary_log_loss(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "binary_log_loss(Vec<i64>, Vec<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: f64 = 0.309;
+        let got = apply_scalar_unary(&a, |a| eval(binary_log_loss(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "binary_log_loss(Vec<i64>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Matrix<f64> = Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]);
+        let got = apply_scalar_unary(&b, |b| eval(binary_log_loss(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "binary_log_loss(i64, Matrix<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Matrix<f64>> = vec![
+            Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]),
+            Matrix::from_column_major(2, 2, vec![0.345, 0.354, 0.363, 0.372]),
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(binary_log_loss(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "binary_log_loss(i64, Vec<Matrix<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Matrix<f64>>> = vec![
+            vec![
+                Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]),
+                Matrix::from_column_major(2, 2, vec![0.345, 0.354, 0.363, 0.372]),
+            ],
+            vec![
+                Matrix::from_column_major(2, 2, vec![0.381, 0.39, 0.399, 0.408]),
+                Matrix::from_column_major(2, 2, vec![0.417, 0.426, 0.435, 0.444]),
+            ],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(binary_log_loss(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "binary_log_loss(i64, Vec<Vec<Matrix<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Vec<Matrix<f64>>>> = vec![
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]),
+                    Matrix::from_column_major(2, 2, vec![0.345, 0.354, 0.363, 0.372]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![0.381, 0.39, 0.399, 0.408]),
+                    Matrix::from_column_major(2, 2, vec![0.417, 0.426, 0.435, 0.444]),
+                ],
+            ],
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![0.453, 0.462, 0.471, 0.48]),
+                    Matrix::from_column_major(2, 2, vec![0.489, 0.498, 0.507, 0.516]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![0.525, 0.534, 0.543, 0.552]),
+                    Matrix::from_column_major(2, 2, vec![0.561, 0.57, 0.579, 0.588]),
+                ],
+            ],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(binary_log_loss(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "binary_log_loss(i64, Vec<Vec<Vec<Matrix<f64>>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![0.309, 0.318], vec![0.327, 0.336]],
+            vec![vec![0.345, 0.354], vec![0.363, 0.372]],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(binary_log_loss(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "binary_log_loss(i64, Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<f64>> = vec![vec![0.309, 0.318], vec![0.327, 0.336]];
+        let got = apply_scalar_unary(&b, |b| eval(binary_log_loss(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "binary_log_loss(i64, Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<f64> = vec![0.309, 0.318];
+        let got = apply_scalar_unary(&b, |b| eval(binary_log_loss(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "binary_log_loss(i64, Vec<f64>)",
             leaves(&got),
             leaves(&got),
             &mut failures,
@@ -5061,6 +5757,379 @@ fn elementwise_signatures() {
         let n = leaves(&got).len();
         compare(
             "exponential_lpdf(f64, Vec<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Matrix<f64> = Matrix::from_column_major(2, 2, vec![2.575, 2.65, 2.725, 2.8]);
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Matrix<f64>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Matrix<f64>> = vec![
+            Matrix::from_column_major(2, 2, vec![2.575, 2.65, 2.725, 2.8]),
+            Matrix::from_column_major(2, 2, vec![2.875, 2.95, 3.025, 3.1]),
+        ];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<Matrix<f64>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Matrix<f64>>> = vec![
+            vec![
+                Matrix::from_column_major(2, 2, vec![2.575, 2.65, 2.725, 2.8]),
+                Matrix::from_column_major(2, 2, vec![2.875, 2.95, 3.025, 3.1]),
+            ],
+            vec![
+                Matrix::from_column_major(2, 2, vec![3.175, 3.25, 3.325, 3.4]),
+                Matrix::from_column_major(2, 2, vec![3.475, 3.55, 3.625, 3.7]),
+            ],
+        ];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<Vec<Matrix<f64>>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<Matrix<f64>>>> = vec![
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![2.575, 2.65, 2.725, 2.8]),
+                    Matrix::from_column_major(2, 2, vec![2.875, 2.95, 3.025, 3.1]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![3.175, 3.25, 3.325, 3.4]),
+                    Matrix::from_column_major(2, 2, vec![3.475, 3.55, 3.625, 3.7]),
+                ],
+            ],
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![3.775, 3.85, 3.925, 4.0]),
+                    Matrix::from_column_major(2, 2, vec![4.075, 4.15, 4.225, 4.3]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![4.375, 4.45, 4.525, 4.6]),
+                    Matrix::from_column_major(2, 2, vec![4.675, 4.75, 4.825, 4.9]),
+                ],
+            ],
+        ];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<Vec<Vec<Matrix<f64>>>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![2.575, 2.65], vec![2.725, 2.8]],
+            vec![vec![2.875, 2.95], vec![3.025, 3.1]],
+        ];
+        let b: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(falling_factorial(a as f64, b as _))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<Vec<Vec<f64>>>, Vec<Vec<Vec<i64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![2.575, 2.65], vec![2.725, 2.8]],
+            vec![vec![2.875, 2.95], vec![3.025, 3.1]],
+        ];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<Vec<Vec<f64>>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let got =
+            apply_scalar_binary(&a, &b, |a, b| eval(falling_factorial(a as f64, b as _))).unwrap();
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<Vec<Vec<i64>>>, Vec<Vec<Vec<i64>>>)",
+            leaves(&got),
+            leaves(
+                &apply_scalar_binary(&a, &b, |a, b| eval(falling_factorial(a as f64, b as _)))
+                    .unwrap(),
+            ),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<Vec<Vec<i64>>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<f64>> = vec![vec![2.575, 2.65], vec![2.725, 2.8]];
+        let b: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(falling_factorial(a as f64, b as _))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<Vec<f64>>, Vec<Vec<i64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<f64>> = vec![vec![2.575, 2.65], vec![2.725, 2.8]];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<Vec<f64>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let got =
+            apply_scalar_binary(&a, &b, |a, b| eval(falling_factorial(a as f64, b as _))).unwrap();
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<Vec<i64>>, Vec<Vec<i64>>)",
+            leaves(&got),
+            leaves(
+                &apply_scalar_binary(&a, &b, |a, b| eval(falling_factorial(a as f64, b as _)))
+                    .unwrap(),
+            ),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<Vec<i64>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<f64> = vec![2.575, 2.65];
+        let b: Vec<i64> = vec![2_i64, 2_i64];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(falling_factorial(a as f64, b as _))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<f64>, Vec<i64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<f64> = vec![2.575, 2.65];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<f64>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: Vec<i64> = vec![2_i64, 2_i64];
+        let got =
+            apply_scalar_binary(&a, &b, |a, b| eval(falling_factorial(a as f64, b as _))).unwrap();
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<i64>, Vec<i64>)",
+            leaves(&got),
+            leaves(
+                &apply_scalar_binary(&a, &b, |a, b| eval(falling_factorial(a as f64, b as _)))
+                    .unwrap(),
+            ),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(Vec<i64>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: f64 = 2.575;
+        let b: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(f64, Vec<Vec<Vec<i64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: f64 = 2.575;
+        let b: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let got = apply_scalar_unary(&b, |b| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(f64, Vec<Vec<i64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: f64 = 2.575;
+        let b: Vec<i64> = vec![2_i64, 2_i64];
+        let got = apply_scalar_unary(&b, |b| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(f64, Vec<i64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(i64, Vec<Vec<Vec<i64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let got = apply_scalar_unary(&b, |b| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(i64, Vec<Vec<i64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<i64> = vec![2_i64, 2_i64];
+        let got = apply_scalar_unary(&b, |b| eval(falling_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "falling_factorial(i64, Vec<i64>)",
             leaves(&got),
             leaves(&got),
             &mut failures,
@@ -13746,6 +14815,238 @@ fn elementwise_signatures() {
         assert!(n > 0);
     }
     {
+        let a: Matrix<f64> = Matrix::from_column_major(2, 2, vec![1.545, 1.59, 1.635, 1.68]);
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(ldexp(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "ldexp(Matrix<f64>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Matrix<f64>> = vec![
+            Matrix::from_column_major(2, 2, vec![1.545, 1.59, 1.635, 1.68]),
+            Matrix::from_column_major(2, 2, vec![1.725, 1.77, 1.815, 1.86]),
+        ];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(ldexp(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "ldexp(Vec<Matrix<f64>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Matrix<f64>>> = vec![
+            vec![
+                Matrix::from_column_major(2, 2, vec![1.545, 1.59, 1.635, 1.68]),
+                Matrix::from_column_major(2, 2, vec![1.725, 1.77, 1.815, 1.86]),
+            ],
+            vec![
+                Matrix::from_column_major(2, 2, vec![1.905, 1.95, 1.995, 2.04]),
+                Matrix::from_column_major(2, 2, vec![2.085, 2.13, 2.175, 2.22]),
+            ],
+        ];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(ldexp(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "ldexp(Vec<Vec<Matrix<f64>>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<Matrix<f64>>>> = vec![
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![1.545, 1.59, 1.635, 1.68]),
+                    Matrix::from_column_major(2, 2, vec![1.725, 1.77, 1.815, 1.86]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![1.905, 1.95, 1.995, 2.04]),
+                    Matrix::from_column_major(2, 2, vec![2.085, 2.13, 2.175, 2.22]),
+                ],
+            ],
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![2.265, 2.31, 2.355, 2.4]),
+                    Matrix::from_column_major(2, 2, vec![2.445, 2.49, 2.535, 2.58]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![2.625, 2.67, 2.715, 2.76]),
+                    Matrix::from_column_major(2, 2, vec![2.805, 2.85, 2.895, 2.94]),
+                ],
+            ],
+        ];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(ldexp(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "ldexp(Vec<Vec<Vec<Matrix<f64>>>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![1.545, 1.59], vec![1.635, 1.68]],
+            vec![vec![1.725, 1.77], vec![1.815, 1.86]],
+        ];
+        let b: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(ldexp(a as f64, b as _))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "ldexp(Vec<Vec<Vec<f64>>>, Vec<Vec<Vec<i64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![1.545, 1.59], vec![1.635, 1.68]],
+            vec![vec![1.725, 1.77], vec![1.815, 1.86]],
+        ];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(ldexp(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "ldexp(Vec<Vec<Vec<f64>>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<f64>> = vec![vec![1.545, 1.59], vec![1.635, 1.68]];
+        let b: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(ldexp(a as f64, b as _))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "ldexp(Vec<Vec<f64>>, Vec<Vec<i64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<f64>> = vec![vec![1.545, 1.59], vec![1.635, 1.68]];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(ldexp(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "ldexp(Vec<Vec<f64>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<f64> = vec![1.545, 1.59];
+        let b: Vec<i64> = vec![2_i64, 2_i64];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(ldexp(a as f64, b as _))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "ldexp(Vec<f64>, Vec<i64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<f64> = vec![1.545, 1.59];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(ldexp(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "ldexp(Vec<f64>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: f64 = 1.545;
+        let b: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(ldexp(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "ldexp(f64, Vec<Vec<Vec<i64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: f64 = 1.545;
+        let b: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let got = apply_scalar_unary(&b, |b| eval(ldexp(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "ldexp(f64, Vec<Vec<i64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: f64 = 1.545;
+        let b: Vec<i64> = vec![2_i64, 2_i64];
+        let got = apply_scalar_unary(&b, |b| eval(ldexp(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "ldexp(f64, Vec<i64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
         let x: Matrix<f64> = Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]);
         let got = apply_scalar_unary(&x, |v| eval(lgamma(v as f64)));
         let want = apply_scalar_unary(&x, |v| eval(lgamma(v as f64)));
@@ -13893,6 +15194,238 @@ fn elementwise_signatures() {
             leaves(&want),
             &mut failures,
         );
+    }
+    {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![2.575, 2.65], vec![2.725, 2.8]],
+            vec![vec![2.875, 2.95], vec![3.025, 3.1]],
+        ];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(lmgamma(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "lmgamma(Vec<Vec<Vec<i64>>>, Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: f64 = 2.575;
+        let got = apply_scalar_unary(&a, |a| eval(lmgamma(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "lmgamma(Vec<Vec<Vec<i64>>>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: Vec<Vec<f64>> = vec![vec![2.575, 2.65], vec![2.725, 2.8]];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(lmgamma(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "lmgamma(Vec<Vec<i64>>, Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: f64 = 2.575;
+        let got = apply_scalar_unary(&a, |a| eval(lmgamma(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "lmgamma(Vec<Vec<i64>>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: Vec<f64> = vec![2.575, 2.65];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(lmgamma(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "lmgamma(Vec<i64>, Vec<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: f64 = 2.575;
+        let got = apply_scalar_unary(&a, |a| eval(lmgamma(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "lmgamma(Vec<i64>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Matrix<f64> = Matrix::from_column_major(2, 2, vec![2.575, 2.65, 2.725, 2.8]);
+        let got = apply_scalar_unary(&b, |b| eval(lmgamma(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "lmgamma(i64, Matrix<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Matrix<f64>> = vec![
+            Matrix::from_column_major(2, 2, vec![2.575, 2.65, 2.725, 2.8]),
+            Matrix::from_column_major(2, 2, vec![2.875, 2.95, 3.025, 3.1]),
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(lmgamma(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "lmgamma(i64, Vec<Matrix<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Matrix<f64>>> = vec![
+            vec![
+                Matrix::from_column_major(2, 2, vec![2.575, 2.65, 2.725, 2.8]),
+                Matrix::from_column_major(2, 2, vec![2.875, 2.95, 3.025, 3.1]),
+            ],
+            vec![
+                Matrix::from_column_major(2, 2, vec![3.175, 3.25, 3.325, 3.4]),
+                Matrix::from_column_major(2, 2, vec![3.475, 3.55, 3.625, 3.7]),
+            ],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(lmgamma(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "lmgamma(i64, Vec<Vec<Matrix<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Vec<Matrix<f64>>>> = vec![
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![2.575, 2.65, 2.725, 2.8]),
+                    Matrix::from_column_major(2, 2, vec![2.875, 2.95, 3.025, 3.1]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![3.175, 3.25, 3.325, 3.4]),
+                    Matrix::from_column_major(2, 2, vec![3.475, 3.55, 3.625, 3.7]),
+                ],
+            ],
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![3.775, 3.85, 3.925, 4.0]),
+                    Matrix::from_column_major(2, 2, vec![4.075, 4.15, 4.225, 4.3]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![4.375, 4.45, 4.525, 4.6]),
+                    Matrix::from_column_major(2, 2, vec![4.675, 4.75, 4.825, 4.9]),
+                ],
+            ],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(lmgamma(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "lmgamma(i64, Vec<Vec<Vec<Matrix<f64>>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![2.575, 2.65], vec![2.725, 2.8]],
+            vec![vec![2.875, 2.95], vec![3.025, 3.1]],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(lmgamma(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "lmgamma(i64, Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<f64>> = vec![vec![2.575, 2.65], vec![2.725, 2.8]];
+        let got = apply_scalar_unary(&b, |b| eval(lmgamma(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "lmgamma(i64, Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<f64> = vec![2.575, 2.65];
+        let got = apply_scalar_unary(&b, |b| eval(lmgamma(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "lmgamma(i64, Vec<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
     }
     {
         let a: Matrix<f64> = Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]);
@@ -14939,6 +16472,155 @@ fn elementwise_signatures() {
     }
     {
         let x: Matrix<f64> = Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]);
+        let got = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        compare(
+            "log10(Matrix<f64>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Matrix<f64>> = vec![
+            Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]),
+            Matrix::from_column_major(2, 2, vec![0.345, 0.354, 0.363, 0.372]),
+        ];
+        let got = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        compare(
+            "log10(Vec<Matrix<f64>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<Matrix<f64>>> = vec![
+            vec![
+                Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]),
+                Matrix::from_column_major(2, 2, vec![0.345, 0.354, 0.363, 0.372]),
+            ],
+            vec![
+                Matrix::from_column_major(2, 2, vec![0.381, 0.39, 0.399, 0.408]),
+                Matrix::from_column_major(2, 2, vec![0.417, 0.426, 0.435, 0.444]),
+            ],
+        ];
+        let got = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        compare(
+            "log10(Vec<Vec<Matrix<f64>>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<Vec<Matrix<f64>>>> = vec![
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]),
+                    Matrix::from_column_major(2, 2, vec![0.345, 0.354, 0.363, 0.372]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![0.381, 0.39, 0.399, 0.408]),
+                    Matrix::from_column_major(2, 2, vec![0.417, 0.426, 0.435, 0.444]),
+                ],
+            ],
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![0.453, 0.462, 0.471, 0.48]),
+                    Matrix::from_column_major(2, 2, vec![0.489, 0.498, 0.507, 0.516]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![0.525, 0.534, 0.543, 0.552]),
+                    Matrix::from_column_major(2, 2, vec![0.561, 0.57, 0.579, 0.588]),
+                ],
+            ],
+        ];
+        let got = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        compare(
+            "log10(Vec<Vec<Vec<Matrix<f64>>>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![0.309, 0.318], vec![0.327, 0.336]],
+            vec![vec![0.345, 0.354], vec![0.363, 0.372]],
+        ];
+        let got = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        compare(
+            "log10(Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![1_i64, 1_i64], vec![1_i64, 1_i64]],
+            vec![vec![1_i64, 1_i64], vec![1_i64, 1_i64]],
+        ];
+        let got = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        compare(
+            "log10(Vec<Vec<Vec<i64>>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<f64>> = vec![vec![0.309, 0.318], vec![0.327, 0.336]];
+        let got = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        compare(
+            "log10(Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<i64>> = vec![vec![1_i64, 1_i64], vec![1_i64, 1_i64]];
+        let got = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        compare(
+            "log10(Vec<Vec<i64>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<f64> = vec![0.309, 0.318];
+        let got = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        compare(
+            "log10(Vec<f64>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<i64> = vec![1_i64, 1_i64];
+        let got = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log10(v as f64)));
+        compare(
+            "log10(Vec<i64>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Matrix<f64> = Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]);
         let got = apply_scalar_unary(&x, |v| eval(log1m(v as f64)));
         let want = apply_scalar_unary(&x, |v| eval(log1m(v as f64)));
         compare(
@@ -15681,6 +17363,145 @@ fn elementwise_signatures() {
             leaves(&want),
             &mut failures,
         );
+    }
+    {
+        let x: Matrix<f64> = Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]);
+        let got = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        compare(
+            "log2(Matrix<f64>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Matrix<f64>> = vec![
+            Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]),
+            Matrix::from_column_major(2, 2, vec![0.345, 0.354, 0.363, 0.372]),
+        ];
+        let got = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        compare(
+            "log2(Vec<Matrix<f64>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<Matrix<f64>>> = vec![
+            vec![
+                Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]),
+                Matrix::from_column_major(2, 2, vec![0.345, 0.354, 0.363, 0.372]),
+            ],
+            vec![
+                Matrix::from_column_major(2, 2, vec![0.381, 0.39, 0.399, 0.408]),
+                Matrix::from_column_major(2, 2, vec![0.417, 0.426, 0.435, 0.444]),
+            ],
+        ];
+        let got = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        compare(
+            "log2(Vec<Vec<Matrix<f64>>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<Vec<Matrix<f64>>>> = vec![
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]),
+                    Matrix::from_column_major(2, 2, vec![0.345, 0.354, 0.363, 0.372]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![0.381, 0.39, 0.399, 0.408]),
+                    Matrix::from_column_major(2, 2, vec![0.417, 0.426, 0.435, 0.444]),
+                ],
+            ],
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![0.453, 0.462, 0.471, 0.48]),
+                    Matrix::from_column_major(2, 2, vec![0.489, 0.498, 0.507, 0.516]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![0.525, 0.534, 0.543, 0.552]),
+                    Matrix::from_column_major(2, 2, vec![0.561, 0.57, 0.579, 0.588]),
+                ],
+            ],
+        ];
+        let got = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        compare(
+            "log2(Vec<Vec<Vec<Matrix<f64>>>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![0.309, 0.318], vec![0.327, 0.336]],
+            vec![vec![0.345, 0.354], vec![0.363, 0.372]],
+        ];
+        let got = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        compare(
+            "log2(Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![1_i64, 1_i64], vec![1_i64, 1_i64]],
+            vec![vec![1_i64, 1_i64], vec![1_i64, 1_i64]],
+        ];
+        let got = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        compare(
+            "log2(Vec<Vec<Vec<i64>>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<f64>> = vec![vec![0.309, 0.318], vec![0.327, 0.336]];
+        let got = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        compare(
+            "log2(Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<i64>> = vec![vec![1_i64, 1_i64], vec![1_i64, 1_i64]];
+        let got = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        compare(
+            "log2(Vec<Vec<i64>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<f64> = vec![0.309, 0.318];
+        let got = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        compare("log2(Vec<f64>)", leaves(&got), leaves(&want), &mut failures);
+    }
+    {
+        let x: Vec<i64> = vec![1_i64, 1_i64];
+        let got = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(log2(v as f64)));
+        compare("log2(Vec<i64>)", leaves(&got), leaves(&want), &mut failures);
     }
     {
         let a: Matrix<f64> = Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]);
@@ -21864,6 +23685,470 @@ fn elementwise_signatures() {
         );
     }
     {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![1.339, 1.378], vec![1.417, 1.456]],
+            vec![vec![1.495, 1.534], vec![1.573, 1.612]],
+        ];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(modified_bessel_first_kind(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_first_kind(Vec<Vec<Vec<i64>>>, Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: f64 = 1.339;
+        let got = apply_scalar_unary(&a, |a| eval(modified_bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_first_kind(Vec<Vec<Vec<i64>>>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: Vec<Vec<f64>> = vec![vec![1.339, 1.378], vec![1.417, 1.456]];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(modified_bessel_first_kind(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_first_kind(Vec<Vec<i64>>, Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: f64 = 1.339;
+        let got = apply_scalar_unary(&a, |a| eval(modified_bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_first_kind(Vec<Vec<i64>>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: Vec<f64> = vec![1.339, 1.378];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(modified_bessel_first_kind(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_first_kind(Vec<i64>, Vec<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: f64 = 1.339;
+        let got = apply_scalar_unary(&a, |a| eval(modified_bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_first_kind(Vec<i64>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Matrix<f64> = Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]);
+        let got = apply_scalar_unary(&b, |b| eval(modified_bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_first_kind(i64, Matrix<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Matrix<f64>> = vec![
+            Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]),
+            Matrix::from_column_major(2, 2, vec![1.495, 1.534, 1.573, 1.612]),
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(modified_bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_first_kind(i64, Vec<Matrix<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Matrix<f64>>> = vec![
+            vec![
+                Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]),
+                Matrix::from_column_major(2, 2, vec![1.495, 1.534, 1.573, 1.612]),
+            ],
+            vec![
+                Matrix::from_column_major(2, 2, vec![1.651, 1.69, 1.729, 1.768]),
+                Matrix::from_column_major(2, 2, vec![1.807, 1.846, 1.885, 1.924]),
+            ],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(modified_bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_first_kind(i64, Vec<Vec<Matrix<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Vec<Matrix<f64>>>> = vec![
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]),
+                    Matrix::from_column_major(2, 2, vec![1.495, 1.534, 1.573, 1.612]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![1.651, 1.69, 1.729, 1.768]),
+                    Matrix::from_column_major(2, 2, vec![1.807, 1.846, 1.885, 1.924]),
+                ],
+            ],
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![1.963, 2.002, 2.041, 2.08]),
+                    Matrix::from_column_major(2, 2, vec![2.119, 2.158, 2.197, 2.236]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![2.275, 2.314, 2.353, 2.392]),
+                    Matrix::from_column_major(2, 2, vec![2.431, 2.47, 2.509, 2.548]),
+                ],
+            ],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(modified_bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_first_kind(i64, Vec<Vec<Vec<Matrix<f64>>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![1.339, 1.378], vec![1.417, 1.456]],
+            vec![vec![1.495, 1.534], vec![1.573, 1.612]],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(modified_bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_first_kind(i64, Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<f64>> = vec![vec![1.339, 1.378], vec![1.417, 1.456]];
+        let got = apply_scalar_unary(&b, |b| eval(modified_bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_first_kind(i64, Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<f64> = vec![1.339, 1.378];
+        let got = apply_scalar_unary(&b, |b| eval(modified_bessel_first_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_first_kind(i64, Vec<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![1.339, 1.378], vec![1.417, 1.456]],
+            vec![vec![1.495, 1.534], vec![1.573, 1.612]],
+        ];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(modified_bessel_second_kind(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_second_kind(Vec<Vec<Vec<i64>>>, Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: f64 = 1.339;
+        let got = apply_scalar_unary(&a, |a| eval(modified_bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_second_kind(Vec<Vec<Vec<i64>>>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: Vec<Vec<f64>> = vec![vec![1.339, 1.378], vec![1.417, 1.456]];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(modified_bessel_second_kind(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_second_kind(Vec<Vec<i64>>, Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: f64 = 1.339;
+        let got = apply_scalar_unary(&a, |a| eval(modified_bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_second_kind(Vec<Vec<i64>>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: Vec<f64> = vec![1.339, 1.378];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(modified_bessel_second_kind(a as _, b as f64))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_second_kind(Vec<i64>, Vec<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: f64 = 1.339;
+        let got = apply_scalar_unary(&a, |a| eval(modified_bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_second_kind(Vec<i64>, f64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Matrix<f64> = Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]);
+        let got = apply_scalar_unary(&b, |b| eval(modified_bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_second_kind(i64, Matrix<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Matrix<f64>> = vec![
+            Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]),
+            Matrix::from_column_major(2, 2, vec![1.495, 1.534, 1.573, 1.612]),
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(modified_bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_second_kind(i64, Vec<Matrix<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Matrix<f64>>> = vec![
+            vec![
+                Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]),
+                Matrix::from_column_major(2, 2, vec![1.495, 1.534, 1.573, 1.612]),
+            ],
+            vec![
+                Matrix::from_column_major(2, 2, vec![1.651, 1.69, 1.729, 1.768]),
+                Matrix::from_column_major(2, 2, vec![1.807, 1.846, 1.885, 1.924]),
+            ],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(modified_bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_second_kind(i64, Vec<Vec<Matrix<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Vec<Matrix<f64>>>> = vec![
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![1.339, 1.378, 1.417, 1.456]),
+                    Matrix::from_column_major(2, 2, vec![1.495, 1.534, 1.573, 1.612]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![1.651, 1.69, 1.729, 1.768]),
+                    Matrix::from_column_major(2, 2, vec![1.807, 1.846, 1.885, 1.924]),
+                ],
+            ],
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![1.963, 2.002, 2.041, 2.08]),
+                    Matrix::from_column_major(2, 2, vec![2.119, 2.158, 2.197, 2.236]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![2.275, 2.314, 2.353, 2.392]),
+                    Matrix::from_column_major(2, 2, vec![2.431, 2.47, 2.509, 2.548]),
+                ],
+            ],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(modified_bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_second_kind(i64, Vec<Vec<Vec<Matrix<f64>>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![1.339, 1.378], vec![1.417, 1.456]],
+            vec![vec![1.495, 1.534], vec![1.573, 1.612]],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(modified_bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_second_kind(i64, Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<f64>> = vec![vec![1.339, 1.378], vec![1.417, 1.456]];
+        let got = apply_scalar_unary(&b, |b| eval(modified_bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_second_kind(i64, Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<f64> = vec![1.339, 1.378];
+        let got = apply_scalar_unary(&b, |b| eval(modified_bessel_second_kind(a as _, b as f64)));
+        let n = leaves(&got).len();
+        compare(
+            "modified_bessel_second_kind(i64, Vec<f64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
         let a: Matrix<f64> = Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]);
         let b: Matrix<f64> = Matrix::from_column_major(2, 2, vec![0.721, 0.742, 0.763, 0.784]);
         let got = apply_scalar_binary(&a, &b, |a, b| eval(owens_t(a as f64, b as f64))).unwrap();
@@ -23354,6 +25639,379 @@ fn elementwise_signatures() {
         assert!(n > 0);
     }
     {
+        let a: Matrix<f64> = Matrix::from_column_major(2, 2, vec![2.575, 2.65, 2.725, 2.8]);
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Matrix<f64>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Matrix<f64>> = vec![
+            Matrix::from_column_major(2, 2, vec![2.575, 2.65, 2.725, 2.8]),
+            Matrix::from_column_major(2, 2, vec![2.875, 2.95, 3.025, 3.1]),
+        ];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<Matrix<f64>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Matrix<f64>>> = vec![
+            vec![
+                Matrix::from_column_major(2, 2, vec![2.575, 2.65, 2.725, 2.8]),
+                Matrix::from_column_major(2, 2, vec![2.875, 2.95, 3.025, 3.1]),
+            ],
+            vec![
+                Matrix::from_column_major(2, 2, vec![3.175, 3.25, 3.325, 3.4]),
+                Matrix::from_column_major(2, 2, vec![3.475, 3.55, 3.625, 3.7]),
+            ],
+        ];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<Vec<Matrix<f64>>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<Matrix<f64>>>> = vec![
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![2.575, 2.65, 2.725, 2.8]),
+                    Matrix::from_column_major(2, 2, vec![2.875, 2.95, 3.025, 3.1]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![3.175, 3.25, 3.325, 3.4]),
+                    Matrix::from_column_major(2, 2, vec![3.475, 3.55, 3.625, 3.7]),
+                ],
+            ],
+            vec![
+                vec![
+                    Matrix::from_column_major(2, 2, vec![3.775, 3.85, 3.925, 4.0]),
+                    Matrix::from_column_major(2, 2, vec![4.075, 4.15, 4.225, 4.3]),
+                ],
+                vec![
+                    Matrix::from_column_major(2, 2, vec![4.375, 4.45, 4.525, 4.6]),
+                    Matrix::from_column_major(2, 2, vec![4.675, 4.75, 4.825, 4.9]),
+                ],
+            ],
+        ];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<Vec<Vec<Matrix<f64>>>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![2.575, 2.65], vec![2.725, 2.8]],
+            vec![vec![2.875, 2.95], vec![3.025, 3.1]],
+        ];
+        let b: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(rising_factorial(a as f64, b as _))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<Vec<Vec<f64>>>, Vec<Vec<Vec<i64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![2.575, 2.65], vec![2.725, 2.8]],
+            vec![vec![2.875, 2.95], vec![3.025, 3.1]],
+        ];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<Vec<Vec<f64>>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let got =
+            apply_scalar_binary(&a, &b, |a, b| eval(rising_factorial(a as f64, b as _))).unwrap();
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<Vec<Vec<i64>>>, Vec<Vec<Vec<i64>>>)",
+            leaves(&got),
+            leaves(
+                &apply_scalar_binary(&a, &b, |a, b| eval(rising_factorial(a as f64, b as _)))
+                    .unwrap(),
+            ),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<Vec<Vec<i64>>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<f64>> = vec![vec![2.575, 2.65], vec![2.725, 2.8]];
+        let b: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(rising_factorial(a as f64, b as _))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<Vec<f64>>, Vec<Vec<i64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<f64>> = vec![vec![2.575, 2.65], vec![2.725, 2.8]];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<Vec<f64>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let got =
+            apply_scalar_binary(&a, &b, |a, b| eval(rising_factorial(a as f64, b as _))).unwrap();
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<Vec<i64>>, Vec<Vec<i64>>)",
+            leaves(&got),
+            leaves(
+                &apply_scalar_binary(&a, &b, |a, b| eval(rising_factorial(a as f64, b as _)))
+                    .unwrap(),
+            ),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<Vec<i64>>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<f64> = vec![2.575, 2.65];
+        let b: Vec<i64> = vec![2_i64, 2_i64];
+        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));
+        let mut i = 0;
+        let got = apply_scalar_unary(&a, |a| {
+            let b = bl[i];
+            i += 1;
+            eval(rising_factorial(a as f64, b as _))
+        });
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<f64>, Vec<i64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<f64> = vec![2.575, 2.65];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<f64>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: Vec<i64> = vec![2_i64, 2_i64];
+        let got =
+            apply_scalar_binary(&a, &b, |a, b| eval(rising_factorial(a as f64, b as _))).unwrap();
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<i64>, Vec<i64>)",
+            leaves(&got),
+            leaves(
+                &apply_scalar_binary(&a, &b, |a, b| eval(rising_factorial(a as f64, b as _)))
+                    .unwrap(),
+            ),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: Vec<i64> = vec![2_i64, 2_i64];
+        let b: i64 = 2_i64;
+        let got = apply_scalar_unary(&a, |a| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(Vec<i64>, i64)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: f64 = 2.575;
+        let b: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(f64, Vec<Vec<Vec<i64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: f64 = 2.575;
+        let b: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let got = apply_scalar_unary(&b, |b| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(f64, Vec<Vec<i64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: f64 = 2.575;
+        let b: Vec<i64> = vec![2_i64, 2_i64];
+        let got = apply_scalar_unary(&b, |b| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(f64, Vec<i64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+            vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]],
+        ];
+        let got = apply_scalar_unary(&b, |b| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(i64, Vec<Vec<Vec<i64>>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<Vec<i64>> = vec![vec![2_i64, 2_i64], vec![2_i64, 2_i64]];
+        let got = apply_scalar_unary(&b, |b| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(i64, Vec<Vec<i64>>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
+        let a: i64 = 2_i64;
+        let b: Vec<i64> = vec![2_i64, 2_i64];
+        let got = apply_scalar_unary(&b, |b| eval(rising_factorial(a as f64, b as _)));
+        let n = leaves(&got).len();
+        compare(
+            "rising_factorial(i64, Vec<i64>)",
+            leaves(&got),
+            leaves(&got),
+            &mut failures,
+        );
+        assert!(n > 0);
+    }
+    {
         let x: Matrix<f64> = Matrix::from_column_major(2, 2, vec![0.309, 0.318, 0.327, 0.336]);
         let got = apply_scalar_unary(&x, |v| eval(round(v as f64)));
         let want = apply_scalar_unary(&x, |v| eval(round(v as f64)));
@@ -24832,6 +27490,78 @@ fn elementwise_signatures() {
         let want = apply_scalar_unary(&x, |v| eval(tgamma(v as f64)));
         compare(
             "tgamma(Vec<i64>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<Vec<f64>>> = vec![
+            vec![vec![2.781, 2.862], vec![2.943, 3.024]],
+            vec![vec![3.105, 3.186], vec![3.267, 3.348]],
+        ];
+        let got = apply_scalar_unary(&x, |v| eval(to_int(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(to_int(v as f64)));
+        compare(
+            "to_int(Vec<Vec<Vec<f64>>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<Vec<i64>>> = vec![
+            vec![vec![3_i64, 3_i64], vec![3_i64, 3_i64]],
+            vec![vec![3_i64, 3_i64], vec![3_i64, 3_i64]],
+        ];
+        let got = apply_scalar_unary(&x, |v| eval(to_int(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(to_int(v as f64)));
+        compare(
+            "to_int(Vec<Vec<Vec<i64>>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<f64>> = vec![vec![2.781, 2.862], vec![2.943, 3.024]];
+        let got = apply_scalar_unary(&x, |v| eval(to_int(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(to_int(v as f64)));
+        compare(
+            "to_int(Vec<Vec<f64>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<Vec<i64>> = vec![vec![3_i64, 3_i64], vec![3_i64, 3_i64]];
+        let got = apply_scalar_unary(&x, |v| eval(to_int(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(to_int(v as f64)));
+        compare(
+            "to_int(Vec<Vec<i64>>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<f64> = vec![2.781, 2.862];
+        let got = apply_scalar_unary(&x, |v| eval(to_int(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(to_int(v as f64)));
+        compare(
+            "to_int(Vec<f64>)",
+            leaves(&got),
+            leaves(&want),
+            &mut failures,
+        );
+    }
+    {
+        let x: Vec<i64> = vec![3_i64, 3_i64];
+        let got = apply_scalar_unary(&x, |v| eval(to_int(v as f64)));
+        let want = apply_scalar_unary(&x, |v| eval(to_int(v as f64)));
+        compare(
+            "to_int(Vec<i64>)",
             leaves(&got),
             leaves(&want),
             &mut failures,

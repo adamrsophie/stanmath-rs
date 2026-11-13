@@ -22,6 +22,14 @@ OPERATORS = {"add", "subtract", "multiply", "elt_multiply", "elt_divide", "squar
 # Arrays nest through one recursive impl (Vec<C> for any container C), so calls stop at this many
 # Vec levels; deep_arrays() checks one function to the deepest level Stan has.
 MAX_DEPTH = 3
+# Real arguments for functions with an int argument, which the scalar Stan fixture lacks; their
+# int arguments are 2.
+EXTRA = {
+    "falling_factorial": [2.5], "rising_factorial": [2.5], "bessel_first_kind": [1.3],
+    "bessel_second_kind": [1.3], "modified_bessel_first_kind": [1.3],
+    "modified_bessel_second_kind": [1.3], "binary_log_loss": [0.3], "ldexp": [1.5],
+    "lmgamma": [2.5], "to_int": [2.7],
+}
 
 
 def rust(t):
@@ -90,13 +98,16 @@ def main():
         if name.endswith("_rng") or name.startswith(("lower_bound", "upper_bound")) or name in OPERATORS:
             continue
         scalar = [a for a, r in sigs[name] if all(t in SCALAR for t in a) and r in SCALAR]
-        if not scalar or len(scalar[0]) not in (1, 2):
+        scalar = [a for a in scalar if len(a) in (1, 2)]
+        if not scalar:
             continue
-        k = len(scalar[0])
+        # The arity of the vectorized forms (log2 and log10 also have a constant, zero argument form).
+        k = max(len(a) for a in scalar)
+        scalar = [a for a in scalar if len(a) == k]
         is_int = [all(a[p] == "int" for a in scalar) for p in range(k)]
-        if name not in pts and not all(is_int):
+        if name not in pts and name not in EXTRA and not all(is_int):
             continue
-        reals = list(pts.get(name, []))
+        reals = list(pts.get(name, EXTRA.get(name, [])))
         calls = {}
         for a, r in sigs[name]:
             if len(a) != k or all(t in SCALAR for t in a):
