@@ -28,7 +28,21 @@ jobs:
         run: |
           ./stan_probe > stan_probe.csv
           cat stan_probe.csv
+      - name: stanc
+        working-directory: tools/stan-reference/stanc
+        continue-on-error: true
+        run: |
+          curl -fsSL -o stanc https://github.com/stan-dev/stanc3/releases/download/v2.40.0/linux-stanc
+          chmod +x stanc
+          ./stanc --version
+          ./stanc --dump-stan-math-signatures | grep -i laplace > laplace_signatures.txt || true
+          cat laplace_signatures.txt
+          ./stanc --o laplace.hpp laplace.stan
+          grep -n "laplace_marginal" laplace.hpp | tee laplace_calls.txt
       - uses: actions/upload-artifact@v4
         with:
           name: stan-probe
-          path: tools/stan-reference/stan_probe.csv
+          path: |
+            tools/stan-reference/stan_probe.csv
+            tools/stan-reference/stanc/*.txt
+            tools/stan-reference/stanc/laplace.hpp
