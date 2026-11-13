@@ -313,8 +313,19 @@ by a signature test (by a generator's ledger or a `// stan:` label), compared wi
 the reference CSVs, skipped only because its arrays nest deeper than the generators write calls
 for, or checked by name only. A function whose signatures differ only in spelling a vector
 (vector, row vector, or one dimensional real array) is one Rust call, so a reference comparison of
-that call counts for each spelling. Run against CmdStan 2.40.0 it reports 18812 called, 210
-compared with Stan values, 5088 deeper than the calls, 181 by name, and no unchecked line.
+that call counts for each spelling. Run against CmdStan 2.40.0 it reports 18993 called, 210
+compared with Stan values, 5088 deeper than the calls, none by name, and no unchecked line.
+The 5088 deeper lines are array forms nested past the depth the generators write calls for (the
+same nested map as the shallower forms); they are not called one by one.
+
+`tests/signatures_linalg_misc.rs` and `tests/signatures_distributions_misc.rs` call the last
+signatures no generator reached: products and quotients with a scalar, the vector forms of the
+solvers, the complex forms of the matrix functions, the decompositions (checked by
+reconstruction), the FFTs (against a direct DFT), the CSR functions, the small constructors, the
+Poisson binomial (against enumeration), the categorical forms with an array response, the
+Gaussian dynamic linear model (against a Kalman filter written in the test), the container forms
+of `wiener_lpdf` (against the sum of scalar calls), and `hypergeometric_rng` and
+`categorical_rng`.
 
 `tests/signatures_glm.rs`, written by `tools/reference/gen_glm.py`, calls all 58 `_glm_lpdf` and
 `_glm_lpmf` signatures and compares each, in value and gradient, with the sum of its response
