@@ -176,6 +176,14 @@ pub fn apply_scalar_ternary<C: ScalarContainer, U>(
     a.zip_scalars(b, &mut |x, y| f(x, y, cs.next().expect("shapes checked")))
 }
 
+/// The scalars of `x` in order: Stan's `to_array_1d` for arrays of any depth (row-major order) and
+/// for matrices (column-major order).
+pub fn to_array_1d_nested<C: ScalarContainer>(x: &C) -> Vec<C::Scalar> {
+    let mut out = Vec::new();
+    x.map_scalars(&mut |v| out.push(v));
+    out
+}
+
 macro_rules! apply_broadcast {
     ($(#[$doc:meta])* $name:ident, $($a:ident: $A:ident),+) => {
         $(#[$doc])*

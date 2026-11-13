@@ -289,6 +289,15 @@ result (239 deeper array forms run the same generic code).
 `to_complex`, `get_real`, `get_imag`, and `conj` over complex containers (`ScalarContainer` now
 treats `Complex<T>` as a leaf) and checks each against the definition (111 deeper array forms share
 the recursive impl).
+`tests/signatures_utilities.rs`, written by `tools/reference/gen_utilities.py`, calls 187
+signatures of `sum`, `prod`, `cumulative_sum`, `to_vector`, `to_row_vector`, `to_array_1d`,
+`to_array_2d`, `to_vector_array`, `to_row_vector_array`, `to_matrix`, `append_col`, `append_row`,
+`fma`, `log_mix`, `hypergeometric_3F2`, and `hypergeometric_pFq`, each through its Rust form, and
+checks the result against the definition written out from the input's elements. The fill order of
+`to_matrix` and the array form of `log_mix` were probed against Stan Math. Stan's one-element
+concatenations (`append_col(real, row_vector)`, `append_row(vector, vector)` and similar) are
+`append_array` on slices, `sum(array[] int)` is `iter().sum()`, and `to_array_1d` of an array of
+any depth is `to_array_1d_nested`.
 
 The scalar sweep also fixed four conventions to match Stan: `fmax` and `fmin` return the second argument
 on ties (and take its derivative); `beta(a, b)` with a nonpositive argument is
