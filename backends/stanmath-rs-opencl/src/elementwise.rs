@@ -9,6 +9,7 @@ use stanmath_rs_autodiff::{MultiFn, Real};
 use stanmath_rs_core::Result;
 
 use crate::device::{Arg, DeviceBuffer, launch};
+use crate::special::PRELUDE;
 
 macro_rules! unary_table {
     ($($variant:ident $name:literal $host:path, $value:literal, $deriv:literal;)*) => {
@@ -98,13 +99,17 @@ unary_table! {
     Ceil "ceil" f::ceil, "ceil(x)", "0.0";
     Round "round" f::round, "round(x)", "0.0";
     Trunc "trunc" f::trunc, "trunc(x)", "0.0";
+    Lgamma "lgamma" f::lgamma, "lgamma(x)", "digamma(x)";
+    Tgamma "tgamma" f::tgamma, "tgamma(x)", "y * digamma(x)";
+    Digamma "digamma" f::digamma, "digamma(x)", "trigamma(x)";
+    Trigamma "trigamma" f::trigamma, "trigamma(x)", "tetragamma(x)";
+    InvPhi "inv_Phi" f::inv_Phi, "inv_Phi(x)", "2.5066282746310002 * exp(0.5 * y * y)";
 }
 
 fn source(op: Unary) -> String {
     let (value, deriv) = op.expressions();
     format!(
-        "#pragma OPENCL EXTENSION cl_khr_fp64 : enable
-__kernel void value(__global const double* xs, __global double* ys) {{
+        "{PRELUDE}__kernel void value(__global const double* xs, __global double* ys) {{
   const size_t i = get_global_id(0);
   const double x = xs[i];
   ys[i] = {value};
@@ -260,13 +265,20 @@ binary_table! {
     Hypot "hypot" f::hypot, "hypot(x, y)", "x / z", "y / z";
     LogDiffExp "log_diff_exp" f::log_diff_exp,
         "x + log(-expm1(y - x))", "-1.0 / expm1(y - x)", "-1.0 / expm1(x - y)";
+    Lbeta "lbeta" f::lbeta, "lgamma(x) + lgamma(y) - lgamma(x + y)",
+        "digamma(x) - digamma(x + y)", "digamma(y) - digamma(x + y)";
+    Beta "beta" f::beta, "exp(lgamma(x) + lgamma(y) - lgamma(x + y))",
+        "z * (digamma(x) - digamma(x + y))", "z * (digamma(y) - digamma(x + y))";
+    Lmultiply "lmultiply" f::lmultiply, "x == 0.0 && y == 0.0 ? 0.0 : x * log(y)", "log(y)", "x / y";
+    LogInvLogitDiff "log_inv_logit_diff" f::log_inv_logit_diff,
+        "x - log1p(exp(x)) - log1p(exp(y)) + log(-expm1(y - x))",
+        "1.0 / (1.0 + exp(x)) + 1.0 / expm1(x - y)", "-1.0 / (1.0 + exp(-y)) - 1.0 / expm1(x - y)";
 }
 
 fn binary_source(op: Binary) -> String {
     let (value, da, db) = op.expressions();
     format!(
-        "#pragma OPENCL EXTENSION cl_khr_fp64 : enable
-__kernel void value(__global const double* xs, __global const double* ys, __global double* zs) {{
+        "{PRELUDE}__kernel void value(__global const double* xs, __global const double* ys, __global double* zs) {{
   const size_t i = get_global_id(0);
   const double x = xs[i];
   const double y = ys[i];
@@ -440,7 +452,7 @@ mod tests {
     #[test]
     fn every_binary_function_matches_the_host() {
         let x = [0.3, 0.8, 1.7, 2.4];
-        let y = [0.1, 0.5, 1.2, -0.6];
+        let y = [0.1, 0.5, 1.2, 0.6];
         for &op in Binary::ALL {
             // log_diff_exp needs x > y, pow a positive base; these points satisfy both.
             let got = binary_on_device(op, &x, &y).unwrap();

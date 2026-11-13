@@ -10,6 +10,7 @@ mod density;
 mod device;
 mod elementwise;
 mod glm;
+mod special;
 mod tri;
 
 pub use cholesky::cholesky_decompose_on_device;

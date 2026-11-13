@@ -10,6 +10,7 @@ use stanmath_rs_autodiff::{MultiFn, Real};
 use stanmath_rs_core::{Error, Result};
 
 use crate::device::{Arg, DeviceBuffer, launch};
+use crate::special::PRELUDE;
 
 /// What an argument of a density must satisfy.
 #[derive(Clone, Copy)]
@@ -276,21 +277,7 @@ density_table! {
 }
 
 /// Definitions shared by every density program.
-const COMMON: &str = "#pragma OPENCL EXTENSION cl_khr_fp64 : enable
-#define LOG_SQRT_2PI 0.91893853320467274178
-// Digamma for x > 0: the recurrence up to 10, then the asymptotic series.
-double digamma(double x) {
-  double r = 0.0;
-  while (x < 10.0) {
-    r -= 1.0 / x;
-    x += 1.0;
-  }
-  const double f = 1.0 / (x * x);
-  return r + log(x) - 0.5 / x
-         - f * (1.0 / 12.0 - f * (1.0 / 120.0 - f * (1.0 / 252.0 - f * (1.0 / 240.0
-         - f * (1.0 / 132.0)))));
-}
-";
+const COMMON: &str = "#define LOG_SQRT_2PI 0.91893853320467274178\n";
 
 fn source(op: Density) -> String {
     let (prelude, lp, partials) = op.code();
@@ -318,7 +305,7 @@ fn source(op: Density) -> String {
         .map(|(k, d)| format!("  d{k}[i] = {d};\n"))
         .collect();
     format!(
-        "{COMMON}__kernel void eval({}) {{\n  const size_t i = get_global_id(0);\n{loads}  {prelude}\n  lp[i] = {lp};\n{stores}}}\n",
+        "{PRELUDE}{COMMON}__kernel void eval({}) {{\n  const size_t i = get_global_id(0);\n{loads}  {prelude}\n  lp[i] = {lp};\n{stores}}}\n",
         params.join(", ")
     )
 }
