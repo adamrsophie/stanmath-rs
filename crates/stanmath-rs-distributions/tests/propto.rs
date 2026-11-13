@@ -4,7 +4,7 @@
 // Reference values keep the 17 significant digits that Stan Math printed.
 #![allow(clippy::excessive_precision)]
 
-use stanmath_rs_autodiff::value_and_grad;
+use stanmath_rs_autodiff::{Var, value_and_grad};
 use stanmath_rs_core::Matrix;
 use stanmath_rs_distributions::*;
 
@@ -407,4 +407,412 @@ fn propto_checks_arguments_and_supports() {
     // Outside the support the value is -inf when an argument is a variable, as in Stan.
     let v = value_and_grad(|v| uniform_lupdf(2.0, v[0], 1.5).unwrap(), &[0.1]).value;
     assert_eq!(v, f64::NEG_INFINITY);
+}
+
+/// The value of `f` with its one argument an autodiff variable at `x`.
+fn at(x: f64, f: impl for<'t> Fn(&[Var<'t>]) -> Var<'t>) -> f64 {
+    value_and_grad(|v| f(v), &[x]).value
+}
+
+#[test]
+fn remaining_kernel_propto_values_match_stan() {
+    let cases: Vec<(&str, f64, f64)> = vec![
+        (
+            "skew_normal, y a variable",
+            at(0.4, |v| skew_normal_lupdf(v[0], 0.1, 1.3, 0.8).unwrap()),
+            0.11005981100662235,
+        ),
+        (
+            "skew_normal, omega a variable",
+            at(1.3, |v| skew_normal_lupdf(0.4, 0.1, v[0], 0.8).unwrap()),
+            -0.15230445346086871,
+        ),
+        (
+            "skew_normal, alpha a variable",
+            at(0.8, |v| skew_normal_lupdf(0.4, 0.1, 1.3, v[0]).unwrap()),
+            0.13668702994153359,
+        ),
+        (
+            "skew_normal full",
+            skew_normal_lpdf(0.4, 0.1, 1.3, 0.8).unwrap(),
+            -1.0712429866655413,
+        ),
+        (
+            "double_exponential, mu a variable",
+            at(0.1, |v| double_exponential_lupdf(0.4, v[0], 1.3).unwrap()),
+            -0.23076923076923078,
+        ),
+        (
+            "double_exponential, sigma a variable",
+            at(1.3, |v| double_exponential_lupdf(0.4, 0.1, v[0]).unwrap()),
+            -0.49313349523672184,
+        ),
+        (
+            "double_exponential full",
+            double_exponential_lpdf(0.4, 0.1, 1.3).unwrap(),
+            -1.1862806757966671,
+        ),
+        (
+            "von_mises, mu a variable",
+            at(0.1, |v| von_mises_lupdf(0.4, v[0], 2.0).unwrap()),
+            1.910672978251212,
+        ),
+        (
+            "von_mises, kappa a variable",
+            at(2.0, |v| von_mises_lupdf(0.4, 0.1, v[0]).unwrap()),
+            1.0866794367682557,
+        ),
+        (
+            "von_mises full",
+            von_mises_lpdf(0.4, 0.1, 2.0).unwrap(),
+            -0.7511976296410896,
+        ),
+        (
+            "rayleigh, y a variable",
+            at(1.1, |v| rayleigh_lupdf(v[0], 0.8).unwrap()),
+            -0.85000232019567501,
+        ),
+        (
+            "rayleigh, sigma a variable",
+            at(0.8, |v| rayleigh_lupdf(1.1, v[0]).unwrap()),
+            -0.49902539737158058,
+        ),
+        (
+            "rayleigh full",
+            rayleigh_lpdf(1.1, 0.8).unwrap(),
+            -0.40371521756725565,
+        ),
+        (
+            "pareto, y a variable",
+            at(2.0, |v| pareto_lupdf(v[0], 1.2, 3.0).unwrap()),
+            -2.7725887222397811,
+        ),
+        (
+            "pareto, y_min a variable",
+            at(1.2, |v| pareto_lupdf(2.0, v[0], 3.0).unwrap()),
+            0.5469646703818638,
+        ),
+        (
+            "pareto, alpha a variable",
+            at(3.0, |v| pareto_lupdf(2.0, 1.2, v[0]).unwrap()),
+            -1.1270117631898076,
+        ),
+        (
+            "pareto full",
+            pareto_lpdf(2.0, 1.2, 3.0).unwrap(),
+            -1.1270117631898076,
+        ),
+        (
+            "pareto_type_2, mu a variable",
+            at(0.5, |v| pareto_type_2_lupdf(2.0, v[0], 1.5, 3.0).unwrap()),
+            -2.7725887222397811,
+        ),
+        (
+            "pareto_type_2, lambda a variable",
+            at(1.5, |v| pareto_type_2_lupdf(2.0, 0.5, v[0], 3.0).unwrap()),
+            -3.1780538303479453,
+        ),
+        (
+            "pareto_type_2, alpha a variable",
+            at(3.0, |v| pareto_type_2_lupdf(2.0, 0.5, 1.5, v[0]).unwrap()),
+            -1.6739764335716714,
+        ),
+        (
+            "pareto_type_2 full",
+            pareto_type_2_lpdf(2.0, 0.5, 1.5, 3.0).unwrap(),
+            -2.0794415416798357,
+        ),
+        (
+            "frechet, y a variable",
+            at(1.3, |v| frechet_lupdf(v[0], 2.0, 0.9).unwrap()),
+            -1.2663827342308756,
+        ),
+        (
+            "frechet, alpha a variable",
+            at(2.0, |v| frechet_lupdf(1.3, v[0], 0.9).unwrap()),
+            -0.78395658498658272,
+        ),
+        (
+            "frechet, sigma a variable",
+            at(0.9, |v| frechet_lupdf(1.3, 2.0, v[0]).unwrap()),
+            -0.69001097214405482,
+        ),
+        (
+            "frechet full",
+            frechet_lpdf(1.3, 2.0, 0.9).unwrap(),
+            -0.78395658498658272,
+        ),
+        (
+            "chi_square, y a variable",
+            at(1.7, |v| chi_square_lupdf(v[0], 3.0).unwrap()),
+            -0.58468587446891473,
+        ),
+        (
+            "chi_square, nu a variable",
+            at(3.0, |v| chi_square_lupdf(1.7, v[0]).unwrap()),
+            -0.65362440767358754,
+        ),
+        (
+            "chi_square full",
+            chi_square_lpdf(1.7, 3.0).unwrap(),
+            -1.5036244076735876,
+        ),
+        (
+            "inv_chi_square, y a variable",
+            at(0.7, |v| inv_chi_square_lupdf(v[0], 3.0).unwrap()),
+            0.17740164556111682,
+        ),
+        (
+            "inv_chi_square, nu a variable",
+            at(3.0, |v| inv_chi_square_lupdf(0.7, v[0]).unwrap()),
+            -0.027251173357841552,
+        ),
+        (
+            "inv_chi_square full",
+            inv_chi_square_lpdf(0.7, 3.0).unwrap(),
+            -0.74153688764355585,
+        ),
+        (
+            "scaled_inv_chi_square, y a variable",
+            at(0.7, |v| {
+                scaled_inv_chi_square_lupdf(v[0], 3.0, 0.8).unwrap()
+            }),
+            -0.47974121158174055,
+        ),
+        (
+            "scaled_inv_chi_square, nu a variable",
+            at(3.0, |v| {
+                scaled_inv_chi_square_lupdf(0.7, v[0], 0.8).unwrap()
+            }),
+            -0.42019196572687795,
+        ),
+        (
+            "scaled_inv_chi_square, s a variable",
+            at(0.8, |v| {
+                scaled_inv_chi_square_lupdf(0.7, 3.0, v[0]).unwrap()
+            }),
+            -2.040859225371201,
+        ),
+        (
+            "scaled_inv_chi_square full",
+            scaled_inv_chi_square_lpdf(0.7, 3.0, 0.8).unwrap(),
+            -0.42019196572687789,
+        ),
+        (
+            "exp_mod_normal, mu a variable",
+            at(0.1, |v| exp_mod_normal_lupdf(0.4, v[0], 1.3, 0.8).unwrap()),
+            -0.57055938562141995,
+        ),
+        (
+            "exp_mod_normal, sigma a variable",
+            at(1.3, |v| exp_mod_normal_lupdf(0.4, 0.1, v[0], 0.8).unwrap()),
+            -0.57055938562141995,
+        ),
+        (
+            "exp_mod_normal, lambda a variable",
+            at(0.8, |v| exp_mod_normal_lupdf(0.4, 0.1, 1.3, v[0]).unwrap()),
+            -0.79370293693562965,
+        ),
+        (
+            "exp_mod_normal full",
+            exp_mod_normal_lpdf(0.4, 0.1, 1.3, 0.8).unwrap(),
+            -1.4868501174955751,
+        ),
+        (
+            "skew_double_exponential, mu a variable",
+            at(0.1, |v| {
+                skew_double_exponential_lupdf(0.4, v[0], 1.3, 0.3).unwrap()
+            }),
+            -0.13846153846153847,
+        ),
+        (
+            "skew_double_exponential, sigma a variable",
+            at(1.3, |v| {
+                skew_double_exponential_lupdf(0.4, 0.1, v[0], 0.3).unwrap()
+            }),
+            -0.40082580292902953,
+        ),
+        (
+            "skew_double_exponential, tau a variable",
+            at(0.3, |v| {
+                skew_double_exponential_lupdf(0.4, 0.1, 1.3, v[0]).unwrap()
+            }),
+            -1.6991092867262068,
+        ),
+        (
+            "skew_double_exponential full",
+            skew_double_exponential_lpdf(0.4, 0.1, 1.3, 0.3).unwrap(),
+            -1.2683263706337526,
+        ),
+        (
+            "loglogistic, y a variable",
+            at(1.3, |v| loglogistic_lupdf(v[0], 1.1, 2.5).unwrap()),
+            -1.4536747090145306,
+        ),
+        (
+            "loglogistic, alpha a variable",
+            at(1.1, |v| loglogistic_lupdf(1.3, v[0], 2.5).unwrap()),
+            -0.77565942665118781,
+        ),
+        (
+            "loglogistic, beta a variable",
+            at(2.5, |v| loglogistic_lupdf(1.3, 1.1, v[0]).unwrap()),
+            -0.77565942665118781,
+        ),
+        (
+            "loglogistic full",
+            loglogistic_lpdf(1.3, 1.1, 2.5).unwrap(),
+            -0.77565942665118781,
+        ),
+        (
+            "beta_proportion, y a variable",
+            at(0.3, |v| beta_proportion_lupdf(v[0], 0.4, 5.0).unwrap()),
+            -1.9173226922034008,
+        ),
+        (
+            "beta_proportion, mu a variable",
+            at(0.4, |v| beta_proportion_lupdf(0.3, v[0], 5.0).unwrap()),
+            -2.6104698727633462,
+        ),
+        (
+            "beta_proportion, kappa a variable",
+            at(5.0, |v| beta_proportion_lupdf(0.3, 0.4, v[0]).unwrap()),
+            0.56758395758459956,
+        ),
+        (
+            "beta_proportion full",
+            beta_proportion_lpdf(0.3, 0.4, 5.0).unwrap(),
+            0.56758395758459956,
+        ),
+        (
+            "weibull, y a variable",
+            at(1.2, |v| weibull_lupdf(v[0], 1.5, 0.9).unwrap()),
+            -1.4484399394420246,
+        ),
+        (
+            "weibull, sigma a variable",
+            at(0.9, |v| weibull_lupdf(1.2, 1.5, v[0]).unwrap()),
+            -1.3815599443522624,
+        ),
+        (
+            "weibull full",
+            weibull_lpdf(1.2, 1.5, 0.9).unwrap(),
+            -0.88493405784712087,
+        ),
+        (
+            "normal_sufficient, mu a variable",
+            at(0.7, |v| {
+                normal_sufficient_lupdf(1.5, 7.5, 4i64, v[0], 1.3).unwrap()
+            }),
+            -2.9763313609467454,
+        ),
+        (
+            "normal_sufficient, sigma a variable",
+            at(1.3, |v| {
+                normal_sufficient_lupdf(1.5, 7.5, 4i64, 0.7, v[0]).unwrap()
+            }),
+            -4.0257884188167097,
+        ),
+        (
+            "normal_sufficient, y_bar a variable",
+            at(1.5, |v| {
+                normal_sufficient_lupdf(v[0], 7.5, 4i64, 0.7, 1.3).unwrap()
+            }),
+            -2.9763313609467454,
+        ),
+        (
+            "normal_sufficient full",
+            normal_sufficient_lpdf(1.5, 7.5, 4i64, 0.7, 1.3).unwrap(),
+            -7.7015425516354012,
+        ),
+        (
+            "beta_binomial, alpha a variable",
+            at(2.0, |v| {
+                beta_binomial_lupmf(3i64, 10i64, v[0], 3.0).unwrap()
+            }),
+            -6.7264332225212691,
+        ),
+        (
+            "beta_binomial full",
+            beta_binomial_lpmf(3i64, 10i64, 2.0, 3.0).unwrap(),
+            -1.9389414797392224,
+        ),
+        (
+            "neg_binomial, alpha a variable",
+            at(2.0, |v| neg_binomial_lupmf(3i64, v[0], 1.5).unwrap()),
+            -2.3842290820345555,
+        ),
+        (
+            "neg_binomial, beta a variable",
+            at(1.5, |v| neg_binomial_lupmf(3i64, 2.0, v[0]).unwrap()),
+            -3.7705234431544468,
+        ),
+        (
+            "neg_binomial full",
+            neg_binomial_lpmf(3i64, 2.0, 1.5).unwrap(),
+            -2.3842290820345555,
+        ),
+        (
+            "beta_neg_binomial, r a variable",
+            at(2.5, |v| {
+                beta_neg_binomial_lupmf(3i64, v[0], 3.0, 1.5).unwrap()
+            }),
+            -0.8357742165567712,
+        ),
+        (
+            "beta_neg_binomial, alpha a variable",
+            at(3.0, |v| {
+                beta_neg_binomial_lupmf(3i64, 2.5, v[0], 1.5).unwrap()
+            }),
+            -0.8357742165567712,
+        ),
+        (
+            "beta_neg_binomial, beta a variable",
+            at(1.5, |v| {
+                beta_neg_binomial_lupmf(3i64, 2.5, 3.0, v[0]).unwrap()
+            }),
+            -0.8357742165567712,
+        ),
+        (
+            "beta_neg_binomial full",
+            beta_neg_binomial_lpmf(3i64, 2.5, 3.0, 1.5).unwrap(),
+            -2.6275336857848259,
+        ),
+        (
+            "bernoulli, theta a variable",
+            at(0.3, |v| bernoulli_lupmf(1i64, v[0]).unwrap()),
+            -1.2039728043259361,
+        ),
+        (
+            "bernoulli full",
+            bernoulli_lpmf(1i64, 0.3).unwrap(),
+            -1.2039728043259361,
+        ),
+        (
+            "yule_simon, alpha a variable",
+            at(2.0, |v| yule_simon_lupmf(3i64, v[0]).unwrap()),
+            -3.401197381662155,
+        ),
+        (
+            "yule_simon full",
+            yule_simon_lpmf(3i64, 2.0).unwrap(),
+            -2.7080502011022096,
+        ),
+        (
+            "wiener4, alpha a variable",
+            at(1.5, |v| wiener_lupdf(1.2, v[0], 0.3, 0.5, 0.4).unwrap()),
+            -1.4121216265124346,
+        ),
+        (
+            "wiener4 full",
+            wiener_lpdf(1.2, 1.5, 0.3, 0.5, 0.4).unwrap(),
+            -1.4121216265124346,
+        ),
+    ];
+    let failures: Vec<String> = cases
+        .iter()
+        .filter(|&&(_, got, want)| !close(got, want))
+        .map(|(name, got, want)| format!("{name}: {got:e} vs {want:e}"))
+        .collect();
+    assert!(failures.is_empty(), "\n{}", failures.join("\n"));
 }

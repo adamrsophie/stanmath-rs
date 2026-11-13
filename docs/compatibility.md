@@ -98,17 +98,17 @@ arguments are vectorized. Each log density has a `propto` form; see below.
 ### `propto`
 
 Stan's `propto` template flag, which the language exposes as `_lupdf` and `_lupmf`, is a separate
-function in stanmath-rs: `normal_lupdf`, `poisson_lupmf`, and so on, for every log density and
-every overload (`multi_normal_lupdf_array`, `poisson_log_glm_lupmf_row`, ...). An argument is data when its elements are `f64`; `Var` and `Dual` arguments are
-parameters. A `propto` function is zero when every argument is data, and otherwise drops the terms
-that depend only on data, so its gradient equals that of the full function. The normal, standard
-normal, Student's t, Cauchy, logistic, exponential, gamma, inverse gamma, beta, lognormal, uniform,
-Gumbel, binomial, Poisson, and both negative binomial 2 kernels drop their terms as Stan does, and
-their values match Stan Math 5.4.0 (probed with one argument a variable). As in Stan, the
-lognormal keeps its constant `-ln(2 pi) / 2`. The other kernels keep every term when any argument
-is a parameter, which differs from Stan's value by a constant only. The seven GLMs have `propto`
-forms that match Stan's values; since `beta` fixes their scalar type, a GLM whose `phi` or `sigma`
-is a parameter treats `beta` as one too.
+function in stanmath-rs: `normal_lupdf`, `poisson_lupmf`, and so on, for every log density and every
+overload (`multi_normal_lupdf_array`, `poisson_log_glm_lupmf_row`, ...). An argument is data when
+its elements are `f64`; `Var` and `Dual` arguments are parameters. A `propto` function is zero when
+every argument is data, and otherwise drops the terms that depend only on data, so its gradient
+equals that of the full function. Every kernel groups its terms as Stan does, and its values match
+Stan Math 5.4.0, probed with one argument a variable at a time. Stan's grouping is not always the
+finest one: the lognormal keeps its constant `-ln(2 pi) / 2`, the log-logistic keeps `(beta - 1) ln
+y` while `alpha` is a parameter, the beta negative binomial drops only `-ln Gamma(n + 1)`, and the
+Yule-Simon drops `ln Gamma(n)`. The seven GLMs have `propto` forms that match Stan's values; since
+`beta` fixes their scalar type, a GLM whose `phi` or `sigma` is a parameter treats `beta` as one
+too.
 
 The multivariate densities, the Dirichlet, categorical, multinomial, Dirichlet multinomial,
 ordered, Poisson binomial, hypergeometric, and discrete range masses, and the five and seven

@@ -7,13 +7,13 @@
 //! The log mass, log CDF, and log complementary CDF are fused kernels with analytic partials in
 //! `α`, written generically so higher derivatives stay exact.
 
-use stanmath_rs_autodiff::functions::{lbeta, log1m_exp};
+use stanmath_rs_autodiff::functions::{lbeta, lgamma, log1m_exp};
 use stanmath_rs_autodiff::special::digamma_diff;
 use stanmath_rs_autodiff::{Broadcast, IntArg, Promoted, Real};
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::param;
-use crate::kernel::{Kernel, sum_kernel, sum_kernel_propto};
+use crate::kernel::{Keep, Kernel, sum_kernel, sum_kernel_propto};
 
 fn check_yule_simon(f: &'static str, n: Option<i64>, alpha: Option<f64>) -> Result<()> {
     if let Some(n) = n.filter(|&n| n < 1) {
@@ -40,13 +40,27 @@ impl Kernel<1, 1> for YuleSimon {
         check_yule_simon(Self::NAME, n, alpha)
     }
 
-    fn eval<S: Real>([n]: [i64; 1], [alpha]: [S; 1], grad: Option<&mut [S; 1]>) -> S {
+    fn eval<S: Real>(ints: [i64; 1], x: [S; 1], grad: Option<&mut [S; 1]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        [n]: [i64; 1],
+        [alpha]: [S; 1],
+        grad: Option<&mut [S; 1]>,
+        keep: Keep<1>,
+    ) -> S {
         let nf = n as f64;
         if let Some(g) = grad {
             // d/dα [ln α + ln Γ(α + 1) - ln Γ(n + α + 1)]
             g[0] = alpha.recip() + digamma_diff(alpha + 1.0, S::from_f64(nf));
         }
-        alpha.ln() + lbeta(S::from_f64(nf), alpha + 1.0)
+        if keep.term(&[]) {
+            alpha.ln() + lbeta(S::from_f64(nf), alpha + 1.0)
+        } else {
+            // ln B(n, α + 1) without ln Γ(n), which depends only on data.
+            alpha.ln() + lgamma(alpha + 1.0) - lgamma(alpha + (nf + 1.0))
+        }
     }
 }
 

@@ -422,18 +422,13 @@ where
 /// `Γ(n + r) / (n! Γ(r)) B(α + r, β + n) / B(α, β)`.
 fn beta_neg_binomial_density<S: Real>(n: i64, [r, alpha, beta]: [S; 3], keep: Keep<3>) -> S {
     let nf = n as f64;
-    let mut lp = lbeta(r + alpha, beta + nf);
-    if keep.term(&[1, 2]) {
-        lp -= lbeta(alpha, beta);
-    }
-    // ln Γ(n + r) - ln Γ(n + 1) - ln Γ(r) = -ln(n + r) - ln B(r, n + 1), whose -ln Γ(n + 1)
-    // depends only on data.
+    let lp = lbeta(r + alpha, beta + nf) - lbeta(alpha, beta);
     if keep.term(&[]) {
+        // ln Γ(n + r) - ln Γ(n + 1) - ln Γ(r) = -ln(n + r) - ln B(r, n + 1)
         lp - (r + nf).ln() - lbeta(r, S::from_f64(nf + 1.0))
-    } else if keep.term(&[0]) {
-        lp + lgamma(r + nf) - lgamma(r)
     } else {
-        lp
+        // Stan drops only -ln Γ(n + 1), whichever argument is a parameter.
+        lp + lgamma(r + nf) - lgamma(r)
     }
 }
 

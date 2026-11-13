@@ -1295,20 +1295,14 @@ impl Kernel<0, 3> for LogLogistic {
             g[1] = beta * (s * 2.0 - 1.0) / alpha;
             g[2] = beta.recip() + r * (-(s * 2.0) + 1.0);
         }
-        let mut lp = -(log1p_exp(br) * 2.0);
-        if keep.term(&[2]) {
-            lp += beta.ln();
+        let tail = -(log1p_exp(br) * 2.0);
+        // Stan keeps ln β - β ln α while α or β is a parameter, and (β - 1) ln y while any
+        // argument is.
+        if keep.term(&[1, 2]) {
+            beta.ln() - alpha.ln() + (beta - 1.0) * r + tail
+        } else {
+            (beta - 1.0) * y.ln() + tail
         }
-        if keep.term(&[1]) {
-            lp -= alpha.ln();
-        }
-        match (keep.term(&[0, 2]), keep.term(&[1, 2])) {
-            (true, true) => lp += (beta - 1.0) * r,
-            (true, false) => lp += (beta - 1.0) * y.ln(),
-            (false, true) => lp -= (beta - 1.0) * alpha.ln(),
-            (false, false) => {}
-        }
-        lp
     }
 }
 
