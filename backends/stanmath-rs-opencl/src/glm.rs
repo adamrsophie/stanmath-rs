@@ -1,13 +1,14 @@
 //! Generalized linear models on the device: Stan's OpenCL `normal_id_glm_lpdf` and the rest.
 //!
 //! The linear predictor `x beta + alpha` is the device matrix product, and the elementwise
-//! density runs on the device as [`lpmf_on_device`]. The categorical and ordered logistic
-//! models compute their predictor on the device and their density on the host.
+//! density runs on the device as [`lpmf_on_device`]; the categorical and ordered logistic
+//! models have their own row-wise device kernels.
 
-use stanmath_rs_autodiff::Real;
+use stanmath_rs_autodiff::{MultiFn, Real};
 use stanmath_rs_core::{Error, Matrix, Result};
-use stanmath_rs_distributions as d;
 
+use crate::device::{Arg, DeviceBuffer, launch};
+use crate::special::PRELUDE;
 use crate::{Density, lpmf_on_device, multiply_on_device};
 
 /// `x beta + alpha` for an `n` by `k` matrix `x`, with `alpha` of length one or `n`.
@@ -111,11 +112,12 @@ pub fn neg_binomial_2_log_glm_lpmf_on_device<T: Real>(
 }
 
 /// Stan's `categorical_logit_glm_lpmf(y | x, alpha, beta)` with the `n` by `K` predictor
-/// computed on the device; `alpha` has length `K` and `beta` is `k` by `K`.
+/// and the density computed on the device; `alpha` has length `K` and `beta` is `k` by `K`.
 ///
 /// # Errors
 ///
-/// As [`normal_id_glm_lpdf_on_device`], and the host `categorical_logit_lpmf` errors.
+/// As [`normal_id_glm_lpdf_on_device`], and [`Error::InvalidParameter`] for an outcome
+/// outside `1..=K`.
 pub fn categorical_logit_glm_lpmf_on_device<T: Real>(
     y: &[i64],
     x: &Matrix<T>,
@@ -141,35 +143,230 @@ pub fn categorical_logit_glm_lpmf_on_device<T: Real>(
             format!("{} outcomes for {n} rows", y.len()),
         ));
     }
-    let v = eta.as_slice();
-    let mut total = T::zero();
-    for (i, &yi) in y.iter().enumerate() {
-        let row: Vec<T> = (0..k).map(|j| v[i + j * n]).collect();
-        total += d::categorical_logit_lpmf(yi, &row)?;
+    if let Some(&bad) = y.iter().find(|&&v| v < 1 || v > k as i64) {
+        return Err(Error::parameter(F, "y", bad as f64, "in 1..=K"));
     }
-    Ok(total)
+    if n == 0 || k == 0 {
+        return Ok(T::zero());
+    }
+    let f = RowLogProb {
+        kind: Kind::Categorical,
+        y: y.to_vec(),
+        n,
+        k,
+    };
+    Ok(T::map_multi(eta.as_slice(), &f)?[0])
 }
 
-/// Stan's `ordered_logistic_glm_lpmf(y | x, beta, cuts)` with the predictor computed on the
-/// device.
+/// Stan's `ordered_logistic_glm_lpmf(y | x, beta, cuts)` with the predictor and the density
+/// computed on the device.
 ///
 /// # Errors
 ///
-/// As [`normal_id_glm_lpdf_on_device`], and the host `ordered_logistic_lpmf` errors.
+/// As [`normal_id_glm_lpdf_on_device`], and [`Error::InvalidParameter`] for an outcome
+/// outside `1..=K` or cutpoints that are not finite and strictly increasing.
 pub fn ordered_logistic_glm_lpmf_on_device<T: Real>(
     y: &[i64],
     x: &Matrix<T>,
     beta: &[T],
     cuts: &[T],
 ) -> Result<T> {
-    let eta = predictor("ordered_logistic_glm_lpmf", x, &[T::zero()], &column(beta))?;
-    d::ordered_logistic_lpmf(y, eta.as_slice(), cuts)
+    const F: &str = "ordered_logistic_glm_lpmf";
+    let eta = predictor(F, x, &[T::zero()], &column(beta))?;
+    let (n, k) = (eta.nrows(), cuts.len() + 1);
+    if y.len() != n {
+        return Err(Error::dimension(
+            F,
+            format!("{} outcomes for {n} rows", y.len()),
+        ));
+    }
+    if let Some(&bad) = y.iter().find(|&&v| v < 1 || v > k as i64) {
+        return Err(Error::parameter(F, "y", bad as f64, "in 1..=K"));
+    }
+    let c: Vec<f64> = cuts.iter().map(Real::value).collect();
+    if let Some(&bad) = c.iter().find(|v| !v.is_finite()) {
+        return Err(Error::parameter(F, "cuts", bad, "finite"));
+    }
+    if c.windows(2).any(|w| w[0] >= w[1]) {
+        return Err(Error::parameter(F, "cuts", c[0], "strictly increasing"));
+    }
+    if n == 0 {
+        return Ok(T::zero());
+    }
+    let f = RowLogProb {
+        kind: Kind::Ordered,
+        y: y.to_vec(),
+        n,
+        k,
+    };
+    let inputs: Vec<T> = eta.as_slice().iter().chain(cuts).copied().collect();
+    Ok(T::map_multi(&inputs, &f)?[0])
+}
+
+#[derive(Clone, Copy)]
+enum Kind {
+    /// Inputs: the n by K predictor.
+    Categorical,
+    /// Inputs: the n predictors, then the K - 1 cutpoints.
+    Ordered,
+}
+
+/// The summed log probability of row-wise outcomes, with every row on its own work item.
+#[derive(Clone)]
+struct RowLogProb {
+    kind: Kind,
+    y: Vec<i64>,
+    n: usize,
+    k: usize,
+}
+
+const ROWS: &str = "__kernel void categorical(__global const double* eta, __global const double* y,
+                          __global double* lp, __global double* g, const ulong n,
+                          const ulong k) {
+  const size_t i = get_global_id(0);
+  const size_t c = (size_t) y[i] - 1;
+  double m = eta[i];
+  for (size_t j = 1; j < k; j++) m = fmax(m, eta[i + j * n]);
+  double s = 0.0;
+  for (size_t j = 0; j < k; j++) s += exp(eta[i + j * n] - m);
+  lp[i] = eta[i + c * n] - m - log(s);
+  for (size_t j = 0; j < k; j++) g[i + j * n] = (j == c ? 1.0 : 0.0) - exp(eta[i + j * n] - m) / s;
+}
+// Row i: lp, the predictor's gradient, and the gradients of the cutpoints below and above.
+__kernel void ordered(__global const double* eta, __global const double* cuts,
+                      __global const double* y, __global double* lp, __global double* ge,
+                      __global double* glo, __global double* ghi, const ulong k) {
+  const size_t i = get_global_id(0);
+  const long c = (long) y[i];
+  const double e = eta[i];
+  if (c == 1) {
+    const double a = e - cuts[0];
+    lp[i] = a > 0.0 ? -a - log1p(exp(-a)) : -log1p(exp(a));
+    ge[i] = -1.0 / (1.0 + exp(-a));
+    glo[i] = 0.0;
+    ghi[i] = -ge[i];
+  } else if (c == (long) k) {
+    const double a = e - cuts[k - 2];
+    lp[i] = a < 0.0 ? a - log1p(exp(a)) : -log1p(exp(-a));
+    ge[i] = 1.0 / (1.0 + exp(a));
+    glo[i] = -ge[i];
+    ghi[i] = 0.0;
+  } else {
+    const double a = e - cuts[c - 2], b = e - cuts[c - 1];
+    lp[i] = a - log1p(exp(a)) - log1p(exp(b)) + log(-expm1(b - a));
+    const double da = 1.0 / (1.0 + exp(a)) + 1.0 / expm1(a - b);
+    const double db = -1.0 / (1.0 + exp(-b)) - 1.0 / expm1(a - b);
+    ge[i] = da + db;
+    glo[i] = -da;
+    ghi[i] = -db;
+  }
+}
+";
+
+impl RowLogProb {
+    /// The log probability of each row and the gradient with respect to every input.
+    fn device(&self, x: &[f64]) -> Result<(Vec<f64>, Vec<f64>)> {
+        let n = self.n;
+        let y: Vec<f64> = self.y.iter().map(|&v| v as f64).collect();
+        let yb = DeviceBuffer::from_slice(&y)?;
+        let lp = DeviceBuffer::new(n)?;
+        let source = || format!("{PRELUDE}{ROWS}");
+        match self.kind {
+            Kind::Categorical => {
+                let (eta, g) = (DeviceBuffer::from_slice(x)?, DeviceBuffer::new(x.len())?);
+                launch(
+                    "categorical_logit_glm_lpmf",
+                    "glm_rows",
+                    "categorical",
+                    source,
+                    &[
+                        Arg::Buffer(&eta),
+                        Arg::Buffer(&yb),
+                        Arg::Buffer(&lp),
+                        Arg::Buffer(&g),
+                        Arg::Size(n),
+                        Arg::Size(self.k),
+                    ],
+                    &[n],
+                )?;
+                Ok((lp.to_vec()?, g.to_vec()?))
+            }
+            Kind::Ordered => {
+                let (eta, cuts) = (
+                    DeviceBuffer::from_slice(&x[..n])?,
+                    DeviceBuffer::from_slice(&x[n..])?,
+                );
+                let (ge, glo, ghi) = (
+                    DeviceBuffer::new(n)?,
+                    DeviceBuffer::new(n)?,
+                    DeviceBuffer::new(n)?,
+                );
+                launch(
+                    "ordered_logistic_glm_lpmf",
+                    "glm_rows",
+                    "ordered",
+                    source,
+                    &[
+                        Arg::Buffer(&eta),
+                        Arg::Buffer(&cuts),
+                        Arg::Buffer(&yb),
+                        Arg::Buffer(&lp),
+                        Arg::Buffer(&ge),
+                        Arg::Buffer(&glo),
+                        Arg::Buffer(&ghi),
+                        Arg::Size(self.k),
+                    ],
+                    &[n],
+                )?;
+                let mut g = ge.to_vec()?;
+                g.resize(x.len(), 0.0);
+                let (lo, hi) = (glo.to_vec()?, ghi.to_vec()?);
+                for (i, &c) in self.y.iter().enumerate() {
+                    let c = c as usize;
+                    if c >= 2 {
+                        g[n + c - 2] += lo[i];
+                    }
+                    if c < self.k {
+                        g[n + c - 1] += hi[i];
+                    }
+                }
+                Ok((lp.to_vec()?, g))
+            }
+        }
+    }
+}
+
+impl MultiFn for RowLogProb {
+    fn eval<S: Real>(&self, x: &[S]) -> Result<Vec<S>> {
+        if S::ORDER > 0 {
+            return Err(Error::Backend {
+                function: "glm",
+                message: "OpenCL GLMs support reverse mode only, as in Stan".into(),
+            });
+        }
+        let v: Vec<f64> = x.iter().map(Real::value).collect();
+        Ok(vec![S::from_f64(self.device(&v)?.0.iter().sum())])
+    }
+
+    fn reverse(&self, x: &[f64], _y: &[f64], y_adj: &[f64], needed: &[bool], x_adj: &mut [f64]) {
+        // A failed kernel leaves NaN gradients.
+        let g = self
+            .device(x)
+            .map(|(_, g)| g)
+            .unwrap_or_else(|_| vec![f64::NAN; x.len()]);
+        for ((o, gi), &need) in x_adj.iter_mut().zip(g).zip(needed) {
+            if need {
+                *o += y_adj[0] * gi;
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use stanmath_rs_autodiff::{Var, value_and_grad};
+    use stanmath_rs_distributions as d;
 
     const N: usize = 5;
     const K: usize = 3;
