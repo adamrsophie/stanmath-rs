@@ -299,6 +299,15 @@ fn lkj_and_matrix_normal_propto_match_stan() {
     let (lmu, lsd) = ([0.1, 0.0, -0.2], [1.0, 0.8, 1.2]);
     let mn_mu = Matrix::from_rows(&[[0.1, 0.0, 0.2], [-0.1, 0.3, 0.0]]);
     let mn_s = Matrix::from_rows(&[[1.5, 0.2], [0.2, 0.9]]);
+    let mn_full = matrix_normal_prec_lpdf(&gp_y(), &mn_mu, &mn_s, &s).unwrap();
+    let mn_lup = at(&pack(&[&gp_y(), &mn_mu, &mn_s, &s], &[]), |v| {
+        let mut o = 0;
+        let y = take(v, &mut o, 2, 3);
+        let m = take(v, &mut o, 2, 3);
+        let sg = take(v, &mut o, 2, 2);
+        let d = take(v, &mut o, 3, 3);
+        matrix_normal_prec_lupdf(&y, &m, &sg, &d).unwrap()
+    });
     report(
         &[
             (
@@ -359,22 +368,13 @@ fn lkj_and_matrix_normal_propto_match_stan() {
                 -4.0251030172608315,
             ),
             (
-                "matrix_normal_prec, every argument a variable",
-                at(&pack(&[&gp_y(), &mn_mu, &mn_s, &s], &[]), |v| {
-                    let mut o = 0;
-                    let y = take(v, &mut o, 2, 3);
-                    let m = take(v, &mut o, 2, 3);
-                    let sg = take(v, &mut o, 2, 2);
-                    let d = take(v, &mut o, 3, 3);
-                    matrix_normal_prec_lupdf(&y, &m, &sg, &d).unwrap()
-                }),
-                -0.15178745451296272,
+                "matrix_normal_prec, the dropped constant",
+                mn_full - mn_lup,
+                -5.6654186537409998 - -0.15178745451296272,
             ),
-            (
-                "matrix_normal_prec full",
-                matrix_normal_prec_lpdf(&gp_y(), &mn_mu, &mn_s, &s).unwrap(),
-                -5.6654186537409998,
-            ),
+            // Stan Math 5.4.0 prints -5.6654186537409998: it weights ln det Sigma by N/2 and
+            // ln det D by P/2. The matrix normal density weights them by P/2 and N/2.
+            ("matrix_normal_prec full", mn_full, -6.045750221225795),
         ],
         1e-10,
     );

@@ -140,6 +140,9 @@ A few functions follow Stan in returning zero for an empty response before any o
 Deliberate differences:
 
 * `beta_lpdf` and `weibull_lpdf` use `0 ln 0 = 0`, so for example `beta_lpdf(0 | 1, b)` is finite.
+* `matrix_normal_prec_lpdf` of an `N` by `P` matrix weights `ln det Sigma` by `P / 2` and
+  `ln det D` by `N / 2`, as the matrix normal density does. Stan Math 5.4.0 swaps the two weights,
+  so the values differ unless `N = P` or `ln det Sigma = ln det D`.
 
 ## Linear algebra
 
