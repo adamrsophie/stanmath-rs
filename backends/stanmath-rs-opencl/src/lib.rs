@@ -8,7 +8,7 @@
 mod device;
 mod elementwise;
 
-pub use elementwise::{Unary, unary_on_device};
+pub use elementwise::{Binary, Unary, binary_on_device, unary_on_device};
 
 use device::{Arg, DeviceBuffer, launch};
 use stanmath_rs_autodiff::{MultiFn, Real};

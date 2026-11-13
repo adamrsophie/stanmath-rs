@@ -196,6 +196,196 @@ pub fn unary_on_device<T: Real>(op: Unary, x: &[T]) -> Result<Vec<T>> {
     T::map_multi(x, &Map(op))
 }
 
+macro_rules! binary_table {
+    ($($variant:ident $name:literal $host:path, $value:literal, $da:literal, $db:literal;)*) => {
+        /// An elementwise function of two arguments of equal length with an OpenCL kernel.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        pub enum Binary {
+            $(
+                #[doc = concat!("Stan's `", $name, "`.")]
+                $variant,
+            )*
+        }
+
+        impl Binary {
+            /// Every function, in table order.
+            pub const ALL: &'static [Binary] = &[$(Binary::$variant),*];
+
+            /// The Stan name.
+            pub fn name(self) -> &'static str {
+                match self {
+                    $(Binary::$variant => $name,)*
+                }
+            }
+
+            /// `(value, derivative in x, derivative in y)` as OpenCL C expressions in `x`, `y`,
+            /// and the value `z`.
+            fn expressions(self) -> (&'static str, &'static str, &'static str) {
+                match self {
+                    $(Binary::$variant => ($value, $da, $db),)*
+                }
+            }
+
+            fn host<S: Real>(self, a: S, b: S) -> S {
+                match self {
+                    $(Binary::$variant => $host(a, b),)*
+                }
+            }
+        }
+    };
+}
+
+fn add<S: Real>(a: S, b: S) -> S {
+    a + b
+}
+
+fn subtract<S: Real>(a: S, b: S) -> S {
+    a - b
+}
+
+fn multiply<S: Real>(a: S, b: S) -> S {
+    a * b
+}
+
+fn divide<S: Real>(a: S, b: S) -> S {
+    a / b
+}
+
+binary_table! {
+    Add "add" add, "x + y", "1.0", "1.0";
+    Subtract "subtract" subtract, "x - y", "1.0", "-1.0";
+    EltMultiply "elt_multiply" multiply, "x * y", "y", "x";
+    EltDivide "elt_divide" divide, "x / y", "1.0 / y", "-z / y";
+    Pow "pow" f::pow, "pow(x, y)", "y * pow(x, y - 1.0)", "z * log(x)";
+    Hypot "hypot" f::hypot, "hypot(x, y)", "x / z", "y / z";
+    LogDiffExp "log_diff_exp" f::log_diff_exp,
+        "x + log(-expm1(y - x))", "-1.0 / expm1(y - x)", "-1.0 / expm1(x - y)";
+}
+
+fn binary_source(op: Binary) -> String {
+    let (value, da, db) = op.expressions();
+    format!(
+        "#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+__kernel void value(__global const double* xs, __global const double* ys, __global double* zs) {{
+  const size_t i = get_global_id(0);
+  const double x = xs[i];
+  const double y = ys[i];
+  zs[i] = {value};
+}}
+__kernel void adjoint(__global const double* xs, __global const double* ys,
+                      __global const double* zs, __global const double* za,
+                      __global double* xa, __global double* ya) {{
+  const size_t i = get_global_id(0);
+  const double x = xs[i];
+  const double y = ys[i];
+  const double z = zs[i];
+  xa[i] = za[i] * ({da});
+  ya[i] = za[i] * ({db});
+}}
+"
+    )
+}
+
+#[derive(Clone)]
+struct Map2(Binary);
+
+impl Map2 {
+    fn device_value(&self, x: &[f64]) -> Result<Vec<f64>> {
+        let n = x.len() / 2;
+        let (xs, ys) = (
+            DeviceBuffer::from_slice(&x[..n])?,
+            DeviceBuffer::from_slice(&x[n..])?,
+        );
+        let zs = DeviceBuffer::new(n)?;
+        let op = self.0;
+        launch(
+            op.name(),
+            op.name(),
+            "value",
+            || binary_source(op),
+            &[Arg::Buffer(&xs), Arg::Buffer(&ys), Arg::Buffer(&zs)],
+            &[n],
+        )?;
+        zs.to_vec()
+    }
+
+    fn device_adjoint(&self, x: &[f64], z: &[f64], z_adj: &[f64]) -> Result<Vec<f64>> {
+        let n = z.len();
+        let buffers = [&x[..n], &x[n..], z, z_adj]
+            .into_iter()
+            .map(DeviceBuffer::from_slice)
+            .collect::<Result<Vec<_>>>()?;
+        let (xa, ya) = (DeviceBuffer::new(n)?, DeviceBuffer::new(n)?);
+        let op = self.0;
+        launch(
+            op.name(),
+            op.name(),
+            "adjoint",
+            || binary_source(op),
+            &[
+                Arg::Buffer(&buffers[0]),
+                Arg::Buffer(&buffers[1]),
+                Arg::Buffer(&buffers[2]),
+                Arg::Buffer(&buffers[3]),
+                Arg::Buffer(&xa),
+                Arg::Buffer(&ya),
+            ],
+            &[n],
+        )?;
+        let mut g = xa.to_vec()?;
+        g.extend(ya.to_vec()?);
+        Ok(g)
+    }
+}
+
+impl MultiFn for Map2 {
+    fn eval<S: Real>(&self, x: &[S]) -> Result<Vec<S>> {
+        let n = x.len() / 2;
+        if S::ORDER > 0 {
+            return Ok((0..n).map(|i| self.0.host(x[i], x[n + i])).collect());
+        }
+        let v: Vec<f64> = x.iter().map(Real::value).collect();
+        Ok(self
+            .device_value(&v)?
+            .into_iter()
+            .map(S::from_f64)
+            .collect())
+    }
+
+    fn reverse(&self, x: &[f64], z: &[f64], z_adj: &[f64], needed: &[bool], x_adj: &mut [f64]) {
+        // A failed kernel leaves NaN gradients.
+        let g = self
+            .device_adjoint(x, z, z_adj)
+            .unwrap_or_else(|_| vec![f64::NAN; x.len()]);
+        for ((o, gi), &need) in x_adj.iter_mut().zip(g).zip(needed) {
+            if need {
+                *o += gi;
+            }
+        }
+    }
+}
+
+/// `op(x[i], y[i])` for every `i` on the device, in any scalar type, with the adjoint on the
+/// device in reverse mode and the host functions in forward mode.
+///
+/// # Errors
+///
+/// [`stanmath_rs_core::Error::DimensionMismatch`] unless `x` and `y` have the same length, and
+/// [`stanmath_rs_core::Error::Backend`] when a kernel fails.
+pub fn binary_on_device<T: Real>(op: Binary, x: &[T], y: &[T]) -> Result<Vec<T>> {
+    if x.len() != y.len() {
+        return Err(stanmath_rs_core::Error::dimension(
+            op.name(),
+            format!("x has {} elements but y has {}", x.len(), y.len()),
+        ));
+    }
+    if x.is_empty() {
+        return Ok(Vec::new());
+    }
+    let xy: Vec<T> = x.iter().chain(y).copied().collect();
+    T::map_multi(&xy, &Map2(op))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -245,5 +435,50 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn every_binary_function_matches_the_host() {
+        let x = [0.3, 0.8, 1.7, 2.4];
+        let y = [0.1, 0.5, 1.2, -0.6];
+        for &op in Binary::ALL {
+            // log_diff_exp needs x > y, pow a positive base; these points satisfy both.
+            let got = binary_on_device(op, &x, &y).unwrap();
+            for i in 0..x.len() {
+                let want = op.host(x[i], y[i]);
+                assert!(
+                    (got[i] - want).abs() <= 1e-13 * (1.0 + want.abs()),
+                    "{}({}, {}): {} vs {want}",
+                    op.name(),
+                    x[i],
+                    y[i],
+                    got[i]
+                );
+            }
+            let xy: Vec<f64> = x.iter().chain(&y).copied().collect();
+            let g = grad(
+                |v| {
+                    let z = binary_on_device(op, &v[..4], &v[4..]).unwrap();
+                    z.iter()
+                        .enumerate()
+                        .map(|(i, &zi)| zi * (1.0 + i as f64))
+                        .sum()
+                },
+                &xy,
+            );
+            for i in 0..4 {
+                let w = 1.0 + i as f64;
+                let da = op.host(Dual::variable(x[i]), Dual::constant(y[i])).eps * w;
+                let db = op.host(Dual::constant(x[i]), Dual::variable(y[i])).eps * w;
+                for (got, want) in [(g[i], da), (g[4 + i], db)] {
+                    assert!(
+                        (got - want).abs() <= 1e-12 * (1.0 + want.abs()),
+                        "d {}: {got} vs {want}",
+                        op.name()
+                    );
+                }
+            }
+        }
+        assert!(binary_on_device(Binary::Add, &x, &y[..2]).is_err());
     }
 }
