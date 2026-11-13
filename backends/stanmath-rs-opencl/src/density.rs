@@ -352,6 +352,15 @@ pub fn lpdf_on_device<T: Real>(op: Density, args: &[&[T]]) -> Result<T> {
             format!("{} arguments, expected {}", args.len(), op.args().len()),
         ));
     }
+    for ((a, &name), &check) in args.iter().zip(op.args()).zip(op.checks()) {
+        if let Some(v) = a.iter().map(Real::value).find(|&v| !check.holds(v)) {
+            return Err(Error::parameter(function, name, v, check.requirement()));
+        }
+    }
+    // An empty argument makes the sum empty, as an empty vector does in Stan.
+    if args.iter().any(|a| a.is_empty()) {
+        return Ok(T::zero());
+    }
     let n = args.iter().map(|a| a.len()).max().unwrap_or(0);
     if let Some(a) = args.iter().position(|a| a.len() != 1 && a.len() != n) {
         return Err(Error::dimension(
@@ -362,14 +371,6 @@ pub fn lpdf_on_device<T: Real>(op: Density, args: &[&[T]]) -> Result<T> {
                 args[a].len()
             ),
         ));
-    }
-    for ((a, &name), &check) in args.iter().zip(op.args()).zip(op.checks()) {
-        if let Some(v) = a.iter().map(Real::value).find(|&v| !check.holds(v)) {
-            return Err(Error::parameter(function, name, v, check.requirement()));
-        }
-    }
-    if n == 0 || args.iter().any(|a| a.is_empty()) {
-        return Ok(T::zero());
     }
     let f = Lpdf {
         op,
@@ -465,6 +466,12 @@ mod tests {
                         if on_device {
                             lpdf_on_device(op, &refs).unwrap()
                         } else {
+                            // Stan does not broadcast a vector of length one, so repeat it.
+                            let full: Vec<Vec<Var<'_>>> = parts
+                                .iter()
+                                .map(|p| p.iter().copied().cycle().take(4).collect())
+                                .collect();
+                            let refs: Vec<&[Var<'_>]> = full.iter().map(Vec::as_slice).collect();
                             host(op, &refs)
                         }
                     },
