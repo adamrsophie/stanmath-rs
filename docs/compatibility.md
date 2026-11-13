@@ -55,8 +55,8 @@ forward over forward) against mpmath.
 | normal | `Phi`, `log_Phi`, `inv_Phi` | tested |
 | incomplete gamma | `gamma_p`, `gamma_q` with derivatives in both arguments | tested |
 | incomplete beta | `beta_inc` (`inc_beta` in Stan) with derivatives in all three arguments | tested |
-| other Stan functions | `Phi_approx`, `owens_t`, `log_modified_bessel_first_kind`, Bessel functions, `lambert_w`, `binary_log_loss`, `log_falling_factorial`, `log_rising_factorial`, `lmgamma`, `hypergeometric_*` | planned |
-| integer functions | `choose`, `factorial`, `bit operations` | not supported |
+| other Stan functions | `Phi_approx`, `owens_t`, `log_modified_bessel_first_kind`, Bessel functions, `lambert_w`, `binary_log_loss`, `log_falling_factorial`, `log_rising_factorial`, `lmgamma`, `hypergeometric_*` | tested |
+| integer functions | `choose`, `falling_factorial`, `rising_factorial`, `int_step`, `logical_*` | supported |
 
 ## Distributions
 
@@ -229,3 +229,21 @@ to `1e-12` and Stan does not:
 | `exp_mod_normal_lcdf(-2 \| 0, 0.5, 3)`, value and gradient | 1.6e-10 to 2e-8 | about 1e-15 |
 | `poisson_binomial_lccdf(3 \| [0.6, 0.4, 0.8])`, value | NaN (the exact value is `log 0`) | `-inf`, zero gradient |
 | `ordered_probit_lpmf`, d/d eta and cutpoints | 7e-7 to 3e-6 | about 1e-16 |
+
+`crates/stanmath-rs/tests/stan_reference_scalar.rs` covers every function of one or two reals in the
+Stan language (from `stanc --dump-stan-math-signatures`) except the `_rng` and bound transform
+functions: 103 functions and 574 cases, written by `tools/stan-reference/gen_scalar.py`. Where Stan
+throws, stanmath-rs must return an error or NaN. They agree to `1e-10` except 43 rows, where
+stanmath-rs matches a 40 digit mpmath reference (`tools/reference/scalar.py`) to `1e-12`:
+
+| Case | Stan relative error | stanmath-rs |
+| --- | --- | --- |
+| `digamma` derivative and `trigamma` | 1e-10 to 3e-9 | about 1e-16 |
+| `std_normal_lcdf`, `std_normal_lccdf`, derivative | 1.7e-7 to 4e-5 | about 1e-16 |
+| `gamma_q`, d/d a | 1.7e-7 to 1.3e-5 | about 1e-15 |
+| chi-square and inverse chi-square CDFs, d/d nu | 4e-9 to 4e-6 | about 1e-15 |
+
+The sweep also fixed four conventions to match Stan: `fmax` and `fmin` return the second argument
+on ties (and take its derivative); `beta(a, b)` with a nonpositive argument is
+`|Γ(a) Γ(b) / Γ(a + b)|`; `log_falling_factorial` and `log_rising_factorial` reject `x <= 0`; and
+`log_modified_bessel_first_kind` accepts orders in `[-1, 0)`.

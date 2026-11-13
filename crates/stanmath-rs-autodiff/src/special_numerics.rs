@@ -125,7 +125,7 @@ pub fn modified_bessel_second_kind<T: Real>(v: i32, z: T) -> T {
     z.map_unary(&BesselK(v))
 }
 
-/// `ln I_v(z)` for real `v >= 0` and `z >= 0`, generically.
+/// `ln I_v(z)` for real `v >= -1` and `z >= 0`, generically. `I_{-1} = I_1`.
 ///
 /// For `z > 30 + v^2` it uses the asymptotic expansion
 /// `I_v(z) ~ exp(z) / sqrt(2 pi z) sum_k (-1)^k a_k(v) / z^k` (DLMF 10.40.1); otherwise the power
@@ -133,14 +133,19 @@ pub fn modified_bessel_second_kind<T: Real>(v: i32, z: T) -> T {
 /// (DLMF 10.25.2), whose terms are positive, rescaled to avoid overflow.
 fn log_bessel_i_generic<S: Real>(v: S, z: S, stop: Stop) -> (S, usize) {
     let (vv, zv) = (v.value(), z.value());
-    if vv.is_nan() || zv.is_nan() || vv < 0.0 || zv < 0.0 {
+    if vv.is_nan() || zv.is_nan() || vv < -1.0 || zv < 0.0 {
         return (S::from_f64(f64::NAN), 0);
     }
+    if vv == -1.0 {
+        return log_bessel_i_generic(-v, z, stop);
+    }
     if zv == 0.0 {
-        return (
-            S::from_f64(if vv == 0.0 { 0.0 } else { f64::NEG_INFINITY }),
-            0,
-        );
+        let at_zero = match vv.partial_cmp(&0.0) {
+            Some(core::cmp::Ordering::Equal) => 0.0,
+            Some(core::cmp::Ordering::Less) => f64::INFINITY,
+            _ => f64::NEG_INFINITY,
+        };
+        return (S::from_f64(at_zero), 0);
     }
     if zv == f64::INFINITY {
         return (S::from_f64(f64::INFINITY), 0);
@@ -218,7 +223,8 @@ impl BinaryFn for LogBesselI {
 }
 
 /// `ln I_v(z)`, the logarithm of the modified Bessel function of the first kind, for real order
-/// `v >= 0` and `z >= 0`, with derivatives in both arguments.
+/// `v >= -1` and `z >= 0`, with derivatives in both arguments. As in Stan Math 5.4.0, a negative
+/// order below one is evaluated directly (`I_{-v} != I_v`) and `ln I_v(0)` is `+inf` for `v < 0`.
 #[inline]
 pub fn log_modified_bessel_first_kind<T: Real>(v: T, z: T) -> T {
     v.map_binary(z, &LogBesselI)

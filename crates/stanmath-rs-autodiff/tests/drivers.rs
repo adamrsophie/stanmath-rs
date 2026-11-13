@@ -219,7 +219,8 @@ fn forward_mode_scalar_drivers() {
 #[test]
 fn derivative_conventions_at_kinks() {
     assert_eq!(derivative(abs, 0.0), 0.0);
-    assert_eq!(grad(|p| fmax(p[0], p[1]), &[1.0, 1.0]), vec![1.0, 0.0]);
+    // Ties take the second argument, as Stan Math.
+    assert_eq!(grad(|p| fmax(p[0], p[1]), &[1.0, 1.0]), vec![0.0, 1.0]);
     assert_eq!(grad(|p| p[0].floor() + p[0], &[2.5]), vec![1.0]);
     // d/db 0^b is taken to be zero; d/da 0^2 is zero.
     assert_eq!(grad(|p| pow(p[0], p[1]), &[0.0, 2.0]), vec![0.0, 0.0]);

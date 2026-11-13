@@ -33,12 +33,20 @@ pub fn binary_log_loss<T: Real>(y: i64, y_hat: T) -> T {
 /// `ln Γ(x + 1) - ln Γ(x - n + 1)`, the log of the falling factorial for real arguments.
 #[inline]
 pub fn log_falling_factorial<T: Real>(x: T, n: T) -> T {
+    // Stan Math rejects x <= 0 (checked against Stan Math 5.4.0).
+    if !(x.value() > 0.0) {
+        return T::from_f64(f64::NAN);
+    }
     lgamma(x + 1.0) - lgamma(x - n + 1.0)
 }
 
 /// `ln Γ(x + n) - ln Γ(x)`, the log of the rising factorial for real arguments.
 #[inline]
 pub fn log_rising_factorial<T: Real>(x: T, n: T) -> T {
+    // Stan Math rejects x <= 0 (checked against Stan Math 5.4.0).
+    if !(x.value() > 0.0) {
+        return T::from_f64(f64::NAN);
+    }
     lgamma(x + n) - lgamma(x)
 }
 
@@ -129,7 +137,13 @@ pub fn log_mix_slice<T: Real>(theta: &[T], lp: &[T]) -> T {
 /// Beta function `B(a, b) = exp(ln B(a, b))`.
 #[inline]
 pub fn beta<T: Real>(a: T, b: T) -> T {
-    lbeta(a, b).exp()
+    if a.value() > 0.0 && b.value() > 0.0 {
+        lbeta(a, b).exp()
+    } else {
+        // Stan Math 5.4.0 returns exp(lgamma(a) + lgamma(b) - lgamma(a + b)) with lgamma the log
+        // of |Γ|, so the result is |Γ(a) Γ(b) / Γ(a + b)| for nonpositive arguments.
+        (lgamma(a) + lgamma(b) - lgamma(a + b)).exp()
+    }
 }
 
 /// `ln (n choose k)` for real arguments (Stan's name for [`lchoose`]).

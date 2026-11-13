@@ -7,7 +7,7 @@
 //! # Conventions at nondifferentiable points
 //!
 //! * `abs`, `fabs`: derivative zero at zero.
-//! * `fmax`, `fmin`: ties return the first argument and take its derivative.
+//! * `fmax`, `fmin`: ties return the second argument and take its derivative, as Stan Math.
 //! * `floor`, `ceil`, `round`, `trunc`: derivative zero everywhere.
 //! * `pow(a, b)` at `a = 0`: the partial with respect to `b` is zero.
 
@@ -189,16 +189,24 @@ pub fn fma<T: Real>(a: T, b: T, c: T) -> T {
     a * b + c
 }
 
-/// The larger argument; ties return `a`.
+/// The larger argument; ties return `b` and take its derivative, as Stan Math.
 #[inline]
 pub fn fmax<T: Real>(a: T, b: T) -> T {
-    a.max(b)
+    if b.value() >= a.value() || a.is_nan() {
+        b
+    } else {
+        a
+    }
 }
 
-/// The smaller argument; ties return `a`.
+/// The smaller argument; ties return `b` and take its derivative, as Stan Math.
 #[inline]
 pub fn fmin<T: Real>(a: T, b: T) -> T {
-    a.min(b)
+    if b.value() <= a.value() || a.is_nan() {
+        b
+    } else {
+        a
+    }
 }
 
 /// Positive difference `max(a - b, 0)`.

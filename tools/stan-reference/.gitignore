@@ -4,3 +4,4 @@ stan_probe
 *.o
 *.d
 stan_reference_extra
+stan_reference_scalar
