@@ -6,6 +6,9 @@
 //! [`Matrix`]; move matrices with [`to_matrix_cl`] and [`from_matrix_cl`].
 
 mod device;
+mod elementwise;
+
+pub use elementwise::{Unary, unary_on_device};
 
 use device::{Arg, DeviceBuffer, launch};
 use stanmath_rs_autodiff::{MultiFn, Real};
@@ -102,7 +105,8 @@ fn product(
     launch(
         "multiply",
         "multiply",
-        MULTIPLY,
+        "multiply",
+        || MULTIPLY.to_string(),
         &[
             Arg::Buffer(a),
             Arg::Buffer(b),

@@ -146,12 +146,13 @@ pub(crate) enum Arg<'a> {
     Size(usize),
 }
 
-/// Runs kernel `name` from `source` over the index space `global` and waits for it. Does nothing
-/// when the index space is empty.
+/// Runs kernel `kernel` of the program `program` over the index space `global` and waits for it.
+/// The program is built from `source()` on first use. Does nothing when the index space is empty.
 pub(crate) fn launch(
     function: &'static str,
-    name: &'static str,
-    source: &'static str,
+    program: &'static str,
+    kernel: &str,
+    source: impl FnOnce() -> String,
     args: &[Arg<'_>],
     global: &[usize],
 ) -> Result<()> {
@@ -161,15 +162,20 @@ pub(crate) fn launch(
     let r = runtime()?;
     let kernel = {
         let mut programs = r.programs.lock().unwrap_or_else(PoisonError::into_inner);
-        let program = match programs.entry(name) {
+        let built = match programs.entry(program) {
             Entry::Occupied(e) => e.into_mut(),
             Entry::Vacant(e) => e.insert(
-                Program::create_and_build_from_source(&r.context, source, "").map_err(|log| {
-                    fail(function, format!("kernel {name} failed to build: {log}"))
-                })?,
+                Program::create_and_build_from_source(&r.context, &source(), "").map_err(
+                    |log| {
+                        fail(
+                            function,
+                            format!("program {program} failed to build: {log}"),
+                        )
+                    },
+                )?,
             ),
         };
-        Kernel::create(program, name).map_err(|e| fail(function, e))?
+        Kernel::create(built, kernel).map_err(|e| fail(function, e))?
     };
     let sizes: Vec<cl_ulong> = args
         .iter()
