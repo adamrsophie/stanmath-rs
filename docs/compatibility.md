@@ -62,8 +62,7 @@ forward over forward) against mpmath.
 
 Log densities (`_lpdf` / `_lpmf`), log CDFs (`_lcdf`), log complementary CDFs (`_lccdf`), and
 random number generators (`_rng`) with Stan's parameterizations and argument checks. All
-arguments are vectorized. `propto` (dropping constants) is not implemented; stanmath-rs always returns
-the full density.
+arguments are vectorized. Each log density has a `propto` form; see below.
 
 | Distribution | lpdf / lpmf | lcdf / lccdf | rng | Status |
 | --- | --- | --- | --- | --- |
@@ -99,8 +98,8 @@ the full density.
 ### `propto`
 
 Stan's `propto` template flag, which the language exposes as `_lupdf` and `_lupmf`, is a separate
-function in stanmath-rs: `normal_lupdf`, `poisson_lupmf`, and so on, for every density built on a
-fused kernel. An argument is data when its elements are `f64`; `Var` and `Dual` arguments are
+function in stanmath-rs: `normal_lupdf`, `poisson_lupmf`, and so on, for every log density and
+every overload (`multi_normal_lupdf_array`, `poisson_log_glm_lupmf_row`, ...). An argument is data when its elements are `f64`; `Var` and `Dual` arguments are
 parameters. A `propto` function is zero when every argument is data, and otherwise drops the terms
 that depend only on data, so its gradient equals that of the full function. The normal, standard
 normal, Student's t, Cauchy, logistic, exponential, gamma, inverse gamma, beta, lognormal, uniform,
@@ -109,8 +108,17 @@ their values match Stan Math 5.4.0 (probed with one argument a variable). As in 
 lognormal keeps its constant `-ln(2 pi) / 2`. The other kernels keep every term when any argument
 is a parameter, which differs from Stan's value by a constant only. The seven GLMs have `propto`
 forms that match Stan's values; since `beta` fixes their scalar type, a GLM whose `phi` or `sigma`
-is a parameter treats `beta` as one too. Multivariate densities and the full Wiener model have no
-`propto` form yet.
+is a parameter treats `beta` as one too.
+
+The multivariate densities, the Dirichlet, categorical, multinomial, Dirichlet multinomial,
+ordered, Poisson binomial, hypergeometric, and discrete range masses, and the five and seven
+parameter Wiener densities also match Stan's `propto` values. Matrix arguments share the scalar
+type, so they are parameters whenever the result is differentiable; vector arguments such as `y`,
+`mu`, `nu`, `w`, and `eta` keep their own flags. Stan's grouping shows in a few places: the
+Cholesky forms of the Wishart and inverse Wishart drop their Jacobian constant `K ln 2` only with
+`nu`, the inverse Wishart keeps `-nu K / 2 ln 2` while its scale is a parameter, and the
+hypergeometric and discrete range masses, whose arguments are all integers, are zero under
+`propto`, even outside the support. The Laplace marginal likelihoods have no `propto` form.
 
 ### Boundary conventions
 

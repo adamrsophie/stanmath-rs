@@ -629,7 +629,8 @@ fn wishart_cholesky_with<T: Real, N: Lift<T>>(
         return Ok(T::zero());
     }
     let mut lp = T::zero();
-    if keep(propto, &[]) {
+    // Stan groups the Jacobian constant K ln 2 with the terms that depend only on nu.
+    if keep(propto, &[pn]) {
         lp += k as f64 * LN_2;
     }
     if keep(propto, &[pm]) {
@@ -678,11 +679,13 @@ fn inv_wishart_with<T: Real, N: Lift<T>>(
     let kf = k as f64;
     let mut lp = T::zero();
     if keep(propto, &[pm, pn]) {
-        lp +=
-            log_det_cholesky(&ls) * (nu * 0.5) - log_det_cholesky(&lw) * ((nu + (kf + 1.0)) * 0.5);
+        // Stan keeps -νK/2 ln 2 of the inverse Wishart while S is a parameter.
+        lp += log_det_cholesky(&ls) * (nu * 0.5)
+            - log_det_cholesky(&lw) * ((nu + (kf + 1.0)) * 0.5)
+            - nu * (kf * 0.5 * LN_2);
     }
     if keep(propto, &[pn]) {
-        lp += wishart_nu_terms(nu, k);
+        lp -= lmgamma(k, nu * 0.5);
     }
     if keep(propto, &[pm]) {
         lp -= sum_squares(&mdivide_left_tri_low(&lw, &ls)?) * 0.5;
@@ -720,7 +723,8 @@ fn inv_wishart_cholesky_with<T: Real, N: Lift<T>>(
         return Ok(T::zero());
     }
     let mut lp = T::zero();
-    if keep(propto, &[]) {
+    // Stan groups the Jacobian constant K ln 2 with the terms that depend only on nu.
+    if keep(propto, &[pn]) {
         lp += k as f64 * LN_2;
     }
     if keep(propto, &[pn]) {
