@@ -273,6 +273,14 @@ scalar sampler at each index of scalar or slice arguments. `tests/signatures_rng
 `tools/reference/gen_rng.py`, calls all 1995 of them (124 Rust shapes) and requires the draws to
 equal the scalar sampler's, in order from the same seed.
 
+The bound transforms (`lower_bound`, `upper_bound`, `lower_upper_bound`, `offset_multiplier`, each
+`_constrain`, `_jacobian`, `_unconstrain`) apply over containers the same way, with
+`apply_scalar_ternary` when both bounds are containers. `tests/signatures_bounds.rs`, written by
+`tools/reference/gen_bounds.py`, calls 468 of their container signatures (252 Rust shapes; 684
+deeper array forms share the recursive impl) and requires the scalar transform of every element and,
+for `_jacobian`, the summed log Jacobian. `tests/signatures_qf.rs` covers the 256 broadcast forms of
+`student_t_qf` through `apply_broadcast4`.
+
 The scalar sweep also fixed four conventions to match Stan: `fmax` and `fmin` return the second argument
 on ties (and take its derivative); `beta(a, b)` with a nonpositive argument is
 `|Γ(a) Γ(b) / Γ(a + b)|`; `log_falling_factorial` and `log_rising_factorial` reject `x <= 0`; and

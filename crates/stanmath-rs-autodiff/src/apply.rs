@@ -143,6 +143,27 @@ pub fn apply_scalar_binary<C: ScalarContainer, U>(
     a.zip_scalars(b, &mut f)
 }
 
+/// `f` applied to the scalars of `a`, `b`, and `c` at each position, for three containers of one
+/// shape (Stan's three argument vectorized functions, such as `lower_upper_bound_constrain`). For
+/// a scalar argument, capture it in a closure passed to [`apply_scalar_binary`] or
+/// [`apply_scalar_unary`].
+///
+/// # Errors
+///
+/// [`Error::DimensionMismatch`] when the shapes differ.
+pub fn apply_scalar_ternary<C: ScalarContainer, U>(
+    a: &C,
+    b: &C,
+    c: &C,
+    mut f: impl FnMut(C::Scalar, C::Scalar, C::Scalar) -> U,
+) -> Result<C::Mapped<U>> {
+    a.zip_scalars(c, &mut |_, _| ())?;
+    let mut cs = Vec::new();
+    c.map_scalars(&mut |v| cs.push(v));
+    let mut cs = cs.into_iter();
+    a.zip_scalars(b, &mut |x, y| f(x, y, cs.next().expect("shapes checked")))
+}
+
 macro_rules! apply_broadcast {
     ($(#[$doc:meta])* $name:ident, $($a:ident: $A:ident),+) => {
         $(#[$doc])*
