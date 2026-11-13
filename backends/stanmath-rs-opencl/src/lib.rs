@@ -9,11 +9,13 @@ mod cholesky;
 mod density;
 mod device;
 mod elementwise;
+mod tri;
 
 pub use cholesky::cholesky_decompose_on_device;
 pub use density::{Density, lpdf_on_device};
 
 pub use elementwise::{Binary, Unary, binary_on_device, unary_on_device};
+pub use tri::mdivide_left_tri_low_on_device;
 
 use device::{Arg, DeviceBuffer, launch};
 use stanmath_rs_autodiff::{MultiFn, Real};
