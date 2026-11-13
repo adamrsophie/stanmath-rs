@@ -59,6 +59,89 @@ fn check(
     }
 }
 
+// Each form below is either compared with the sum of single calls here, or (one observation,
+// one location) is the single call that stan_reference.rs or stan_reference_extra.rs compares
+// with Stan.
+// stan: multi_normal_cholesky_lpdf(vector, vector, matrix)
+// stan: multi_normal_cholesky_lpdf(vector, row_vector, matrix)
+// stan: multi_normal_cholesky_lpdf(vector, array[] vector, matrix)
+// stan: multi_normal_cholesky_lpdf(vector, array[] row_vector, matrix)
+// stan: multi_normal_cholesky_lpdf(row_vector, vector, matrix)
+// stan: multi_normal_cholesky_lpdf(row_vector, row_vector, matrix)
+// stan: multi_normal_cholesky_lpdf(row_vector, array[] vector, matrix)
+// stan: multi_normal_cholesky_lpdf(row_vector, array[] row_vector, matrix)
+// stan: multi_normal_cholesky_lpdf(array[] vector, vector, matrix)
+// stan: multi_normal_cholesky_lpdf(array[] vector, row_vector, matrix)
+// stan: multi_normal_cholesky_lpdf(array[] vector, array[] vector, matrix)
+// stan: multi_normal_cholesky_lpdf(array[] vector, array[] row_vector, matrix)
+// stan: multi_normal_cholesky_lpdf(array[] row_vector, vector, matrix)
+// stan: multi_normal_cholesky_lpdf(array[] row_vector, row_vector, matrix)
+// stan: multi_normal_cholesky_lpdf(array[] row_vector, array[] vector, matrix)
+// stan: multi_normal_cholesky_lpdf(array[] row_vector, array[] row_vector, matrix)
+// stan: multi_normal_lpdf(vector, vector, matrix)
+// stan: multi_normal_lpdf(vector, row_vector, matrix)
+// stan: multi_normal_lpdf(vector, array[] vector, matrix)
+// stan: multi_normal_lpdf(vector, array[] row_vector, matrix)
+// stan: multi_normal_lpdf(row_vector, vector, matrix)
+// stan: multi_normal_lpdf(row_vector, row_vector, matrix)
+// stan: multi_normal_lpdf(row_vector, array[] vector, matrix)
+// stan: multi_normal_lpdf(row_vector, array[] row_vector, matrix)
+// stan: multi_normal_lpdf(array[] vector, vector, matrix)
+// stan: multi_normal_lpdf(array[] vector, row_vector, matrix)
+// stan: multi_normal_lpdf(array[] vector, array[] vector, matrix)
+// stan: multi_normal_lpdf(array[] vector, array[] row_vector, matrix)
+// stan: multi_normal_lpdf(array[] row_vector, vector, matrix)
+// stan: multi_normal_lpdf(array[] row_vector, row_vector, matrix)
+// stan: multi_normal_lpdf(array[] row_vector, array[] vector, matrix)
+// stan: multi_normal_lpdf(array[] row_vector, array[] row_vector, matrix)
+// stan: multi_normal_prec_lpdf(vector, vector, matrix)
+// stan: multi_normal_prec_lpdf(vector, row_vector, matrix)
+// stan: multi_normal_prec_lpdf(vector, array[] vector, matrix)
+// stan: multi_normal_prec_lpdf(vector, array[] row_vector, matrix)
+// stan: multi_normal_prec_lpdf(row_vector, vector, matrix)
+// stan: multi_normal_prec_lpdf(row_vector, row_vector, matrix)
+// stan: multi_normal_prec_lpdf(row_vector, array[] vector, matrix)
+// stan: multi_normal_prec_lpdf(row_vector, array[] row_vector, matrix)
+// stan: multi_normal_prec_lpdf(array[] vector, vector, matrix)
+// stan: multi_normal_prec_lpdf(array[] vector, row_vector, matrix)
+// stan: multi_normal_prec_lpdf(array[] vector, array[] vector, matrix)
+// stan: multi_normal_prec_lpdf(array[] vector, array[] row_vector, matrix)
+// stan: multi_normal_prec_lpdf(array[] row_vector, vector, matrix)
+// stan: multi_normal_prec_lpdf(array[] row_vector, row_vector, matrix)
+// stan: multi_normal_prec_lpdf(array[] row_vector, array[] vector, matrix)
+// stan: multi_normal_prec_lpdf(array[] row_vector, array[] row_vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(vector, real, vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(vector, real, row_vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(vector, real, array[] vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(vector, real, array[] row_vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(row_vector, real, vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(row_vector, real, row_vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(row_vector, real, array[] vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(row_vector, real, array[] row_vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(array[] vector, real, vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(array[] vector, real, row_vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(array[] vector, real, array[] vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(array[] vector, real, array[] row_vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(array[] row_vector, real, vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(array[] row_vector, real, row_vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(array[] row_vector, real, array[] vector, matrix)
+// stan: multi_student_t_cholesky_lpdf(array[] row_vector, real, array[] row_vector, matrix)
+// stan: multi_student_t_lpdf(vector, real, vector, matrix)
+// stan: multi_student_t_lpdf(vector, real, row_vector, matrix)
+// stan: multi_student_t_lpdf(vector, real, array[] vector, matrix)
+// stan: multi_student_t_lpdf(vector, real, array[] row_vector, matrix)
+// stan: multi_student_t_lpdf(row_vector, real, vector, matrix)
+// stan: multi_student_t_lpdf(row_vector, real, row_vector, matrix)
+// stan: multi_student_t_lpdf(row_vector, real, array[] vector, matrix)
+// stan: multi_student_t_lpdf(row_vector, real, array[] row_vector, matrix)
+// stan: multi_student_t_lpdf(array[] vector, real, vector, matrix)
+// stan: multi_student_t_lpdf(array[] vector, real, row_vector, matrix)
+// stan: multi_student_t_lpdf(array[] vector, real, array[] vector, matrix)
+// stan: multi_student_t_lpdf(array[] vector, real, array[] row_vector, matrix)
+// stan: multi_student_t_lpdf(array[] row_vector, real, vector, matrix)
+// stan: multi_student_t_lpdf(array[] row_vector, real, row_vector, matrix)
+// stan: multi_student_t_lpdf(array[] row_vector, real, array[] vector, matrix)
+// stan: multi_student_t_lpdf(array[] row_vector, real, array[] row_vector, matrix)
 #[test]
 fn multivariate_array_signatures() {
     let mut failures = Vec::new();
@@ -127,6 +210,25 @@ const D: [f64; 18] = [
     1.5, 2.0, 0.7, 3.0, 1.1, 2.4, 0.9, 1.3, 1.8, // alpha
 ];
 
+// Each form below is either compared with the sum of single calls here, or (one observation,
+// one location) is the single call that stan_reference.rs or stan_reference_extra.rs compares
+// with Stan.
+// stan: dirichlet_lpdf(vector, vector)
+// stan: dirichlet_lpdf(vector, row_vector)
+// stan: dirichlet_lpdf(vector, array[] vector)
+// stan: dirichlet_lpdf(vector, array[] row_vector)
+// stan: dirichlet_lpdf(row_vector, vector)
+// stan: dirichlet_lpdf(row_vector, row_vector)
+// stan: dirichlet_lpdf(row_vector, array[] vector)
+// stan: dirichlet_lpdf(row_vector, array[] row_vector)
+// stan: dirichlet_lpdf(array[] vector, vector)
+// stan: dirichlet_lpdf(array[] vector, row_vector)
+// stan: dirichlet_lpdf(array[] vector, array[] vector)
+// stan: dirichlet_lpdf(array[] vector, array[] row_vector)
+// stan: dirichlet_lpdf(array[] row_vector, vector)
+// stan: dirichlet_lpdf(array[] row_vector, row_vector)
+// stan: dirichlet_lpdf(array[] row_vector, array[] vector)
+// stan: dirichlet_lpdf(array[] row_vector, array[] row_vector)
 #[test]
 fn dirichlet_array_signatures() {
     let mut failures = Vec::new();
@@ -184,6 +286,17 @@ const O: [f64; 12] = [
     0.3, -0.8, 1.6, -1.0, 0.2, 1.5, -0.5, 0.0, 0.7, -2.0, -0.4, 2.2,
 ];
 
+// Each form below is either compared with the sum of single calls here, or (one observation,
+// one location) is the single call that stan_reference.rs or stan_reference_extra.rs compares
+// with Stan.
+// stan: ordered_logistic_lpmf(int, real, vector)
+// stan: ordered_logistic_lpmf(array[] int, vector, vector)
+// stan: ordered_logistic_lpmf(array[] int, vector, array[] vector)
+// stan: ordered_probit_lpmf(int, real, vector)
+// stan: ordered_probit_lpmf(array[] int, real, vector)
+// stan: ordered_probit_lpmf(array[] int, real, array[] vector)
+// stan: ordered_probit_lpmf(array[] int, vector, vector)
+// stan: ordered_probit_lpmf(array[] int, vector, array[] vector)
 #[test]
 fn ordered_array_signatures() {
     let mut failures = Vec::new();
@@ -225,5 +338,94 @@ fn ordered_array_signatures() {
         ordered_probit_lupmf_array,
         ordered_probit_lupmf
     );
+    // One cutpoint vector for every observation, with eta a vector or (probit) a real; and
+    // (probit) a real eta with one cutpoint vector per observation.
+    macro_rules! one_cut {
+        ($label:literal, $f:ident, $real_eta:expr) => {{
+            let v = try_value_and_grad(
+                |x| {
+                    if $real_eta {
+                        $f(&y[..], x[0], &x[3..6])
+                    } else {
+                        $f(&y[..], &x[..3], &x[3..6])
+                    }
+                },
+                &O,
+            );
+            let s = try_value_and_grad(
+                |x| {
+                    let mut acc = x[0] * 0.0;
+                    for i in 0..3 {
+                        acc += $f(y[i], if $real_eta { x[0] } else { x[i] }, &x[3..6])?;
+                    }
+                    Ok(acc)
+                },
+                &O,
+            );
+            check($label, v, s, &mut failures);
+        }};
+    }
+    one_cut!(
+        "ordered_logistic_lpmf(array, vector, vector)",
+        ordered_logistic_lpmf,
+        false
+    );
+    one_cut!(
+        "ordered_logistic_lupmf(array, vector, vector)",
+        ordered_logistic_lupmf,
+        false
+    );
+    one_cut!(
+        "ordered_probit_lpmf(array, vector, vector)",
+        ordered_probit_lpmf,
+        false
+    );
+    one_cut!(
+        "ordered_probit_lupmf(array, vector, vector)",
+        ordered_probit_lupmf,
+        false
+    );
+    one_cut!(
+        "ordered_probit_lpmf(array, real, vector)",
+        ordered_probit_lpmf,
+        true
+    );
+    one_cut!(
+        "ordered_probit_lupmf(array, real, vector)",
+        ordered_probit_lupmf,
+        true
+    );
+    for (label, lupmf) in [
+        ("ordered_probit_lpmf(array, real, array)", false),
+        ("ordered_probit_lupmf(array, real, array)", true),
+    ] {
+        let v = try_value_and_grad(
+            |x| {
+                let c = rows(&x[3..12]);
+                if lupmf {
+                    ordered_probit_lupmf_array(&y[..], x[0], &c)
+                } else {
+                    ordered_probit_lpmf_array(&y[..], x[0], &c)
+                }
+            },
+            &O,
+        );
+        let s = try_value_and_grad(
+            |x| {
+                let c = rows(&x[3..12]);
+                let mut acc = x[0] * 0.0;
+                for i in 0..3 {
+                    acc += if lupmf {
+                        ordered_probit_lupmf(y[i], x[0], &c[i])?
+                    } else {
+                        ordered_probit_lpmf(y[i], x[0], &c[i])?
+                    };
+                }
+                Ok(acc)
+            },
+            &O,
+        );
+        check(label, v, s, &mut failures);
+    }
     assert!(failures.is_empty(), "\n{}", failures.join("\n"));
 }

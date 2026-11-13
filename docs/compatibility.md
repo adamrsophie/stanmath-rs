@@ -313,8 +313,18 @@ by a signature test (by a generator's ledger or a `// stan:` label), compared wi
 the reference CSVs, skipped only because its arrays nest deeper than the generators write calls
 for, or checked by name only. A function whose signatures differ only in spelling a vector
 (vector, row vector, or one dimensional real array) is one Rust call, so a reference comparison of
-that call counts for each spelling. Run against CmdStan 2.40.0 it reports 18258 called, 237
-compared with Stan values, 4797 deeper than the calls, 999 by name, and no unchecked line.
+that call counts for each spelling. Run against CmdStan 2.40.0 it reports 18470 called, 237
+compared with Stan values, 4941 deeper than the calls, 643 by name, and no unchecked line.
+
+`tests/signatures_transforms.rs`, written by `tools/reference/gen_transforms.py`, calls the array
+forms of the structural transforms (`_constrain`, `_jacobian`, and `_unconstrain` of simplex,
+sum_to_zero, ordered, positive_ordered, unit_vector, the stochastic matrices, cov_matrix,
+corr_matrix, and the Cholesky factors) to three array levels. Stan's array forms apply the
+transform to each element; in Rust they are an iterator map, and a `_jacobian` map adds each
+element's log Jacobian to one `lp`. `tests/signatures_multivariate.rs` labels the multivariate
+normal, Student t, Dirichlet, and ordered logistic and probit signatures it calls, and now also
+calls the ordered forms with one cutpoint vector for every observation and (probit) a real
+linear predictor with one cutpoint vector per observation.
 
 `tests/stan_reference_complex.rs` compares the complex scalar functions (the elementary and
 inverse trigonometric and hyperbolic functions, `exp`, `log`, `log10`, `sqrt`, `pow`, `abs`, `arg`,

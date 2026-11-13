@@ -27,7 +27,7 @@ import sys
 import tempfile
 
 GENERATORS = ["gen_signatures", "gen_elementwise", "gen_rng", "gen_bounds", "gen_containers",
-              "gen_complex", "gen_utilities", "gen_operators"]
+              "gen_complex", "gen_utilities", "gen_operators", "gen_transforms"]
 DATA = "crates/stanmath-rs/tests/data"
 CSV_DATA = ["crates/stanmath-rs-distributions/tests/data/stan_reference.csv",
             "crates/stanmath-rs-distributions/tests/data/stan_reference_extra.csv",
