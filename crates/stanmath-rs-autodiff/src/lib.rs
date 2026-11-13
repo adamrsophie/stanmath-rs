@@ -43,6 +43,7 @@ mod dual;
 pub mod functions;
 mod functions_extra;
 mod incomplete;
+mod library;
 mod overloads;
 pub mod primitives;
 mod real;

@@ -47,6 +47,7 @@ mod decomp_tuple;
 mod eigen;
 mod gp;
 mod ldlt;
+mod library;
 mod lu;
 mod matrix_fn;
 mod ops;
@@ -74,6 +75,7 @@ pub use ldlt::{
     symmetrize_from_lower_tri, symmetrize_from_upper_tri, trace_gen_inv_quad_form_ldlt,
     trace_inv_quad_form_ldlt,
 };
+pub use library::*;
 pub use lu::{
     Triangle, determinant, inverse, log_determinant, mdivide_left, mdivide_left_tri,
     mdivide_left_tri_upper, mdivide_right, mdivide_right_spd, mdivide_right_tri,

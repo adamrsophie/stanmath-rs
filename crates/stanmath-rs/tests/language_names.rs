@@ -116,6 +116,15 @@ use stanmath_rs::prelude::{
     wishart_cholesky_rng, wishart_rng, yule_simon_rng,
 };
 
+/// Stan Math library functions outside the language, from the public API documentation.
+#[allow(unused_imports)]
+use stanmath_rs::prelude::{
+    cov_exp_quad, csr_u_to_z, divide_columns, finite_diff_stepsize, grad_2F1, grad_F32, grad_pFq,
+    grad_reg_inc_beta, grad_reg_inc_gamma, grad_reg_lower_inc_gamma, i_times, inc_beta_dda,
+    inc_beta_ddb, inc_beta_ddz, is_any_nan, is_integer, log_gamma_q_dgamma, matrix_exp_2x2,
+    matrix_exp_pade, neg_i_times, scaled_add, unitspaced_array,
+};
+
 #[test]
 fn every_stan_language_name_is_public() {
     // The imports above are the check; this records how many names they cover.

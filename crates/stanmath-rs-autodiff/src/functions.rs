@@ -19,6 +19,7 @@ pub use crate::complex::{
     to_complex,
 };
 pub use crate::functions_extra::*;
+pub use crate::library::*;
 pub use crate::overloads::*;
 pub use crate::scalar_wave2::*;
 pub use crate::special_numerics::{
