@@ -313,8 +313,8 @@ by a signature test (by a generator's ledger or a `// stan:` label), compared wi
 the reference CSVs, skipped only because its arrays nest deeper than the generators write calls
 for, or checked by name only. A function whose signatures differ only in spelling a vector
 (vector, row vector, or one dimensional real array) is one Rust call, so a reference comparison of
-that call counts for each spelling. Run against CmdStan 2.40.0 it reports 18766 called, 210
-compared with Stan values, 5034 deeper than the calls, 281 by name, and no unchecked line.
+that call counts for each spelling. Run against CmdStan 2.40.0 it reports 18812 called, 210
+compared with Stan values, 5088 deeper than the calls, 181 by name, and no unchecked line.
 
 `tests/signatures_glm.rs`, written by `tools/reference/gen_glm.py`, calls all 58 `_glm_lpdf` and
 `_glm_lpmf` signatures and compares each, in value and gradient, with the sum of its response
@@ -323,6 +323,13 @@ by every observation of a longer response, and `normal_id_glm_lpdf` with a real 
 element slice) shares it across the rows of `x`. Stan Math 5.4.0 differs in one case:
 `poisson_log_glm_lpmf` with an int response and several rows of `x` adds `-lgamma(y + 1)` once
 rather than once per observation; stanmath-rs returns the sum over the observations.
+
+`tests/signatures_gp.rs`, written by `tools/reference/gen_gp.py`, calls all 28 signatures of the
+stationary kernels (`gp_exp_quad_cov`, `gp_matern32_cov`, `gp_matern52_cov`,
+`gp_exponential_cov`, `gp_periodic_cov`) through `gp_points_1d`, the `_cross` functions, and the
+`_ard` functions, and compares every entry with the kernel formula. The elementwise test also
+calls the forms that pair a two dimensional int array with a matrix (`ldexp(matrix, array[,]
+int)`), which Stan pairs by position.
 
 `tests/stan_reference_scalar_extra.rs` compares with Stan Math 5.4.0 the scalar signatures the
 one and two real sweep cannot reach (`tools/stan-reference/stan_reference_scalar_extra.cpp`): the
