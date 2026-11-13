@@ -1,6 +1,9 @@
 //! GLM result types promote across every argument, as in Stan: data `beta` with an autodiff
 //! design matrix, and data `x`, `alpha`, and `beta` with an autodiff `phi`.
 
+// Reference values keep the 17 significant digits that Stan Math printed.
+#![allow(clippy::excessive_precision)]
+
 use stanmath_rs_autodiff::{Var, value_and_grad};
 use stanmath_rs_core::Matrix;
 use stanmath_rs_distributions::*;
@@ -89,5 +92,7 @@ fn propto_keeps_the_data_linear_predictor_out() {
         &[1.5],
     );
     same(&[glm.value - plain.value], &[6f64.ln()]);
+    // Stan Math 5.4.0, neg_binomial_2_log_glm_lpmf<true> with only phi a var.
+    same(&[glm.value, glm.gradient[0]], &[-5.1058654989833698, 0.28072083048372631]);
     same(&glm.gradient, &plain.gradient);
 }
