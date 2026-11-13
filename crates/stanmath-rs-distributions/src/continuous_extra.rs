@@ -18,7 +18,7 @@ use stanmath_rs_core::special::{HALF_LN_2PI, LN_2PI};
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::{obs, param};
-use crate::kernel::{Kernel, sum_kernel, sum_kernel_propto, sum_terms};
+use crate::kernel::{Keep, Kernel, sum_kernel, sum_kernel_propto, sum_terms};
 
 /// `a ln y` with the convention `0 ln 0 = 0`.
 #[inline]
@@ -624,7 +624,16 @@ impl Kernel<0, 3> for Gumbel {
         check_gumbel(Self::NAME, x)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, mu, beta]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, mu, beta]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         let inv_beta = beta.recip();
         let z = (y - mu) * inv_beta;
         let e = (-z).exp();
@@ -634,7 +643,8 @@ impl Kernel<0, 3> for Gumbel {
             g[1] = -(dz * inv_beta);
             g[2] = -(dz * z + 1.0) * inv_beta;
         }
-        -beta.ln() - z - e
+        let lp = -z - e;
+        if keep.term(&[2]) { lp - beta.ln() } else { lp }
     }
 }
 

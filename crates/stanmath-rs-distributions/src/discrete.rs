@@ -456,7 +456,16 @@ impl Kernel<1, 2> for NegBinomial2Log {
         param::positive_finite(Self::NAME, "phi", phi)
     }
 
-    fn eval<S: Real>([n]: [i64; 1], [eta, phi]: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+    fn eval<S: Real>(ints: [i64; 1], x: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        [n]: [i64; 1],
+        [eta, phi]: [S; 2],
+        grad: Option<&mut [S; 2]>,
+        keep: Keep<2>,
+    ) -> S {
         let nf = n as f64;
         let log_phi = phi.ln();
         // ln(1 + mu / phi) = log1p_exp(eta - ln phi); ln(mu + phi) = log_sum_exp(eta, ln phi)
@@ -467,7 +476,14 @@ impl Kernel<1, 2> for NegBinomial2Log {
             g[0] = -((phi + nf) * inv_logit(eta - log_phi)) + nf;
             g[1] = -digamma_diff(phi, S::from_f64(nf)) - log1p_ratio + (mu - nf) / (mu + phi);
         }
-        neg_binomial_coef(nf, phi) + (eta - log_mu_phi) * nf - phi * log1p_ratio
+        let mut lp = -(log_mu_phi * nf) - phi * log1p_ratio;
+        if keep.term(&[0]) {
+            lp += eta * nf;
+        }
+        if keep.term(&[1]) {
+            lp += neg_binomial_coef(nf, phi);
+        }
+        lp
     }
 }
 

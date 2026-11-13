@@ -67,6 +67,133 @@ fn propto_values_match_stan() {
     }
 }
 
+/// `f` with its one argument a variable at `x`.
+fn var1(
+    f: impl for<'t> FnOnce(&[stanmath_rs_autodiff::Var<'t>]) -> stanmath_rs_autodiff::Var<'t>,
+    x: f64,
+) -> f64 {
+    value_and_grad(f, &[x]).value
+}
+
+#[test]
+fn propto_values_of_the_other_kernels_match_stan() {
+    let cases: [(&str, f64, f64); 22] = [
+        (
+            "std_normal y",
+            var1(|v| std_normal_lupdf(v[0]).unwrap(), 0.4),
+            -0.080000000000000016,
+        ),
+        (
+            "cauchy sigma",
+            var1(|v| cauchy_lupdf(0.5, -0.2, v[0]).unwrap(), 1.3),
+            -0.51696061233350643,
+        ),
+        (
+            "cauchy mu",
+            var1(|v| cauchy_lupdf(0.5, v[0], 1.3).unwrap(), -0.2),
+            -0.25459634786601543,
+        ),
+        (
+            "logistic mu",
+            var1(|v| logistic_lupdf(0.5, v[0], 0.8).unwrap(), 0.1),
+            -1.4481539683602134,
+        ),
+        (
+            "exponential y",
+            var1(|v| exponential_lupdf(v[0], 1.9).unwrap(), 0.7),
+            -1.3299999999999998,
+        ),
+        (
+            "exponential beta",
+            var1(|v| exponential_lupdf(0.7, v[0]).unwrap(), 1.9),
+            -0.68814611382760515,
+        ),
+        (
+            "inv_gamma beta",
+            var1(|v| inv_gamma_lupdf(1.2, 2.5, v[0]).unwrap(), 0.8),
+            -1.224525544952191,
+        ),
+        (
+            "inv_gamma alpha",
+            var1(|v| inv_gamma_lupdf(1.2, v[0], 0.8).unwrap(), 2.5),
+            -1.4806671975372845,
+        ),
+        (
+            "beta a",
+            var1(|v| beta_lupdf(0.3, v[0], 3.5).unwrap(), 2.0),
+            2.7538411632927806,
+        ),
+        (
+            "beta y",
+            var1(|v| beta_lupdf(v[0], 2.0, 3.5).unwrap(), 0.3),
+            -2.095660164172767,
+        ),
+        (
+            "lognormal y",
+            var1(|v| lognormal_lupdf(v[0], 0.2, 0.6).unwrap(), 1.4),
+            -1.2812783689486584,
+        ),
+        (
+            "lognormal sigma",
+            var1(|v| lognormal_lupdf(1.4, 0.2, v[0]).unwrap(), 0.6),
+            -0.43398050856145476,
+        ),
+        (
+            "uniform y",
+            var1(|v| uniform_lupdf(v[0], 0.1, 1.5).unwrap(), 0.4),
+            0.0,
+        ),
+        (
+            "uniform alpha",
+            var1(|v| uniform_lupdf(0.4, v[0], 1.5).unwrap(), 0.1),
+            -0.33647223662121289,
+        ),
+        (
+            "poisson_log alpha",
+            var1(|v| poisson_log_lupmf(3i64, v[0]).unwrap(), 0.8),
+            0.17445907150753226,
+        ),
+        (
+            "binomial_logit alpha",
+            var1(|v| binomial_logit_lupmf(4i64, 10i64, v[0]).unwrap(), -0.4),
+            -6.7301525239995259,
+        ),
+        (
+            "neg_binomial_2 mu",
+            var1(|v| neg_binomial_2_lupmf(3i64, v[0], 1.5).unwrap(), 2.0),
+            -2.949794154387074,
+        ),
+        (
+            "neg_binomial_2 phi",
+            var1(|v| neg_binomial_2_lupmf(3i64, 2.0, v[0]).unwrap(), 1.5),
+            -4.2464763568172774,
+        ),
+        (
+            "neg_binomial_2_log eta",
+            var1(|v| neg_binomial_2_log_lupmf(3i64, v[0], 1.5).unwrap(), 0.6),
+            -2.9945148130015662,
+        ),
+        (
+            "weibull alpha",
+            var1(|v| weibull_lupdf(1.2, v[0], 0.9).unwrap(), 1.5),
+            -0.88493405784712087,
+        ),
+        (
+            "gumbel mu",
+            var1(|v| gumbel_lupdf(0.5, v[0], 2.0).unwrap(), 1.0),
+            -1.0340254166877414,
+        ),
+        (
+            "bernoulli_logit alpha",
+            var1(|v| bernoulli_logit_lupmf(1i64, v[0]).unwrap(), 0.3),
+            -0.55435524446852713,
+        ),
+    ];
+    for (name, got, want) in cases {
+        assert!(close(got, want), "{name}: {got} vs {want}");
+    }
+}
+
 /// `full - propto` at `x` and at a second point, with the argument `j` the only variable: the
 /// dropped terms must not depend on that argument. A term dropped although it depends on the
 /// argument (a wrong dependency list) fails this.

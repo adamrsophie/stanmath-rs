@@ -355,7 +355,7 @@ pub fn map_rect_parallel<T: Real, J: MapRectJob>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use stanmath_rs_autodiff::grad;
+    use stanmath_rs_autodiff::{Dual, grad};
 
     /// Sum of `params[0] x^2 + exp(params[1] x)`.
     struct Quad;
@@ -383,5 +383,76 @@ mod tests {
         for (a, b) in par.iter().zip(&seq) {
             assert!((a - b).abs() < 1e-12, "{a} vs {b}");
         }
+    }
+
+    /// Ignores its parameters.
+    struct Constant;
+    impl PartialSum<f64> for Constant {
+        fn eval<S: Real>(&self, slice: &[f64], _: usize, _: usize, _: &[S]) -> Result<S> {
+            Ok(S::from_f64(slice.iter().sum()))
+        }
+    }
+
+    #[test]
+    fn a_partial_sum_that_ignores_its_parameters_has_zero_gradient() {
+        let x = [1.0, 2.0, 3.5];
+        let g = grad(
+            |v| reduce_sum_parallel(Constant, &x, 1, v).unwrap(),
+            &[0.4, 1.0],
+        );
+        assert_eq!(g, vec![0.0, 0.0]);
+    }
+
+    #[test]
+    fn forward_mode_matches_reverse_mode() {
+        let x: Vec<f64> = (0..10).map(|i| f64::from(i) * 0.3).collect();
+        let p = [0.3, -0.2];
+        let g = grad(|v| reduce_sum_parallel(Quad, &x, 3, v).unwrap(), &p);
+        let d: Dual<f64> =
+            reduce_sum_parallel(Quad, &x, 3, &[Dual::variable(p[0]), Dual::constant(p[1])])
+                .unwrap();
+        assert!((d.eps - g[0]).abs() < 1e-12, "{} vs {}", d.eps, g[0]);
+    }
+
+    /// Panics on the element 3.
+    struct Panics;
+    impl PartialSum<f64> for Panics {
+        fn eval<S: Real>(&self, slice: &[f64], _: usize, _: usize, _: &[S]) -> Result<S> {
+            assert!(!slice.contains(&3.0), "worker panic");
+            Ok(S::zero())
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn a_panic_in_a_worker_reaches_the_caller() {
+        let x = [1.0, 2.0, 3.0, 4.0];
+        let _ = grad(|v| reduce_sum_parallel(Panics, &x, 1, v).unwrap(), &[0.1]);
+    }
+
+    /// Returns no outputs.
+    struct Nothing;
+    impl MapRectJob for Nothing {
+        fn eval<S: Real>(&self, _: &[S], _: &[S], _: &[f64], _: &[i64]) -> Result<Vec<S>> {
+            Ok(Vec::new())
+        }
+    }
+
+    #[test]
+    fn map_rect_jobs_with_no_outputs() {
+        let none_r = [Vec::new(), Vec::new()];
+        let none_i = [Vec::new(), Vec::new()];
+        let out: Vec<f64> =
+            map_rect_parallel(Nothing, &[1.0], &[vec![2.0], vec![3.0]], &none_r, &none_i).unwrap();
+        assert!(out.is_empty());
+        let g = grad(
+            |v| {
+                let thetas = [v[1..2].to_vec(), v[2..].to_vec()];
+                let o = map_rect_parallel(Nothing, &v[..1], &thetas, &none_r, &none_i).unwrap();
+                o.iter().fold(v[0] * 0.0, |a, &b| a + b)
+            },
+            &[1.0, 2.0, 3.0],
+        );
+        assert_eq!(g, vec![0.0, 0.0, 0.0]);
     }
 }

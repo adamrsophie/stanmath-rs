@@ -102,13 +102,13 @@ Stan's `propto` template flag, which the language exposes as `_lupdf` and `_lupm
 function in stanmath-rs: `normal_lupdf`, `poisson_lupmf`, and so on, for every density built on a
 fused kernel. An argument is data when its elements are `f64`; `Var` and `Dual` arguments are
 parameters. A `propto` function is zero when every argument is data, and otherwise drops the terms
-that depend only on data, so its gradient equals that of the full function. The normal, Student's
-t, Cauchy, logistic, exponential, gamma, inverse gamma, beta, lognormal, uniform, binomial,
-Poisson, and negative binomial (mean and dispersion) kernels drop their terms as Stan does; the
-values were checked against Stan Math 5.4.0 for normal, Poisson, gamma, binomial, and Student's
-t. The other kernels keep every term when any argument is a parameter, which differs from Stan's
-value by a constant only. Multivariate densities, the GLMs, and the full Wiener model have no
-`propto` form yet.
+that depend only on data, so its gradient equals that of the full function. The normal, standard
+normal, Student's t, Cauchy, logistic, exponential, gamma, inverse gamma, beta, lognormal, uniform,
+Gumbel, binomial, Poisson, and both negative binomial 2 kernels drop their terms as Stan does, and
+their values match Stan Math 5.4.0 (probed with one argument a variable). As in Stan, the
+lognormal keeps its constant `-ln(2 pi) / 2`. The other kernels keep every term when any argument
+is a parameter, which differs from Stan's value by a constant only. Multivariate densities, the
+GLMs, and the full Wiener model have no `propto` form yet.
 
 ### Boundary conventions
 
@@ -122,10 +122,10 @@ When a sequence argument is empty, the result is zero, but the scalar arguments 
 validated, as in Stan: `normal_lpdf([] | 0, -1)` is an error. Checks that relate two arguments,
 such as `y > tau` for `wiener_lpdf`, apply only when both are present.
 A few functions follow Stan in returning zero for an empty response before any other check:
-`poisson_log_glm`, `bernoulli_logit_glm`, and `ordered_logistic`. `ordered_probit`,
-`categorical`, and `normal_id_glm` check their other arguments first, also as in Stan.
-`binomial_logit_glm`, `neg_binomial_2_log_glm`, `categorical_logit_glm`, and
-`ordered_logistic_glm` have not yet been compared with Stan for an empty response.
+`poisson_log_glm`, `bernoulli_logit_glm`, `binomial_logit_glm`, `categorical_logit_glm`, and
+`ordered_logistic`. `ordered_probit`, `ordered_logistic_glm` (the cutpoints), `categorical`,
+`normal_id_glm` (a scalar `sigma`), and `neg_binomial_2_log_glm` (a scalar `alpha`, but not
+`phi`) check those arguments first, also as in Stan Math 5.4.0.
 
 Deliberate differences:
 

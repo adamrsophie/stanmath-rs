@@ -125,4 +125,20 @@ fn empty_responses_of_the_glm_ordered_and_categorical_families() {
     assert!(categorical_lpmf(none_int, &[0.5, 0.6]).is_err());
     assert!(discrete_range_lpmf(none_int, 5i64, 2i64).is_err());
     assert!(discrete_range_lpmf(3i64, 5i64, 2i64).is_err());
+    // The other four GLMs.
+    assert_eq!(
+        binomial_logit_glm_lpmf(none_int, none_int, &x0, f64::NAN, &beta).unwrap(),
+        0.0
+    );
+    assert_eq!(
+        neg_binomial_2_log_glm_lpmf(none_int, &x0, 0.0, &beta, -1.0).unwrap(),
+        0.0
+    );
+    assert!(neg_binomial_2_log_glm_lpmf(none_int, &x0, f64::NAN, &beta, 1.0).is_err());
+    let beta23 = Matrix::from_rows(&[[0.1, -0.2, 0.3], [0.4, 0.0, -0.1]]);
+    assert_eq!(
+        categorical_logit_glm_lpmf(none_int, &x0, &[f64::NAN, 0.0, 0.1], &beta23).unwrap(),
+        0.0
+    );
+    assert!(ordered_logistic_glm_lpmf(none_int, &x0, &beta, &[1.0, 0.0]).is_err());
 }

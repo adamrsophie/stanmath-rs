@@ -632,12 +632,10 @@ impl Kernel<0, 3> for LogNormal {
             g[1] = z * inv_sigma;
             g[2] = (z.square() - 1.0) * inv_sigma;
         }
-        let mut lp = -(z.square() * 0.5);
+        // Stan Math 5.4.0 keeps the constant -ln(2 pi) / 2 of the lognormal under propto.
+        let mut lp = -(z.square() * 0.5) - HALF_LN_2PI;
         if keep.term(&[2]) {
             lp -= sigma.ln();
-        }
-        if keep.term(&[]) {
-            lp -= HALF_LN_2PI;
         }
         if keep.term(&[0]) {
             lp -= ln_y;

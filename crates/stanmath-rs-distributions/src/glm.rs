@@ -16,7 +16,7 @@ use crate::continuous::normal_lpdf;
 use crate::discrete::{
     bernoulli_logit_lpmf, binomial_logit_lpmf, neg_binomial_2_log_lpmf, poisson_log_lpmf,
 };
-use crate::discrete_extra::ordered_logistic_lpmf;
+use crate::discrete_extra::{check_cutpoints, ordered_logistic_lpmf};
 
 fn check_finite<T: Real>(f: &'static str, name: &'static str, xs: &[T]) -> Result<()> {
     match xs.iter().find(|v| !v.is_finite()) {
@@ -187,6 +187,10 @@ where
 {
     const F: &str = "neg_binomial_2_log_glm_lpmf";
     check_rows(F, y.int_len(), x.nrows())?;
+    // Stan checks a scalar alpha even with no rows, but not phi (checked against Stan Math 5.4.0).
+    if let Some(a) = alpha.arg_scalar() {
+        param::finite(F, "alpha", Lift::<T>::lift(a).value())?;
+    }
     let eta = linear_predictor(F, x, &alpha, beta)?;
     let phi: Vec<T> = broadcast_arg(F, "phi", &phi, x.nrows())?;
     neg_binomial_2_log_lpmf(y, &eta[..], &phi[..])
@@ -263,14 +267,15 @@ where
             return Err(Error::observation(F, "y", v as f64, "in [1, C]"));
         }
     }
+    if len == 0 {
+        // Stan returns zero before checking x, alpha, and beta (checked against Stan Math 5.4.0).
+        return Ok(T::zero());
+    }
     let alpha: Vec<T> = alpha.iter().map(|&a| a.lift()).collect();
     let xt = lift_matrix(x);
     check_finite(F, "x", xt.as_slice())?;
     check_finite(F, "alpha", &alpha)?;
     check_finite(F, "beta", beta.as_slice())?;
-    if len == 0 {
-        return Ok(T::zero());
-    }
     let eta = multiply(&xt, beta)?;
     let mut lp = T::zero();
     for i in 0..n {
@@ -298,5 +303,8 @@ where
     check_rows(F, y.int_len(), x.nrows())?;
     let eta = x_beta(F, x, beta)?;
     let cuts: Vec<T> = cuts.iter().map(|&c| c.lift()).collect();
+    // Unlike ordered_logistic_lpmf, Stan checks the cutpoints even with no rows (checked against
+    // Stan Math 5.4.0).
+    check_cutpoints(F, &cuts)?;
     ordered_logistic_lpmf(y, &eta[..], &cuts)
 }
