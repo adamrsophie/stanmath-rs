@@ -37,12 +37,11 @@ jobs:
           ./stanc --version
           ./stanc --dump-stan-math-signatures | grep -i laplace > laplace_signatures.txt || true
           cat laplace_signatures.txt
-          ./stanc --o laplace.hpp laplace.stan
-          grep -n "laplace_marginal" laplace.hpp | tee laplace_calls.txt
+          ./variants.sh | tee laplace_calls.txt
       - uses: actions/upload-artifact@v4
         with:
           name: stan-probe
           path: |
             tools/stan-reference/stan_probe.csv
             tools/stan-reference/stanc/*.txt
-            tools/stan-reference/stanc/laplace.hpp
+            tools/stan-reference/stanc/v*.hpp
