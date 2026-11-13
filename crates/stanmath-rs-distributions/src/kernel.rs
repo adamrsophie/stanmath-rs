@@ -135,7 +135,7 @@ where
     K: Kernel<M, N>,
     A: Broadcast<N>,
 {
-    sum_kernel_keep::<K, A, M, N>(ints, args, false)
+    sum_kernel_keep::<K, A, M, N>(ints, args, false, None)
 }
 
 /// [`sum_kernel`] up to terms that depend only on data (Stan's `propto`). Zero when every argument
@@ -148,13 +148,30 @@ where
     K: Kernel<M, N>,
     A: Broadcast<N>,
 {
-    sum_kernel_keep::<K, A, M, N>(ints, args, true)
+    sum_kernel_keep::<K, A, M, N>(ints, args, true, None)
+}
+
+/// [`sum_kernel`] or [`sum_kernel_propto`] with the data mask given by the caller, for functions
+/// that lift their arguments before the kernel sees them: `data[j]` says whether argument `j`
+/// depends only on data.
+pub(crate) fn sum_kernel_masked<K, A, const M: usize, const N: usize>(
+    ints: [&dyn IntArg; M],
+    args: A,
+    propto: bool,
+    data: [bool; N],
+) -> Result<Promoted<A, N>>
+where
+    K: Kernel<M, N>,
+    A: Broadcast<N>,
+{
+    sum_kernel_keep::<K, A, M, N>(ints, args, propto, Some(data))
 }
 
 fn sum_kernel_keep<K, A, const M: usize, const N: usize>(
     ints: [&dyn IntArg; M],
     args: A,
     propto: bool,
+    mask: Option<[bool; N]>,
 ) -> Result<Promoted<A, N>>
 where
     K: Kernel<M, N>,
@@ -187,7 +204,7 @@ where
         )?;
         return Ok(Promoted::<A, N>::zero());
     }
-    let data = args.data();
+    let data = mask.unwrap_or_else(|| args.data());
     if propto && data.iter().all(|&d| d) {
         return Ok(Promoted::<A, N>::zero());
     }

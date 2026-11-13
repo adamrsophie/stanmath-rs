@@ -155,6 +155,44 @@ int main() {
   probe1("propto.weibull.var_alpha", [&] { return with_var(1.5, [&](const var& a) { return weibull_lpdf<true>(1.2, a, 0.9); }); });
   probe1("propto.gumbel.var_mu", [&] { return with_var(1.0, [&](const var& m) { return gumbel_lpdf<true>(0.5, m, 2.0); }); });
   probe1("propto.bernoulli_logit.var_alpha", [&] { return with_var(0.3, [&](const var& a) { return bernoulli_logit_lpmf<true>(1, a); }); });
+  // propto of the GLMs, with beta (or phi, or sigma) an autodiff variable.
+  M gx(3, 2);
+  gx << 0.5, -1.0, 1.2, 0.3, -0.4, 0.8;
+  const std::vector<int> gy = {2, 0, 5};
+  const std::vector<int> gb = {1, 0, 1};
+  const std::vector<int> gn = {4, 3, 6};
+  const std::vector<int> gc = {1, 3, 2};
+  V gyr(3);
+  gyr << 0.7, -1.1, 2.0;
+  V galpha(3);
+  galpha << 0.1, -0.2, 0.3;
+  V gcuts(2);
+  gcuts << -0.5, 0.7;
+  const auto var_vec = [](const V& v) {
+    Eigen::Matrix<var, -1, 1> out(v.size());
+    for (int i = 0; i < v.size(); ++i) out(i) = v(i);
+    return out;
+  };
+  const auto val = [](const var& r) {
+    const double out = r.val();
+    recover_memory();
+    return out;
+  };
+  probe1("propto.poisson_log_glm.var_beta", [&] { return val(poisson_log_glm_lpmf<true>(gy, gx, 0.3, var_vec(beta2))); });
+  probe1("propto.poisson_log_glm.full", [&] { return poisson_log_glm_lpmf<false>(gy, gx, 0.3, beta2); });
+  probe1("propto.bernoulli_logit_glm.var_beta", [&] { return val(bernoulli_logit_glm_lpmf<true>(gb, gx, 0.3, var_vec(beta2))); });
+  probe1("propto.binomial_logit_glm.var_beta", [&] { return val(binomial_logit_glm_lpmf<true>(gy, gn, gx, 0.3, var_vec(beta2))); });
+  probe1("propto.binomial_logit_glm.full", [&] { return binomial_logit_glm_lpmf<false>(gy, gn, gx, 0.3, beta2); });
+  probe1("propto.neg_binomial_2_log_glm.var_beta", [&] { return val(neg_binomial_2_log_glm_lpmf<true>(gy, gx, 0.3, var_vec(beta2), 1.5)); });
+  probe1("propto.neg_binomial_2_log_glm.var_phi", [&] { return val(neg_binomial_2_log_glm_lpmf<true>(gy, gx, 0.3, beta2, var(1.5))); });
+  probe1("propto.neg_binomial_2_log_glm.full", [&] { return neg_binomial_2_log_glm_lpmf<false>(gy, gx, 0.3, beta2, 1.5); });
+  probe1("propto.normal_id_glm.var_beta", [&] { return val(normal_id_glm_lpdf<true>(gyr, gx, 0.3, var_vec(beta2), 0.8)); });
+  probe1("propto.normal_id_glm.var_sigma", [&] { return val(normal_id_glm_lpdf<true>(gyr, gx, 0.3, beta2, var(0.8))); });
+  probe1("propto.normal_id_glm.full", [&] { return normal_id_glm_lpdf<false>(gyr, gx, 0.3, beta2, 0.8); });
+  probe1("propto.categorical_logit_glm.var_alpha", [&] { return val(categorical_logit_glm_lpmf<true>(gc, gx, var_vec(galpha), beta23)); });
+  probe1("propto.categorical_logit_glm.full", [&] { return categorical_logit_glm_lpmf<false>(gc, gx, galpha, beta23); });
+  probe1("propto.ordered_logistic_glm.var_beta", [&] { return val(ordered_logistic_glm_lpmf<true>(gc, gx, var_vec(beta2), gcuts)); });
+  probe1("propto.ordered_logistic_glm.full", [&] { return ordered_logistic_glm_lpmf<false>(gc, gx, beta2, gcuts); });
 
   // normal_id_glm with a vector x.
   V y(3);
