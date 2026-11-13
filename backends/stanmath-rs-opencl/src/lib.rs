@@ -12,7 +12,7 @@ mod elementwise;
 mod tri;
 
 pub use cholesky::cholesky_decompose_on_device;
-pub use density::{Density, lpdf_on_device};
+pub use density::{Density, lpdf_on_device, lpmf_on_device};
 
 pub use elementwise::{Binary, Unary, binary_on_device, unary_on_device};
 pub use tri::mdivide_left_tri_low_on_device;
