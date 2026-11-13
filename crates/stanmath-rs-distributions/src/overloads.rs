@@ -517,8 +517,8 @@ propto_pair! {
 // Gaussian dynamic linear model with a diagonal observation covariance.
 
 propto_pair! {
-    /// [`gaussian_dlm_obs_lpdf`] with `vector V`: the observation covariance is the diagonal matrix
-    /// with diagonal `v`.
+    /// [`gaussian_dlm_obs_lpdf`] with `vector V`: the observation covariance is the diagonal
+    /// matrix with diagonal `v`.
     gaussian_dlm_obs_lpdf_vector_v, gaussian_dlm_obs_lupdf_vector_v <T>(
         y: &Matrix<T>,
         f: &Matrix<T>,
@@ -527,16 +527,22 @@ propto_pair! {
         w: &Matrix<T>,
         m0: &[T],
         c0: &Matrix<T>,
-        ) -> Result<T> {
+    ) -> Result<T>
+    where { T: Real }
+    base(gaussian_dlm_obs_lpdf, gaussian_dlm_obs_lupdf) |base| {
         let r = v.len();
         let v_diag = Matrix::from_fn(r, r, |i, j| if i == j { v[i] } else { T::zero() });
-        gaussian_dlm_obs_lpdf(y, f, g, &v_diag, w, m0, c0)
-        }
-        // Wiener arities with an explicit precision.
-        /// Stan's seven argument `wiener_lpdf(y | a, t0, w, v, sv, precision)`: the five parameter
-        /// density [`wiener5_lpdf`](crate::wiener5_lpdf) with an explicit `precision`, as for
-        /// [`wiener_full_prec_lpdf`].
-        pub fn wiener5_prec_lpdf<Y, A, T0, W, V, SV>(
+        base(y, f, g, &v_diag, w, m0, c0)
+    }
+}
+
+// Wiener arities with an explicit precision.
+
+propto_pair! {
+    /// Stan's seven argument `wiener_lpdf(y | a, t0, w, v, sv, precision)`: the five parameter
+    /// density [`wiener5_lpdf`](crate::wiener5_lpdf) with an explicit `precision`, as for
+    /// [`wiener_full_prec_lpdf`].
+    wiener5_prec_lpdf, wiener5_prec_lupdf <Y, A, T0, W, V, SV>(
         y: Y,
         a: A,
         t0: T0,
@@ -545,7 +551,7 @@ propto_pair! {
         sv: SV,
         precision: f64,
     ) -> Result<WienerOut<(Y, A, T0, W, V, SV, f64, f64), 8>>
-    where { T: Real, (Y, A, T0, W, V, SV, f64, f64): WienerArgs<8> }
+    where { (Y, A, T0, W, V, SV, f64, f64): WienerArgs<8> }
     base(wiener_full_prec_lpdf, wiener_full_prec_lupdf) |base| {
         base(y, a, t0, w, v, sv, 0.0, 0.0, precision)
     }
