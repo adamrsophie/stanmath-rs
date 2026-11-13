@@ -62,6 +62,13 @@ pub enum Error {
         /// Iterations performed before giving up.
         iterations: usize,
     },
+    /// A failure in an MPI or OpenCL backend, or an error raised in an MPI worker process.
+    Backend {
+        /// Function that reported the failure.
+        function: &'static str,
+        /// What went wrong.
+        message: String,
+    },
 }
 
 impl Error {
@@ -141,6 +148,7 @@ impl fmt::Display for Error {
                 f,
                 "{function}: no convergence after {iterations} iterations"
             ),
+            Error::Backend { function, message } => write!(f, "{function}: {message}"),
         }
     }
 }

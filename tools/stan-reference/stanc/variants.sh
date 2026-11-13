@@ -26,19 +26,10 @@ m='rep_vector(0, n)'
 k='k_f, (x, alpha, rho)'
 o='generate_laplace_options(n)'
 calls=(
-  "laplace_marginal_poisson_log_lupmf(y | idx, $m, $k)"
-  "laplace_marginal_poisson_log_lupmf(y | idx, $m, 1, $k)"
-  "laplace_marginal_poisson_log_lupmf(y | idx, $m, $k, 1)"
-  "laplace_marginal_poisson_log_lpmf(y | idx, $m, 1, $k)"
-  "laplace_marginal_tol_poisson_log_lupmf(y | idx, $m, $k, $o)"
-  "laplace_marginal_tol_poisson_log_lupmf(y | idx, $m, 1, $k, $o)"
-  "laplace_marginal_neg_binomial_2_log_lupmf(y | idx, eta, $m, $k)"
-  "laplace_marginal_neg_binomial_2_log_lupmf(y | idx, eta, $m, 1, $k)"
-  "laplace_marginal_bernoulli_logit_lupmf(y | idx, $m, $k)"
-  "laplace_marginal_bernoulli_logit_lupmf(y | idx, $m, 1, $k)"
-  "laplace_marginal(ll_f, (y, idx), $k)"
-  "laplace_marginal(ll_f, (y, idx), 1, $k)"
-  "laplace_marginal_tol(ll_f, (y, idx), 1, $k, $o)"
+  "laplace_marginal_neg_binomial_2_log_lupmf(y | idx, rep_vector(eta, n), $m, 1, $k)"
+  "laplace_marginal_neg_binomial_2_log_lupmf(y | idx, $m, eta, 1, $k)"
+  "laplace_marginal_neg_binomial_2_log_lupmf(y | idx, $m, rep_vector(eta, n), 1, $k)"
+  "laplace_marginal_tol_neg_binomial_2_log_lupmf(y | idx, rep_vector(eta, n), $m, 1, $k, $o)"
 )
 i=0
 for c in "${calls[@]}"; do

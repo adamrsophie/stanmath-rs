@@ -73,3 +73,38 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo bench --workspace --no-run
+
+  # The MPI and OpenCL backends live outside the workspace: they need OpenMPI and an OpenCL
+  # runtime. POCL gives a CPU OpenCL device with double precision.
+  backends:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            backends/stanmath-rs-mpi
+            backends/stanmath-rs-opencl
+      - name: Install OpenMPI and POCL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopenmpi-dev openmpi-bin libclang-dev pocl-opencl-icd ocl-icd-opencl-dev clinfo
+      - name: MPI backend
+        working-directory: backends/stanmath-rs-mpi
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+          cargo build --example map_rect_mpi
+          mpirun -n 1 target/debug/examples/map_rect_mpi
+          mpirun -n 3 --oversubscribe target/debug/examples/map_rect_mpi
+      - name: OpenCL backend
+        working-directory: backends/stanmath-rs-opencl
+        run: |
+          clinfo -l
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test

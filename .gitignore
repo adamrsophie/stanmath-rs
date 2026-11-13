@@ -3,3 +3,5 @@
 /documentation/
 .DS_Store
 /site/
+/backends/*/target
+/backends/*/Cargo.lock

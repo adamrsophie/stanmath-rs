@@ -53,6 +53,14 @@ std::vector<double> lower_rows(const Eigen::MatrixXd& m) {
   return out;
 }
 
+// The covariance function of the Laplace probes, as stanc writes a user function's functor.
+struct laplace_cov {
+  template <typename T0, typename T1, typename T2>
+  Eigen::Matrix<stan::return_type_t<stan::base_type_t<T0>, T1, T2>, -1, -1> operator()(
+      const T0& x, const T1& alpha, const T2& rho, std::ostream* msgs) const {
+    return stan::math::add_diag(stan::math::gp_exp_quad_cov(x, alpha, rho), 1e-8);
+  }
+};
 }  // namespace
 
 int main() {
@@ -587,5 +595,23 @@ int main() {
   pb << 1.7, 2.4;
   probe1("hypergeometric_pFq.0.5_1.2__1.7_2.4__0.8", [&] { return hypergeometric_pFq(pa, pb, 0.8); });
   probe1("hypergeometric_pFq.0.5_1.2__1.7_2.4__-3.5", [&] { return hypergeometric_pFq(pa, pb, -3.5); });
+
+  // Laplace marginals, called as stanc 2.40 calls them: y, a one based y_index, the mean, the
+  // Hessian block size, the covariance functor, and its arguments.
+  const std::vector<int> ly = {1, 0, 3};
+  const std::vector<int> lb = {1, 0, 1};
+  const std::vector<int> lidx = {1, 2, 3};
+  std::vector<V> lx(3, V(1));
+  lx[0] << 0.0;
+  lx[1] << 0.5;
+  lx[2] << 1.2;
+  const V lm = V::Zero(3);
+  probe1("laplace.poisson_log.full", [&] { return laplace_marginal_poisson_log_lpmf<false>(ly, lidx, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
+  probe1("laplace.poisson_log.all_data", [&] { return laplace_marginal_poisson_log_lpmf<true>(ly, lidx, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
+  probe1("laplace.poisson_log.var_alpha", [&] { return with_var(1.2, [&](const var& a) { return laplace_marginal_poisson_log_lpmf<true>(ly, lidx, lm, 1, laplace_cov(), std::forward_as_tuple(lx, a, 0.7), nullptr); }); });
+  probe1("laplace.poisson_log.var_alpha_full", [&] { return with_var(1.2, [&](const var& a) { return laplace_marginal_poisson_log_lpmf<false>(ly, lidx, lm, 1, laplace_cov(), std::forward_as_tuple(lx, a, 0.7), nullptr); }); });
+  probe1("laplace.bernoulli_logit.full", [&] { return laplace_marginal_bernoulli_logit_lpmf<false>(lb, lidx, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
+  probe1("laplace.bernoulli_logit.all_data", [&] { return laplace_marginal_bernoulli_logit_lpmf<true>(lb, lidx, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
+  probe1("laplace.bernoulli_logit.var_alpha", [&] { return with_var(1.2, [&](const var& a) { return laplace_marginal_bernoulli_logit_lpmf<true>(lb, lidx, lm, 1, laplace_cov(), std::forward_as_tuple(lx, a, 0.7), nullptr); }); });
   return 0;
 }
