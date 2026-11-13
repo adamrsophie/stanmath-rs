@@ -245,7 +245,16 @@ stanmath-rs matches a 40 digit mpmath reference (`tools/reference/scalar.py`) to
 | `gamma_q`, d/d a | 1.7e-7 to 1.3e-5 | about 1e-15 |
 | chi-square and inverse chi-square CDFs, d/d nu | 4e-9 to 4e-6 | about 1e-15 |
 
-The sweep also fixed four conventions to match Stan: `fmax` and `fmin` return the second argument
+`crates/stanmath-rs/tests/stan_reference_matrix.rs` checks 97 cases of the matrix functions
+(decompositions, inverses, solves, products, reductions, `matrix_exp`, `svd_*`, `qr_*`, sorting and
+softmax) and every constraining transform's `_constrain`, `_jacobian`, and `_unconstrain` form
+against Stan to `1e-10`; a matrix result is reduced to a weighted sum of its entries, so the
+gradient covers each one. `svd_U`, `svd_V`, and the `qr_*` factors match Stan's signs.
+`eigenvectors_sym` signs are arbitrary (Stan's follow Eigen's solver), so that case checks
+`V diag(1, 2, 3) Vᵀ`. The comparison changed `corr_matrix_unconstrain` to read the diagonal as Stan
+does, which changes only its derivative with respect to the diagonal.
+
+The scalar sweep also fixed four conventions to match Stan: `fmax` and `fmin` return the second argument
 on ties (and take its derivative); `beta(a, b)` with a nonpositive argument is
 `|Γ(a) Γ(b) / Γ(a + b)|`; `log_falling_factorial` and `log_rising_factorial` reject `x <= 0`; and
 `log_modified_bessel_first_kind` accepts orders in `[-1, 0)`.

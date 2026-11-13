@@ -292,7 +292,8 @@ pub fn corr_matrix_free<T: Real>(sigma: &Matrix<T>) -> Result<Vec<T>> {
         }
     }
     let l = cholesky_decompose(sigma)?;
-    let mut remaining = vec![T::one(); k];
+    // The diagonal is one in value; reading it keeps Stan's derivative with respect to it.
+    let mut remaining: Vec<T> = (0..k).map(|i| sigma[(i, i)]).collect();
     let mut y = Vec::with_capacity(k * k.saturating_sub(1) / 2);
     for j in 0..k {
         for i in j + 1..k {
