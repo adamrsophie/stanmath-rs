@@ -5,6 +5,8 @@
 // where result is a value, a ';' separated list of values, or "error: <message>". The probes only
 // call Stan Math's public functions; they settle questions of convention for stanmath-rs.
 
+// The Laplace marginals are in the mix headers, which stanc's generated models include first.
+#include <stan/math/mix.hpp>
 #include <stan/math.hpp>
 
 #include <complex>
