@@ -7,6 +7,8 @@
 //! scalar or a vector with one entry per row. As in Stan, the result's scalar type is the promotion
 //! of every argument's, so data `beta` with an autodiff `x` or `alpha` works.
 
+use std::borrow::Cow;
+
 use stanmath_rs_autodiff::functions::log_sum_exp_slice;
 use stanmath_rs_autodiff::{Arg, Broadcast, IntArg, Lift, Real, broadcast_len};
 use stanmath_rs_core::{Error, Matrix, Result};
@@ -110,6 +112,21 @@ where
     <X as Lift<T>>::DATA && <A::Elem as Lift<T>>::DATA && <B as Lift<T>>::DATA
 }
 
+/// Stan broadcasts a one row `x` (a `row_vector` argument) to every observation of a longer
+/// response (checked against Stan Math 5.4.0 for every GLM).
+fn broadcast_rows<'a, X: Copy>(
+    x: &'a Matrix<X>,
+    responses: &[Option<usize>],
+) -> Cow<'a, Matrix<X>> {
+    match responses.iter().flatten().max() {
+        Some(&n) if x.nrows() == 1 && n > 1 => {
+            let cols = (0..x.ncols()).flat_map(|c| std::iter::repeat_n(x[(0, c)], n));
+            Cow::Owned(Matrix::from_column_major(n, x.ncols(), cols.collect()))
+        }
+        _ => Cow::Borrowed(x),
+    }
+}
+
 /// Requires a sequence response to have one entry per row of `x`.
 fn check_rows(f: &'static str, response: Option<usize>, n: usize) -> Result<()> {
     match response {
@@ -138,6 +155,7 @@ where
     B: Lift<T> + Copy,
 {
     const F: &str = "poisson_log_glm_lpmf";
+    let x = &*broadcast_rows(x, &[y.int_len()]);
     check_rows(F, y.int_len(), x.nrows())?;
     if x.nrows() == 0 {
         // Stan returns zero before checking alpha and beta (checked against Stan Math 5.4.0).
@@ -193,6 +211,7 @@ where
     B: Lift<T> + Copy,
 {
     const F: &str = "bernoulli_logit_glm_lpmf";
+    let x = &*broadcast_rows(x, &[y.int_len()]);
     check_rows(F, y.int_len(), x.nrows())?;
     if x.nrows() == 0 {
         // Stan returns zero before checking alpha and beta (checked against Stan Math 5.4.0).
@@ -260,6 +279,7 @@ where
     B: Lift<T> + Copy,
 {
     const F: &str = "binomial_logit_glm_lpmf";
+    let x = &*broadcast_rows(x, &[n.int_len(), trials.int_len()]);
     check_rows(F, n.int_len(), x.nrows())?;
     check_rows(F, trials.int_len(), x.nrows())?;
     let eta = linear_predictor(F, x, &alpha, beta)?;
@@ -329,6 +349,7 @@ where
     P::Elem: Lift<T>,
 {
     const F: &str = "neg_binomial_2_log_glm_lpmf";
+    let x = &*broadcast_rows(x, &[y.int_len()]);
     check_rows(F, y.int_len(), x.nrows())?;
     // Stan checks a scalar alpha even with no rows, but not phi (checked against Stan Math 5.4.0).
     if let Some(a) = alpha.arg_scalar() {
@@ -405,6 +426,14 @@ where
     S::Elem: Lift<T>,
 {
     const F: &str = "normal_id_glm_lpdf";
+    let x = &*broadcast_rows(x, &[Some(y.len())]);
+    // A real response (a one element slice) is every observation's (checked against Stan Math
+    // 5.4.0).
+    let y = if y.len() == 1 {
+        &vec![y[0]; x.nrows()][..]
+    } else {
+        y
+    };
     check_rows(F, Some(y.len()), x.nrows())?;
     // Stan checks a scalar sigma even with no rows (checked against Stan Math 5.4.0).
     if let Some(s) = sigma.arg_scalar() {
@@ -499,6 +528,7 @@ where
             format!("alpha has length {}, but beta has {c} columns", alpha.len()),
         ));
     }
+    let x = &*broadcast_rows(x, &[y.int_len()]);
     let n = x.nrows();
     check_rows(F, y.int_len(), n)?;
     let len = broadcast_len(F, &[y.int_len(), Some(n)])?;
@@ -584,6 +614,7 @@ where
     C: Lift<T> + Copy,
 {
     const F: &str = "ordered_logistic_glm_lpmf";
+    let x = &*broadcast_rows(x, &[y.int_len()]);
     check_rows(F, y.int_len(), x.nrows())?;
     let eta = x_beta(F, x, beta)?;
     let cuts: Vec<T> = cuts.iter().map(|&c| c.lift()).collect();
