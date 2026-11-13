@@ -93,6 +93,9 @@ fn propto_keeps_the_data_linear_predictor_out() {
     );
     same(&[glm.value - plain.value], &[6f64.ln()]);
     // Stan Math 5.4.0, neg_binomial_2_log_glm_lpmf<true> with only phi a var.
-    same(&[glm.value, glm.gradient[0]], &[-5.1058654989833698, 0.28072083048372631]);
+    same(
+        &[glm.value, glm.gradient[0]],
+        &[-5.1058654989833698, 0.28072083048372631],
+    );
     same(&glm.gradient, &plain.gradient);
 }
