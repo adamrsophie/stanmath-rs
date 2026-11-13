@@ -32,7 +32,13 @@ __kernel void solve(__global const double* l, __global double* b, const ulong n,
 ";
 
 /// `L⁻¹ B` (or `L⁻ᵀ B` when `transpose`) of column-major host slices, on the device.
-fn device_solve(l: &[f64], b: &[f64], n: usize, m: usize, transpose: bool) -> Result<Vec<f64>> {
+pub(crate) fn device_solve(
+    l: &[f64],
+    b: &[f64],
+    n: usize,
+    m: usize,
+    transpose: bool,
+) -> Result<Vec<f64>> {
     let (lb, bb) = (DeviceBuffer::from_slice(l)?, DeviceBuffer::from_slice(b)?);
     launch(
         FUNCTION,

@@ -7,10 +7,12 @@
 // The negated comparisons also reject NaN.
 #![allow(clippy::neg_cmp_op_on_partial_ord)]
 
-use stanmath_rs_autodiff::{MultiFn, Real, vjp};
+use stanmath_rs_autodiff::{MultiFn, Real};
 use stanmath_rs_core::{Error, Matrix, Result};
 
 use crate::device::{Arg, DeviceBuffer, launch};
+use crate::host_product;
+use crate::tri::device_solve;
 
 pub(crate) const FUNCTION: &str = "cholesky_decompose";
 
@@ -90,30 +92,59 @@ impl MultiFn for Cholesky {
             .collect())
     }
 
-    fn reverse(&self, x: &[f64], _y: &[f64], y_adj: &[f64], needed: &[bool], x_adj: &mut [f64]) {
-        // ponytail: the adjoint runs on the host; a blocked device adjoint pays off for large n.
+    fn reverse(&self, _x: &[f64], l: &[f64], l_adj: &[f64], needed: &[bool], x_adj: &mut [f64]) {
         let n = self.n;
-        let (_, g) = vjp(
-            |a| {
-                let a = Matrix::from_column_major(n, n, a.to_vec());
-                stanmath_rs_linalg::cholesky_decompose(&a)
-                    .map(Matrix::into_vec)
-                    .unwrap_or_else(|_| a.as_slice().iter().map(|&v| v * f64::NAN).collect())
-            },
-            x,
-            y_adj,
-        );
-        for ((o, gi), &need) in x_adj.iter_mut().zip(g).zip(needed) {
-            if need {
-                *o += gi;
+        // A failed kernel leaves NaN gradients.
+        let s = adjoint(l, l_adj, n).unwrap_or_else(|_| vec![f64::NAN; n * n]);
+        // Only the lower triangle of A is read, so it takes the symmetric part of S.
+        for j in 0..n {
+            for i in j..n {
+                let g = if i == j {
+                    s[i + i * n]
+                } else {
+                    s[i + j * n] + s[j + i * n]
+                };
+                if needed[i + j * n] {
+                    x_adj[i + j * n] += g;
+                }
             }
         }
     }
 }
 
+/// `S = L⁻ᵀ Φ(Lᵀ L̄) L⁻¹`, where Φ keeps the lower triangle and halves the diagonal, with the
+/// product and both triangular solves on the device.
+fn adjoint(l: &[f64], l_adj: &[f64], n: usize) -> Result<Vec<f64>> {
+    // L is constant above the diagonal, so only the lower triangle of L̄ counts.
+    let lower: Vec<f64> = (0..n * n)
+        .map(|k| if k % n >= k / n { l_adj[k] } else { 0.0 })
+        .collect();
+    let m = host_product(l, &lower, n, n, n, true, false)?;
+    // Pᵀ, the transpose of Φ(M), as the right-hand side of the first solve.
+    let mut pt = vec![0.0; n * n];
+    for j in 0..n {
+        for i in j..n {
+            pt[j + i * n] = if i == j {
+                0.5 * m[i + i * n]
+            } else {
+                m[i + j * n]
+            };
+        }
+    }
+    // Wᵀ = L⁻ᵀ Pᵀ gives W = P L⁻¹; then S = L⁻ᵀ W.
+    let wt = device_solve(l, &pt, n, n, true)?;
+    let mut w = vec![0.0; n * n];
+    for j in 0..n {
+        for i in 0..n {
+            w[i + j * n] = wt[j + i * n];
+        }
+    }
+    device_solve(l, &w, n, n, true)
+}
+
 /// The lower Cholesky factor `L` of a symmetric positive definite matrix, `A = L Lᵀ`, with the
 /// factorization on the device, in any scalar type. Forward-mode scalars are factored on the
-/// host; in reverse mode the adjoint runs on the host.
+/// host; in reverse mode the adjoint's product and triangular solves run on the device.
 ///
 /// # Errors
 ///
