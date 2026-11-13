@@ -298,6 +298,10 @@ checks the result against the definition written out from the input's elements. 
 concatenations (`append_col(real, row_vector)`, `append_row(vector, vector)` and similar) are
 `append_array` on slices, `sum(array[] int)` is `iter().sum()`, and `to_array_1d` of an array of
 any depth is `to_array_1d_nested`.
+`tests/signatures_operators.rs`, written by `tools/reference/gen_operators.py`, calls the 72
+container signatures of `add`, `subtract`, `elt_multiply`, and `elt_divide`: two real matrices
+through the library functions, every other form (vectors, complex containers, a scalar with a
+container) as the Rust operator through `apply_scalar_unary` or `apply_scalar_binary`.
 
 The scalar sweep also fixed four conventions to match Stan: `fmax` and `fmin` return the second argument
 on ties (and take its derivative); `beta(a, b)` with a nonpositive argument is
