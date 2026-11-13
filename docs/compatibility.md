@@ -33,7 +33,9 @@ stanmath-rs does not claim compatibility for anything not marked **tested**.
 | `operands_and_partials` | `Var::from_partials`, `NaryFn`, fused distribution kernels | tested |
 | custom reverse-mode functions (`reverse_pass_callback`) | `Tape::custom_op` | tested |
 | `var` over `fvar` (reverse over forward) | not provided | not supported |
-| OpenCL, TBB `reduce_sum`, `map_rect` | not provided | not supported |
+| `reduce_sum`, `map_rect` (TBB) | `reduce_sum`, `map_rect`, and threaded `reduce_sum_parallel`, `map_rect_parallel` | experimental |
+| `map_rect` over MPI | `map_rect_mpi` in `backends/stanmath-rs-mpi` (CI with OpenMPI) | experimental |
+| OpenCL | `backends/stanmath-rs-opencl`, Stan's OpenCL function list (CI with POCL) | experimental |
 
 ## Scalar functions
 
