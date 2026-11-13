@@ -166,7 +166,7 @@ All with `*_constrain`, `*_constrain_lp` (log Jacobian), and `*_free`.
 | `integrate_1d` | `integrate` (tanh-sinh, finite and infinite limits), derivatives with respect to parameters | tested |
 | derivatives with respect to integration limits | | planned |
 | `algebra_solver_powell`, fixed point solvers | | planned |
-| `ode_rk45`, `ode_bdf`, `ode_adams`, adjoint ODE solvers, DAE solvers | | planned |
+| `ode_rk45`, `ode_ckrk`, `ode_adams`, `ode_bdf`, adjoint ODE solvers, DAE solvers | Dormand and Prince, Cash and Karp, variable order Adams (orders 1 to 12, PECE), and Radau IIA; Stan uses CVODES for Adams and BDF, so results agree to the tolerance, not to rounding error. Derivatives are those of the numerical solution | tested |
 
 The LKJ difference above is a Stan Math gradient bug: at `eta = 1` Stan evaluates the normalizing
 constant with a special-case formula that does not depend on `eta`, so its derivative is lost.

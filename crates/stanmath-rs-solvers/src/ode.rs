@@ -11,15 +11,18 @@
 //!   methods agree to the requested tolerance, not to rounding error.
 //! * [`ode_ckrk`]: the Cash and Karp 5(4) pair (Cash and Karp 1990), as in Stan Math, under the
 //!   same step size control as [`ode_rk45`].
-//! * [`ode_adams`] is provided under Stan's name and uses the Dormand and Prince pair; Stan Math
-//!   uses the variable order CVODES Adams method.
+//! * [`ode_adams`]: the variable step, variable order Adams method (orders 1 to 12) in PECE form,
+//!   with coefficients from the integral of the interpolating polynomial (Hairer, Norsett, and
+//!   Wanner, section III.5). For nonstiff problems at tight tolerances. Stan Math uses CVODES
+//!   Adams; the two agree to the requested tolerance.
 //!
 //! # Derivatives
 //!
 //! Step sizes are chosen from primal values only, so every scalar type takes the same sequence of
-//! steps. The explicit method is then differentiated step by step (in reverse mode the tape records
-//! the steps). The implicit method solves its stage equations in `f64` and then takes Newton steps
-//! in the caller's scalar type, as [`solve_system`](crate::solve_system) does, so its stage
+//! steps; the Adams method also chooses its order from primal values. The explicit methods (the
+//! Runge Kutta pairs, and Adams with one corrector step) are then differentiated step by step (in
+//! reverse mode the tape records the steps). The implicit method solves its stage equations in
+//! `f64` and then takes Newton steps in the caller's scalar type, as [`solve_system`](crate::solve_system) does, so its stage
 //! derivatives are exact. In both cases the derivatives are the exact derivatives of the numerical
 //! solution, which differ from the derivatives of the true solution by an amount of the order of
 //! the integration tolerance. Stan Math instead integrates the forward sensitivity equations
@@ -1173,8 +1176,206 @@ pub fn ode_ckrk_tol<T: Real, F: OdeSystem>(
     )
 }
 
-/// Stan's `ode_adams` (CVODES Adams in Stan Math), computed with the Dormand and Prince pair and
-/// [`OdeOptions::STIFF`] tolerances. Results agree with Stan to the tolerance.
+/// Highest order of the Adams method, as in CVODES.
+const ADAMS_MAX_ORDER: usize = 12;
+
+/// Gauss and Legendre nodes and weights on `[0, 1]` (seven points, exact for polynomials of
+/// degree 13).
+const GAUSS7: [(f64, f64); 7] = [
+    (0.025446043828620737, 0.06474248308443485),
+    (0.12923440720030277, 0.13985269574463832),
+    (0.2970774243113014, 0.1909150252525595),
+    (0.5, 0.2089795918367347),
+    (0.7029225756886986, 0.1909150252525595),
+    (0.8707655927996972, 0.13985269574463832),
+    (0.9745539561713792, 0.06474248308443485),
+];
+
+/// Weights `∫_0^1 L_j(s) ds` of the Lagrange basis on `nodes`, with time measured from the start
+/// of the step in units of the step. Integrating the polynomial that interpolates `f` at the
+/// nodes gives the Adams formula `y_{n+1} = y_n + h Σ_j w_j f_j`: Adams and Bashforth when the
+/// nodes are past points, Adams and Moulton when they include the new point `s = 1`
+/// (Hairer, Norsett, and Wanner, *Solving Ordinary Differential Equations I*, section III.5).
+fn adams_weights(nodes: &[f64]) -> Vec<f64> {
+    debug_assert!(
+        nodes.len() <= 14,
+        "seven point quadrature is exact to degree 13"
+    );
+    let mut w = vec![0.0; nodes.len()];
+    for &(x, gw) in &GAUSS7 {
+        for (j, wj) in w.iter_mut().enumerate() {
+            let mut l = gw;
+            for (i, &ti) in nodes.iter().enumerate() {
+                if i != j {
+                    l *= (x - ti) / (nodes[j] - ti);
+                }
+            }
+            *wj += l;
+        }
+    }
+    w
+}
+
+/// Counts from an Adams integration, read by the unit tests.
+#[derive(Debug)]
+#[cfg_attr(not(test), allow(dead_code))]
+struct AdamsStats {
+    accepted: usize,
+    max_order: usize,
+}
+
+/// The variable step, variable order Adams method in PECE form: an Adams and Bashforth predictor
+/// of order `k` from the last `k` values of `f`, an evaluation, an Adams and Moulton corrector of
+/// order `k + 1`, and an evaluation. The difference between the correctors of orders `k + 1`
+/// and `k` estimates the error of order `k`; those of orders `k` and `k + 2` decide the order,
+/// which is kept in `1..=12`.
+///
+/// Step size and order are decided from primal values only, and the corrector is applied once,
+/// so every scalar type takes the same arithmetic path and the derivatives are those of the
+/// numerical solution.
+#[allow(clippy::too_many_arguments)]
+fn adams<T: Real, F: OdeSystem>(
+    name: &'static str,
+    f: &F,
+    y0: &[T],
+    t0: f64,
+    ts: &[f64],
+    theta: &[T],
+    o: &OdeOptions,
+) -> Result<(Vec<Vec<T>>, AdamsStats)> {
+    validate(name, y0, t0, ts, theta, o)?;
+    let theta_v: Vec<f64> = theta.iter().map(Real::value).collect();
+    let mut y = y0.to_vec();
+    let mut t = t0;
+    let f0 = rhs(f, name, t, &y, theta)?;
+    let y0v: Vec<f64> = y.iter().map(Real::value).collect();
+    let f0v: Vec<f64> = f0.iter().map(Real::value).collect();
+    let mut h = initial_step(f, name, t0, &y0v, &f0v, &theta_v, ts[0] - t0, 1, o)?;
+    // `fs[0]` holds `f` at the new point during a step; `fs[1..]` hold `f_n, f_{n-1}, ...` at the
+    // times `past[..]`.
+    let mut fs: Vec<Vec<T>> = vec![Vec::new(), f0];
+    let mut past = vec![t0];
+    let mut k = 1usize;
+    let mut at_order = 0usize;
+    let mut fails = 0usize;
+    let mut stats = AdamsStats {
+        accepted: 0,
+        max_order: 1,
+    };
+    let mut out = Vec::with_capacity(ts.len());
+    for &t_out in ts {
+        let mut steps = 0usize;
+        while t < t_out {
+            if steps >= o.max_num_steps {
+                return Err(Error::NoConvergence {
+                    function: name,
+                    iterations: steps,
+                });
+            }
+            steps += 1;
+            let remaining = t_out - t;
+            let last = h * (1.0 + 1e-10) >= remaining;
+            // Two near equal steps instead of a full step and a short one before an output time.
+            let step = if last {
+                remaining
+            } else if remaining < 2.0 * h {
+                0.5 * remaining
+            } else {
+                h
+            };
+            let s: Vec<f64> = past.iter().map(|&tp| (tp - t) / step).collect();
+            let corrector = |m: usize| {
+                let mut nodes = Vec::with_capacity(m);
+                nodes.push(1.0);
+                nodes.extend_from_slice(&s[..m - 1]);
+                adams_weights(&nodes)
+            };
+            let yp = combine(&y, step, &adams_weights(&s[..k]), &fs[1..=k]);
+            fs[0] = rhs(f, name, t + step, &yp, theta)?;
+            let (c_k, c_k1) = (corrector(k), corrector(k + 1));
+            let yc = combine(&y, step, &c_k1, &fs[..=k]);
+            let yv: Vec<f64> = y.iter().map(Real::value).collect();
+            let ycv: Vec<f64> = yc.iter().map(Real::value).collect();
+            let w = weights(o, &yv, &ycv);
+            // Scaled norm of the difference of two correctors with weights `a` and `b`.
+            let estimate = |a: &[f64], b: &[f64]| {
+                let d: Vec<f64> = (0..y.len())
+                    .map(|i| {
+                        let sum: f64 = a
+                            .iter()
+                            .enumerate()
+                            .map(|(j, aj)| {
+                                (aj - b.get(j).copied().unwrap_or(0.0)) * fs[j][i].value()
+                            })
+                            .sum();
+                        step * sum
+                    })
+                    .collect();
+                rms(&d, &w)
+            };
+            let err = estimate(&c_k1, &c_k);
+            let lower = (k > 1).then(|| {
+                let e = estimate(&c_k, &corrector(k - 1));
+                step_factor(e, k as i32 - 1, 2.0)
+            });
+            if err <= 1.0 {
+                let mut order = k;
+                let mut fac = step_factor(err, k as i32, 2.0);
+                if let Some(fl) = lower.filter(|&fl| fl > fac) {
+                    order = k - 1;
+                    fac = fl;
+                }
+                if order == k && k < ADAMS_MAX_ORDER && at_order > k && past.len() > k {
+                    let e = estimate(&corrector(k + 2), &c_k1);
+                    let fr = step_factor(e, k as i32 + 1, 2.0);
+                    if fr > fac {
+                        order = k + 1;
+                        fac = fr;
+                    }
+                }
+                let prev = h;
+                t = if last { t_out } else { t + step };
+                y = yc;
+                fs[0] = rhs(f, name, t, &y, theta)?;
+                fs.insert(0, Vec::new());
+                fs.truncate(ADAMS_MAX_ORDER + 1);
+                past.insert(0, t);
+                past.truncate(ADAMS_MAX_ORDER);
+                h = step * fac;
+                if step < prev && fac >= 1.0 {
+                    // A step shortened to land on an output time does not shrink the step size.
+                    h = h.max(prev);
+                }
+                at_order = if order == k { at_order + 1 } else { 0 };
+                k = order;
+                fails = 0;
+                stats.accepted += 1;
+                stats.max_order = stats.max_order.max(k);
+            } else {
+                fails += 1;
+                let mut fac = step_factor(err, k as i32, 1.0).min(0.9);
+                if let Some(fl) = lower.filter(|&fl| fl.min(0.9) > fac) {
+                    k -= 1;
+                    fac = fl.min(0.9);
+                    at_order = 0;
+                }
+                if fails >= 3 {
+                    k = 1;
+                    at_order = 0;
+                }
+                h = step * fac;
+                check_step(name, t, h, steps)?;
+            }
+        }
+        out.push(y.clone());
+    }
+    Ok((out, stats))
+}
+
+/// Stan's `ode_adams`: the variable step, variable order Adams method (orders 1 to 12) in PECE
+/// form with [`OdeOptions::STIFF`] tolerances. Stan Math uses CVODES Adams, which also has orders
+/// 1 to 12 but keeps a Nordsieck history and solves the corrector by Newton's method; the two
+/// agree to the requested tolerance, not to rounding error.
 ///
 /// # Errors
 ///
@@ -1186,16 +1387,7 @@ pub fn ode_adams<T: Real, F: OdeSystem>(
     ts: &[f64],
     theta: &[T],
 ) -> Result<Vec<Vec<T>>> {
-    rk45(
-        Pair::DormandPrince,
-        "ode_adams",
-        f,
-        y0,
-        t0,
-        ts,
-        theta,
-        &OdeOptions::STIFF,
-    )
+    adams("ode_adams", f, y0, t0, ts, theta, &OdeOptions::STIFF).map(|(y, _)| y)
 }
 
 /// [`ode_adams`] with explicit tolerances and step limit.
@@ -1211,16 +1403,7 @@ pub fn ode_adams_tol<T: Real, F: OdeSystem>(
     theta: &[T],
     options: &OdeOptions,
 ) -> Result<Vec<Vec<T>>> {
-    rk45(
-        Pair::DormandPrince,
-        "ode_adams_tol",
-        f,
-        y0,
-        t0,
-        ts,
-        theta,
-        options,
-    )
+    adams("ode_adams_tol", f, y0, t0, ts, theta, options).map(|(y, _)| y)
 }
 
 /// Solves a stiff system `dy/dt = f(t, y, θ)` with the Radau IIA method and
@@ -1257,4 +1440,86 @@ pub fn ode_bdf_tol<T: Real, F: OdeSystem>(
     options: &OdeOptions,
 ) -> Result<Vec<Vec<T>>> {
     ode_radau("ode_bdf_tol", f, y0, t0, ts, theta, options)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_weights(nodes: &[f64], want: &[f64]) {
+        let got = adams_weights(nodes);
+        assert_eq!(got.len(), want.len());
+        for (g, w) in got.iter().zip(want) {
+            assert!((g - w).abs() < 1e-13, "{nodes:?}: {got:?} vs {want:?}");
+        }
+    }
+
+    #[test]
+    fn constant_steps_give_the_classical_adams_coefficients() {
+        // Adams and Bashforth with 1 to 5 steps.
+        assert_weights(&[0.0], &[1.0]);
+        assert_weights(&[0.0, -1.0], &[1.5, -0.5]);
+        assert_weights(&[0.0, -1.0, -2.0], &[23.0 / 12.0, -16.0 / 12.0, 5.0 / 12.0]);
+        assert_weights(
+            &[0.0, -1.0, -2.0, -3.0],
+            &[55.0 / 24.0, -59.0 / 24.0, 37.0 / 24.0, -9.0 / 24.0],
+        );
+        let ab5 = [1901.0, -2774.0, 2616.0, -1274.0, 251.0].map(|c| c / 720.0);
+        assert_weights(&[0.0, -1.0, -2.0, -3.0, -4.0], &ab5);
+        // Adams and Moulton with 1 to 5 points.
+        assert_weights(&[1.0], &[1.0]);
+        assert_weights(&[1.0, 0.0], &[0.5, 0.5]);
+        assert_weights(&[1.0, 0.0, -1.0], &[5.0 / 12.0, 8.0 / 12.0, -1.0 / 12.0]);
+        assert_weights(
+            &[1.0, 0.0, -1.0, -2.0],
+            &[9.0 / 24.0, 19.0 / 24.0, -5.0 / 24.0, 1.0 / 24.0],
+        );
+        let am5 = [251.0, 646.0, -264.0, 106.0, -19.0].map(|c| c / 720.0);
+        assert_weights(&[1.0, 0.0, -1.0, -2.0, -3.0], &am5);
+    }
+
+    #[test]
+    fn weights_on_uneven_nodes_integrate_polynomials_of_degree_12() {
+        let nodes = [
+            1.0, 0.0, -0.3, -0.7, -1.0, -1.2, -1.6, -1.9, -2.3, -2.6, -2.8, -3.1, -3.5,
+        ];
+        let w = adams_weights(&nodes);
+        for p in [0, 1, 5, 12] {
+            let terms: Vec<f64> = w.iter().zip(&nodes).map(|(wj, x)| wj * x.powi(p)).collect();
+            let sum: f64 = terms.iter().sum();
+            let scale: f64 = terms.iter().map(|v| v.abs()).sum();
+            let exact = 1.0 / f64::from(p + 1);
+            assert!(
+                (sum - exact).abs() <= 1e-12 * (1.0 + scale),
+                "degree {p}: {sum} vs {exact}"
+            );
+        }
+    }
+
+    struct Oscillator;
+
+    impl OdeSystem for Oscillator {
+        fn eval<S: Real>(&self, _t: S, y: &[S], _theta: &[S]) -> Vec<S> {
+            vec![y[1], -y[0]]
+        }
+    }
+
+    #[test]
+    fn adams_raises_its_order_on_a_smooth_problem() {
+        let (y, stats) = adams(
+            "ode_adams",
+            &Oscillator,
+            &[1.0, 0.0],
+            0.0,
+            &[10.0],
+            &[],
+            &OdeOptions::STIFF,
+        )
+        .unwrap();
+        assert!((y[0][0] - 10f64.cos()).abs() < 1e-7, "{}", y[0][0]);
+        assert!((y[0][1] + 10f64.sin()).abs() < 1e-7, "{}", y[0][1]);
+        // A fourth order method needs thousands of steps here at a tolerance of 1e-10.
+        assert!(stats.max_order >= 6, "{stats:?}");
+        assert!(stats.accepted < 2000, "{stats:?}");
+    }
 }

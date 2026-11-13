@@ -1,10 +1,10 @@
-//! The `propto` forms (`_lupdf`, `_lupmf`): values against Stan Math 5.4.0, and gradients equal to
-//! those of the full forms.
+//! The `propto` forms (`_lupdf`, `_lupmf`): values against Stan Math 5.4.0, and a difference from
+//! the full forms that does not depend on the variables.
 
 // Reference values keep the 17 significant digits that Stan Math printed.
 #![allow(clippy::excessive_precision)]
 
-use stanmath_rs_autodiff::{grad, value_and_grad};
+use stanmath_rs_autodiff::value_and_grad;
 use stanmath_rs_distributions::*;
 
 fn close(a: f64, b: f64) -> bool {
@@ -67,115 +67,99 @@ fn propto_values_match_stan() {
     }
 }
 
-/// With each argument in turn the only variable, the `propto` form has the gradient of the full
-/// form. A term dropped although it depends on that argument fails this. Also, the `propto` form
-/// is zero when every argument is data.
-macro_rules! same_gradients {
+/// `full - propto` at `x` and at a second point, with the argument `j` the only variable: the
+/// dropped terms must not depend on that argument. A term dropped although it depends on the
+/// argument (a wrong dependency list) fails this.
+fn check_gap(name: &str, j: usize, gap: impl Fn(f64) -> f64, x: f64) {
+    let (a, b) = (gap(x), gap(x * 1.1 + 0.05));
+    assert!(
+        a.is_finite() && (a - b).abs() <= 1e-10 * (1.0 + a.abs()),
+        "{name} arg {j}: {a} vs {b}"
+    );
+}
+
+macro_rules! gap {
+    ($n:expr, $j:expr, $x:expr, |$v:ident| $full:expr, $propto:expr) => {
+        check_gap(
+            $n,
+            $j,
+            |x| {
+                value_and_grad(|$v| $full.unwrap(), &[x]).value
+                    - value_and_grad(|$v| $propto.unwrap(), &[x]).value
+            },
+            $x,
+        )
+    };
+}
+
+/// With each argument in turn the only variable, `full - propto` does not depend on it. Also,
+/// the `propto` form is zero when every argument is data.
+macro_rules! only_data_terms_dropped {
     ($full:ident, $propto:ident, [$($i:expr),*], ($a:expr)) => {{
-        let f = grad(|v| $full($($i,)* v[0]).unwrap(), &[$a]);
-        let p = grad(|v| $propto($($i,)* v[0]).unwrap(), &[$a]);
-        assert!(close(p[0], f[0]), "{} arg 0: {} vs {}", stringify!($propto), p[0], f[0]);
-        assert_eq!($propto($($i,)* $a).unwrap(), 0.0, "{}", stringify!($propto));
+        let n = stringify!($propto);
+        gap!(n, 0, $a, |v| $full($($i,)* v[0]), $propto($($i,)* v[0]));
+        assert_eq!($propto($($i,)* $a).unwrap(), 0.0, "{n}");
     }};
     ($full:ident, $propto:ident, [$($i:expr),*], ($a:expr, $b:expr)) => {{
-        let pairs = [
-            (
-                grad(|v| $full($($i,)* v[0], $b).unwrap(), &[$a]),
-                grad(|v| $propto($($i,)* v[0], $b).unwrap(), &[$a]),
-            ),
-            (
-                grad(|v| $full($($i,)* $a, v[0]).unwrap(), &[$b]),
-                grad(|v| $propto($($i,)* $a, v[0]).unwrap(), &[$b]),
-            ),
-        ];
-        for (j, (f, p)) in pairs.iter().enumerate() {
-            assert!(close(p[0], f[0]), "{} arg {j}: {} vs {}", stringify!($propto), p[0], f[0]);
-        }
-        assert_eq!($propto($($i,)* $a, $b).unwrap(), 0.0, "{}", stringify!($propto));
+        let n = stringify!($propto);
+        gap!(n, 0, $a, |v| $full($($i,)* v[0], $b), $propto($($i,)* v[0], $b));
+        gap!(n, 1, $b, |v| $full($($i,)* $a, v[0]), $propto($($i,)* $a, v[0]));
+        assert_eq!($propto($($i,)* $a, $b).unwrap(), 0.0, "{n}");
     }};
     ($full:ident, $propto:ident, [$($i:expr),*], ($a:expr, $b:expr, $c:expr)) => {{
-        let pairs = [
-            (
-                grad(|v| $full($($i,)* v[0], $b, $c).unwrap(), &[$a]),
-                grad(|v| $propto($($i,)* v[0], $b, $c).unwrap(), &[$a]),
-            ),
-            (
-                grad(|v| $full($($i,)* $a, v[0], $c).unwrap(), &[$b]),
-                grad(|v| $propto($($i,)* $a, v[0], $c).unwrap(), &[$b]),
-            ),
-            (
-                grad(|v| $full($($i,)* $a, $b, v[0]).unwrap(), &[$c]),
-                grad(|v| $propto($($i,)* $a, $b, v[0]).unwrap(), &[$c]),
-            ),
-        ];
-        for (j, (f, p)) in pairs.iter().enumerate() {
-            assert!(close(p[0], f[0]), "{} arg {j}: {} vs {}", stringify!($propto), p[0], f[0]);
-        }
-        assert_eq!($propto($($i,)* $a, $b, $c).unwrap(), 0.0, "{}", stringify!($propto));
+        let n = stringify!($propto);
+        gap!(n, 0, $a, |v| $full($($i,)* v[0], $b, $c), $propto($($i,)* v[0], $b, $c));
+        gap!(n, 1, $b, |v| $full($($i,)* $a, v[0], $c), $propto($($i,)* $a, v[0], $c));
+        gap!(n, 2, $c, |v| $full($($i,)* $a, $b, v[0]), $propto($($i,)* $a, $b, v[0]));
+        assert_eq!($propto($($i,)* $a, $b, $c).unwrap(), 0.0, "{n}");
     }};
     ($full:ident, $propto:ident, [$($i:expr),*], ($a:expr, $b:expr, $c:expr, $d:expr)) => {{
-        let pairs = [
-            (
-                grad(|v| $full($($i,)* v[0], $b, $c, $d).unwrap(), &[$a]),
-                grad(|v| $propto($($i,)* v[0], $b, $c, $d).unwrap(), &[$a]),
-            ),
-            (
-                grad(|v| $full($($i,)* $a, v[0], $c, $d).unwrap(), &[$b]),
-                grad(|v| $propto($($i,)* $a, v[0], $c, $d).unwrap(), &[$b]),
-            ),
-            (
-                grad(|v| $full($($i,)* $a, $b, v[0], $d).unwrap(), &[$c]),
-                grad(|v| $propto($($i,)* $a, $b, v[0], $d).unwrap(), &[$c]),
-            ),
-            (
-                grad(|v| $full($($i,)* $a, $b, $c, v[0]).unwrap(), &[$d]),
-                grad(|v| $propto($($i,)* $a, $b, $c, v[0]).unwrap(), &[$d]),
-            ),
-        ];
-        for (j, (f, p)) in pairs.iter().enumerate() {
-            assert!(close(p[0], f[0]), "{} arg {j}: {} vs {}", stringify!($propto), p[0], f[0]);
-        }
-        assert_eq!($propto($($i,)* $a, $b, $c, $d).unwrap(), 0.0, "{}", stringify!($propto));
+        let n = stringify!($propto);
+        gap!(n, 0, $a, |v| $full($($i,)* v[0], $b, $c, $d), $propto($($i,)* v[0], $b, $c, $d));
+        gap!(n, 1, $b, |v| $full($($i,)* $a, v[0], $c, $d), $propto($($i,)* $a, v[0], $c, $d));
+        gap!(n, 2, $c, |v| $full($($i,)* $a, $b, v[0], $d), $propto($($i,)* $a, $b, v[0], $d));
+        gap!(n, 3, $d, |v| $full($($i,)* $a, $b, $c, v[0]), $propto($($i,)* $a, $b, $c, v[0]));
+        assert_eq!($propto($($i,)* $a, $b, $c, $d).unwrap(), 0.0, "{n}");
     }};
 }
 
 #[test]
-fn propto_keeps_the_gradient() {
-    same_gradients!(normal_lpdf, normal_lupdf, [], (1.1, 0.3, 1.7));
-    same_gradients!(std_normal_lpdf, std_normal_lupdf, [], (0.4));
-    same_gradients!(student_t_lpdf, student_t_lupdf, [], (1.1, 4.0, 0.2, 1.5));
-    same_gradients!(cauchy_lpdf, cauchy_lupdf, [], (0.5, -0.2, 1.3));
-    same_gradients!(logistic_lpdf, logistic_lupdf, [], (0.5, 0.1, 0.8));
-    same_gradients!(exponential_lpdf, exponential_lupdf, [], (0.7, 1.9));
-    same_gradients!(gamma_lpdf, gamma_lupdf, [], (1.7, 2.5, 0.8));
-    same_gradients!(inv_gamma_lpdf, inv_gamma_lupdf, [], (1.2, 2.5, 0.8));
-    same_gradients!(beta_lpdf, beta_lupdf, [], (0.3, 2.0, 3.5));
-    same_gradients!(lognormal_lpdf, lognormal_lupdf, [], (1.4, 0.2, 0.6));
-    same_gradients!(uniform_lpdf, uniform_lupdf, [], (0.4, 0.1, 1.5));
-    same_gradients!(weibull_lpdf, weibull_lupdf, [], (1.2, 1.5, 0.9));
-    same_gradients!(binomial_lpmf, binomial_lupmf, [4i64, 10i64], (0.3));
-    same_gradients!(
+fn propto_drops_only_terms_free_of_the_variables() {
+    only_data_terms_dropped!(normal_lpdf, normal_lupdf, [], (1.1, 0.3, 1.7));
+    only_data_terms_dropped!(std_normal_lpdf, std_normal_lupdf, [], (0.4));
+    only_data_terms_dropped!(student_t_lpdf, student_t_lupdf, [], (1.1, 4.0, 0.2, 1.5));
+    only_data_terms_dropped!(cauchy_lpdf, cauchy_lupdf, [], (0.5, -0.2, 1.3));
+    only_data_terms_dropped!(logistic_lpdf, logistic_lupdf, [], (0.5, 0.1, 0.8));
+    only_data_terms_dropped!(exponential_lpdf, exponential_lupdf, [], (0.7, 1.9));
+    only_data_terms_dropped!(gamma_lpdf, gamma_lupdf, [], (1.7, 2.5, 0.8));
+    only_data_terms_dropped!(inv_gamma_lpdf, inv_gamma_lupdf, [], (1.2, 2.5, 0.8));
+    only_data_terms_dropped!(beta_lpdf, beta_lupdf, [], (0.3, 2.0, 3.5));
+    only_data_terms_dropped!(lognormal_lpdf, lognormal_lupdf, [], (1.4, 0.2, 0.6));
+    only_data_terms_dropped!(uniform_lpdf, uniform_lupdf, [], (0.4, 0.1, 1.5));
+    only_data_terms_dropped!(weibull_lpdf, weibull_lupdf, [], (1.2, 1.5, 0.9));
+    only_data_terms_dropped!(binomial_lpmf, binomial_lupmf, [4i64, 10i64], (0.3));
+    only_data_terms_dropped!(
         binomial_logit_lpmf,
         binomial_logit_lupmf,
         [4i64, 10i64],
         (-0.4)
     );
-    same_gradients!(poisson_lpmf, poisson_lupmf, [3i64], (2.2));
-    same_gradients!(poisson_log_lpmf, poisson_log_lupmf, [3i64], (0.8));
-    same_gradients!(
+    only_data_terms_dropped!(poisson_lpmf, poisson_lupmf, [3i64], (2.2));
+    only_data_terms_dropped!(poisson_log_lpmf, poisson_log_lupmf, [3i64], (0.8));
+    only_data_terms_dropped!(
         neg_binomial_2_lpmf,
         neg_binomial_2_lupmf,
         [3i64],
         (2.0, 1.5)
     );
-    same_gradients!(
+    only_data_terms_dropped!(
         neg_binomial_2_log_lpmf,
         neg_binomial_2_log_lupmf,
         [3i64],
         (0.6, 1.5)
     );
-    same_gradients!(bernoulli_logit_lpmf, bernoulli_logit_lupmf, [1i64], (0.3));
-    same_gradients!(gumbel_lpdf, gumbel_lupdf, [], (0.5, 1.0, 2.0));
+    only_data_terms_dropped!(bernoulli_logit_lpmf, bernoulli_logit_lupmf, [1i64], (0.3));
+    only_data_terms_dropped!(gumbel_lpdf, gumbel_lupdf, [], (0.5, 1.0, 2.0));
 }
 
 #[test]

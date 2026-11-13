@@ -79,6 +79,29 @@ fn oscillator_sensitivities() {
     oscillator_gradient!(ode_bdf);
 }
 
+#[test]
+fn adams_is_accurate_at_its_default_tolerance() {
+    let omega = 1.3;
+    // Many output times, so that steps land on them and the history carries across them.
+    let ts: Vec<f64> = (1..=40).map(|i| 0.25 * f64::from(i)).collect();
+    let y = ode_adams(&Oscillator, &[1.0, 0.0], 0.0, &ts, &[omega]).unwrap();
+    for (yt, &t) in y.iter().zip(&ts) {
+        let (pos, vel) = ((omega * t).cos(), -omega * (omega * t).sin());
+        assert!(close(yt[0], pos, 1e-7), "t={t}: {} vs {pos}", yt[0]);
+        assert!(close(yt[1], vel, 1e-7), "t={t}: {} vs {vel}", yt[1]);
+    }
+    let t = 10.0;
+    let g = grad(
+        |th| {
+            let y0 = [Real::from_f64(1.0), Real::from_f64(0.0)];
+            ode_adams(&Oscillator, &y0, 0.0, &[2.5, t], th).unwrap()[1][0]
+        },
+        &[omega],
+    );
+    let want = -t * (omega * t).sin();
+    assert!(close(g[0], want, 1e-6), "{} vs {want}", g[0]);
+}
+
 /// `y' = -lambda (y - sin t) + cos t` with `y(0) = 1`: `y = sin t + exp(-lambda t)`, stiff for
 /// large `lambda`.
 struct Stiff;
