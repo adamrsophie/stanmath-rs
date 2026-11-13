@@ -746,7 +746,16 @@ impl Kernel<0, 3> for Weibull {
         param::positive_finite(Self::NAME, "sigma", sigma)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, alpha, sigma]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, alpha, sigma]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         if y.value() < 0.0 {
             if let Some(g) = grad {
                 *g = [S::zero(); 3];
@@ -760,7 +769,20 @@ impl Kernel<0, 3> for Weibull {
             g[1] = alpha.recip() + log_ratio * (-pow + 1.0);
             g[2] = alpha * (pow - 1.0) / sigma;
         }
-        alpha.ln() - sigma.ln() + multiply_log(alpha - 1.0, log_ratio) - pow
+        if keep.term(&[0, 1]) && keep.term(&[1, 2]) && keep.term(&[1]) {
+            return alpha.ln() - sigma.ln() + multiply_log(alpha - 1.0, log_ratio) - pow;
+        }
+        let mut lp = -pow;
+        if keep.term(&[1]) {
+            lp += alpha.ln();
+        }
+        if keep.term(&[0, 1]) {
+            lp += multiply_log(alpha - 1.0, y.ln());
+        }
+        if keep.term(&[1, 2]) {
+            lp -= alpha * sigma.ln();
+        }
+        lp
     }
 }
 

@@ -6,7 +6,7 @@ use stanmath_rs_core::special::HALF_LN_2PI;
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::{obs, param};
-use crate::kernel::{Kernel, sum_kernel, sum_kernel_propto};
+use crate::kernel::{Keep, Kernel, sum_kernel, sum_kernel_propto};
 
 pub(crate) struct NormalSufficient;
 
@@ -25,10 +25,15 @@ impl Kernel<1, 4> for NormalSufficient {
         param::positive_finite(F, "sigma", sigma)
     }
 
-    fn eval<S: Real>(
+    fn eval<S: Real>(ints: [i64; 1], x: [S; 4], grad: Option<&mut [S; 4]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
         [n]: [i64; 1],
         [y_bar, s_squared, mu, sigma]: [S; 4],
         grad: Option<&mut [S; 4]>,
+        keep: Keep<4>,
     ) -> S {
         let nf = n as f64;
         let diff = y_bar - mu;
@@ -42,7 +47,14 @@ impl Kernel<1, 4> for NormalSufficient {
             g[2] = d_mean;
             g[3] = (ss * inv_var - nf) / sigma;
         }
-        -(ss * inv_var * 0.5) - sigma.ln() * nf - HALF_LN_2PI * nf
+        let mut lp = -(ss * inv_var * 0.5);
+        if keep.term(&[3]) {
+            lp -= sigma.ln() * nf;
+        }
+        if keep.term(&[]) {
+            lp -= HALF_LN_2PI * nf;
+        }
+        lp
     }
 }
 

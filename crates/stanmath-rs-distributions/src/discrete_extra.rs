@@ -7,15 +7,15 @@
 //! hand; the special functions they use (`lbeta`, `beta_inc`) carry accurate derivative rules.
 
 use stanmath_rs_autodiff::functions::{
-    beta_inc, lbeta, log_Phi, log_diff_exp, log_inv_logit, log_sum_exp, log_sum_exp_slice, log1m,
-    log1m_exp, log1m_inv_logit, log1p,
+    beta_inc, lbeta, lgamma, log_Phi, log_diff_exp, log_inv_logit, log_sum_exp, log_sum_exp_slice,
+    log1m, log1m_exp, log1m_inv_logit, log1p,
 };
 use stanmath_rs_autodiff::{Arg, Broadcast, Dual, IntArg, Lift, Promoted, Real, broadcast_len};
 use stanmath_rs_core::{Error, Result};
 
 use crate::check::{obs, param};
 use crate::kernel::{
-    Kernel, drop_if_data, is_param, keep, sum_kernel, sum_kernel_propto, sum_terms,
+    Keep, Kernel, drop_if_data, is_param, keep, sum_kernel, sum_kernel_propto, sum_terms,
 };
 
 /// Tolerance for simplex checks, as Stan's `CONSTRAINT_TOLERANCE`.
@@ -75,12 +75,17 @@ fn int_len(name: &'static str, ints: &[&dyn IntArg]) -> Result<usize> {
 // Beta binomial
 
 /// `ln P(n)` of the beta binomial distribution: `C(N, n) B(n + α, N - n + β) / B(α, β)`.
-fn beta_binomial_density<S: Real>(n: i64, big_n: i64, [alpha, beta]: [S; 2]) -> S {
+fn beta_binomial_density<S: Real>(n: i64, big_n: i64, [alpha, beta]: [S; 2], keep: Keep<2>) -> S {
     if n < 0 || n > big_n {
         return S::from_f64(f64::NEG_INFINITY);
     }
     let (nf, mf) = (n as f64, (big_n - n) as f64);
-    S::from_f64(lchoose_int(big_n, n)) + lbeta(alpha + nf, beta + mf) - lbeta(alpha, beta)
+    let lp = lbeta(alpha + nf, beta + mf) - lbeta(alpha, beta);
+    if keep.term(&[]) {
+        lp + lchoose_int(big_n, n)
+    } else {
+        lp
+    }
 }
 
 fn check_beta_binomial(
@@ -104,11 +109,20 @@ impl Kernel<2, 2> for BetaBinomial {
         check_beta_binomial(Self::NAME, big_n, x)
     }
 
-    fn eval<S: Real>([n, big_n]: [i64; 2], x: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+    fn eval<S: Real>(ints: [i64; 2], x: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        [n, big_n]: [i64; 2],
+        x: [S; 2],
+        grad: Option<&mut [S; 2]>,
+        keep: Keep<2>,
+    ) -> S {
         if let Some(g) = grad {
-            dual_grad(x, g, |d| beta_binomial_density(n, big_n, d));
+            dual_grad(x, g, |d| beta_binomial_density(n, big_n, d, Keep::ALL));
         }
-        beta_binomial_density(n, big_n, x)
+        beta_binomial_density(n, big_n, x, keep)
     }
 }
 
@@ -148,7 +162,9 @@ where
 
 /// `ln sum_{k in ks} P(k)` for the beta binomial distribution.
 fn beta_binomial_log_sum<S: Real>(ks: core::ops::RangeInclusive<i64>, big_n: i64, x: [S; 2]) -> S {
-    let terms: Vec<S> = ks.map(|k| beta_binomial_density(k, big_n, x)).collect();
+    let terms: Vec<S> = ks
+        .map(|k| beta_binomial_density(k, big_n, x, Keep::ALL))
+        .collect();
     log_sum_exp_slice(&terms)
 }
 
@@ -289,12 +305,15 @@ where
 
 /// `ln P(n)` of the negative binomial with shape `α` and inverse scale `β`:
 /// `C(n + α - 1, n) (β / (1 + β))^α (1 / (1 + β))^n`.
-fn neg_binomial_density<S: Real>(n: i64, [alpha, beta]: [S; 2]) -> S {
+fn neg_binomial_density<S: Real>(n: i64, [alpha, beta]: [S; 2], keep: Keep<2>) -> S {
     let nf = n as f64;
-    // ln Γ(n + α) - ln Γ(n + 1) - ln Γ(α) = -ln(n + α) - ln B(α, n + 1)
-    let coef = -(alpha + nf).ln() - lbeta(alpha, S::from_f64(nf + 1.0));
     let tail = if n == 0 { S::zero() } else { log1p(beta) * nf };
-    coef - alpha * log1p(beta.recip()) - tail
+    let lp = -(alpha * log1p(beta.recip())) - tail;
+    if !keep.term(&[0]) {
+        return lp;
+    }
+    // ln Γ(n + α) - ln Γ(n + 1) - ln Γ(α) = -ln(n + α) - ln B(α, n + 1)
+    lp - (alpha + nf).ln() - lbeta(alpha, S::from_f64(nf + 1.0))
 }
 
 fn check_neg_binomial(
@@ -316,11 +335,20 @@ impl Kernel<1, 2> for NegBinomial {
         check_neg_binomial(Self::NAME, n, x)
     }
 
-    fn eval<S: Real>([n]: [i64; 1], x: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+    fn eval<S: Real>(ints: [i64; 1], x: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        [n]: [i64; 1],
+        x: [S; 2],
+        grad: Option<&mut [S; 2]>,
+        keep: Keep<2>,
+    ) -> S {
         if let Some(g) = grad {
-            dual_grad(x, g, |d| neg_binomial_density(n, d));
+            dual_grad(x, g, |d| neg_binomial_density(n, d, Keep::ALL));
         }
-        neg_binomial_density(n, x)
+        neg_binomial_density(n, x, keep)
     }
 }
 
@@ -392,10 +420,21 @@ where
 /// `ln P(n)` of the beta negative binomial: the number of failures before `r` successes when the
 /// success probability is `Beta(α, β)`,
 /// `Γ(n + r) / (n! Γ(r)) B(α + r, β + n) / B(α, β)`.
-fn beta_neg_binomial_density<S: Real>(n: i64, [r, alpha, beta]: [S; 3]) -> S {
+fn beta_neg_binomial_density<S: Real>(n: i64, [r, alpha, beta]: [S; 3], keep: Keep<3>) -> S {
     let nf = n as f64;
-    let coef = -(r + nf).ln() - lbeta(r, S::from_f64(nf + 1.0));
-    coef + lbeta(r + alpha, beta + nf) - lbeta(alpha, beta)
+    let mut lp = lbeta(r + alpha, beta + nf);
+    if keep.term(&[1, 2]) {
+        lp -= lbeta(alpha, beta);
+    }
+    // ln Γ(n + r) - ln Γ(n + 1) - ln Γ(r) = -ln(n + r) - ln B(r, n + 1), whose -ln Γ(n + 1)
+    // depends only on data.
+    if keep.term(&[]) {
+        lp - (r + nf).ln() - lbeta(r, S::from_f64(nf + 1.0))
+    } else if keep.term(&[0]) {
+        lp + lgamma(r + nf) - lgamma(r)
+    } else {
+        lp
+    }
 }
 
 fn check_beta_neg_binomial(
@@ -418,11 +457,20 @@ impl Kernel<1, 3> for BetaNegBinomial {
         check_beta_neg_binomial(Self::NAME, n, x)
     }
 
-    fn eval<S: Real>([n]: [i64; 1], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 1], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        [n]: [i64; 1],
+        x: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         if let Some(g) = grad {
-            dual_grad(x, g, |d| beta_neg_binomial_density(n, d));
+            dual_grad(x, g, |d| beta_neg_binomial_density(n, d, Keep::ALL));
         }
-        beta_neg_binomial_density(n, x)
+        beta_neg_binomial_density(n, x, keep)
     }
 }
 
@@ -460,7 +508,9 @@ where
 
 /// `ln P(X <= n)` of the beta negative binomial by summation of the mass function.
 fn beta_neg_binomial_log_cdf<S: Real>(n: i64, x: [S; 3]) -> S {
-    let terms: Vec<S> = (0..=n).map(|k| beta_neg_binomial_density(k, x)).collect();
+    let terms: Vec<S> = (0..=n)
+        .map(|k| beta_neg_binomial_density(k, x, Keep::ALL))
+        .collect();
     log_sum_exp_slice(&terms)
 }
 

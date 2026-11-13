@@ -130,7 +130,16 @@ impl Kernel<0, 4> for SkewNormal {
         check_skew_normal(Self::NAME, x)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, xi, omega, alpha]: [S; 4], grad: Option<&mut [S; 4]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 4], grad: Option<&mut [S; 4]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, xi, omega, alpha]: [S; 4],
+        grad: Option<&mut [S; 4]>,
+        keep: Keep<4>,
+    ) -> S {
         let inv_omega = omega.recip();
         let z = (y - xi) * inv_omega;
         let az = alpha * z;
@@ -143,7 +152,19 @@ impl Kernel<0, 4> for SkewNormal {
             g[2] = -(dz * z + 1.0) * inv_omega;
             g[3] = z * m;
         }
-        -(z.square() * 0.5) - omega.ln() - HALF_LN_2PI + LN_2 + log_Phi(az)
+        // ln Phi(alpha z) + ln 2 is Stan's ln erfc(-alpha z / sqrt 2), which depends on every
+        // argument.
+        let mut lp = log_Phi(az) + LN_2;
+        if keep.term(&[0, 1, 2]) {
+            lp -= z.square() * 0.5;
+        }
+        if keep.term(&[2]) {
+            lp -= omega.ln();
+        }
+        if keep.term(&[]) {
+            lp -= HALF_LN_2PI;
+        }
+        lp
     }
 }
 
@@ -200,7 +221,16 @@ impl Kernel<0, 3> for DoubleExponential {
         check_double_exponential(Self::NAME, x)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, mu, sigma]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, mu, sigma]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         let inv_sigma = sigma.recip();
         let diff = y - mu;
         // The derivative of |y - mu| is taken to be zero at y = mu.
@@ -217,7 +247,14 @@ impl Kernel<0, 3> for DoubleExponential {
             g[1] = inv_sigma * sign;
             g[2] = (abs * inv_sigma - 1.0) * inv_sigma;
         }
-        -sigma.ln() - abs * inv_sigma - LN_2
+        let mut lp = -(abs * inv_sigma);
+        if keep.term(&[2]) {
+            lp -= sigma.ln();
+        }
+        if keep.term(&[]) {
+            lp -= LN_2;
+        }
+        lp
     }
 }
 
@@ -270,7 +307,16 @@ impl Kernel<0, 3> for VonMises {
         param::nonnegative_finite(Self::NAME, "kappa", kappa)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, mu, kappa]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, mu, kappa]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         let d = y - mu;
         let c = d.cos();
         let log_i0 = log_modified_bessel_first_kind(S::zero(), kappa);
@@ -281,7 +327,14 @@ impl Kernel<0, 3> for VonMises {
             // d/dkappa ln I0(kappa) = I1(kappa) / I0(kappa)
             g[2] = c - (log_modified_bessel_first_kind(S::one(), kappa) - log_i0).exp();
         }
-        kappa * c - log_i0 - LN_2PI
+        let mut lp = kappa * c;
+        if keep.term(&[2]) {
+            lp -= log_i0;
+        }
+        if keep.term(&[]) {
+            lp -= LN_2PI;
+        }
+        lp
     }
 }
 
@@ -382,14 +435,30 @@ impl Kernel<0, 2> for Rayleigh {
         param::positive_finite(Self::NAME, "sigma", sigma)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, sigma]: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, sigma]: [S; 2],
+        grad: Option<&mut [S; 2]>,
+        keep: Keep<2>,
+    ) -> S {
         let inv_sigma = sigma.recip();
         let z = y * inv_sigma;
         if let Some(g) = grad {
             g[0] = y.recip() - z * inv_sigma;
             g[1] = (z.square() - 2.0) * inv_sigma;
         }
-        y.ln() - sigma.ln() * 2.0 - z.square() * 0.5
+        let mut lp = -(z.square() * 0.5);
+        if keep.term(&[0]) {
+            lp += y.ln();
+        }
+        if keep.term(&[1]) {
+            lp -= sigma.ln() * 2.0;
+        }
+        lp
     }
 }
 
@@ -432,7 +501,16 @@ impl Kernel<0, 3> for Pareto {
         param::positive_finite(Self::NAME, "alpha", alpha)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, y_min, alpha]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, y_min, alpha]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         if y.value() < y_min.value() {
             return neg_inf(grad);
         }
@@ -443,7 +521,17 @@ impl Kernel<0, 3> for Pareto {
             g[1] = alpha / y_min;
             g[2] = alpha.recip() + ln_y_min - ln_y;
         }
-        alpha.ln() + alpha * ln_y_min - (alpha + 1.0) * ln_y
+        let mut lp = S::zero();
+        if keep.term(&[2]) {
+            lp += alpha.ln();
+        }
+        if keep.term(&[1, 2]) {
+            lp += alpha * ln_y_min;
+        }
+        if keep.term(&[0, 2]) {
+            lp -= (alpha + 1.0) * ln_y;
+        }
+        lp
     }
 }
 
@@ -510,7 +598,16 @@ impl Kernel<0, 4> for ParetoType2 {
         check_pareto_type_2(Self::NAME, x)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, mu, lambda, alpha]: [S; 4], grad: Option<&mut [S; 4]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 4], grad: Option<&mut [S; 4]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, mu, lambda, alpha]: [S; 4],
+        grad: Option<&mut [S; 4]>,
+        keep: Keep<4>,
+    ) -> S {
         let diff = y - mu;
         let l1p = (diff / lambda).ln_1p();
         if let Some(g) = grad {
@@ -521,7 +618,14 @@ impl Kernel<0, 4> for ParetoType2 {
             g[2] = -lambda.recip() + a1 * diff * inv / lambda;
             g[3] = alpha.recip() - l1p;
         }
-        alpha.ln() - lambda.ln() - (alpha + 1.0) * l1p
+        let mut lp = -((alpha + 1.0) * l1p);
+        if keep.term(&[3]) {
+            lp += alpha.ln();
+        }
+        if keep.term(&[2]) {
+            lp -= lambda.ln();
+        }
+        lp
     }
 }
 
@@ -569,7 +673,16 @@ impl Kernel<0, 3> for Frechet {
         check_frechet(Self::NAME, x)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, alpha, sigma]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, alpha, sigma]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         let log_ratio = (sigma / y).ln();
         let p = (alpha * log_ratio).exp(); // (sigma / y)^alpha
         if let Some(g) = grad {
@@ -577,7 +690,17 @@ impl Kernel<0, 3> for Frechet {
             g[1] = alpha.recip() + log_ratio * (-p + 1.0);
             g[2] = alpha * (-p + 1.0) / sigma;
         }
-        alpha.ln() + alpha * sigma.ln() - (alpha + 1.0) * y.ln() - p
+        let mut lp = -p;
+        if keep.term(&[1]) {
+            lp += alpha.ln();
+        }
+        if keep.term(&[1, 2]) {
+            lp += alpha * sigma.ln();
+        }
+        if keep.term(&[0, 1]) {
+            lp -= (alpha + 1.0) * y.ln();
+        }
+        lp
     }
 }
 
@@ -690,14 +813,33 @@ impl Kernel<0, 2> for ChiSquare {
         check_chi_square(Self::NAME, x)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, nu]: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, nu]: [S; 2],
+        grad: Option<&mut [S; 2]>,
+        keep: Keep<2>,
+    ) -> S {
         let half_nu = nu * 0.5;
         let ln_y = y.ln();
         if let Some(g) = grad {
             g[0] = (half_nu - 1.0) / y - 0.5;
             g[1] = (ln_y - digamma(half_nu) - LN_2) * 0.5;
         }
-        multiply_log(half_nu - 1.0, ln_y) - y * 0.5 - half_nu * LN_2 - lgamma(half_nu)
+        let mut lp = S::zero();
+        if keep.term(&[0, 1]) {
+            lp += multiply_log(half_nu - 1.0, ln_y);
+        }
+        if keep.term(&[0]) {
+            lp -= y * 0.5;
+        }
+        if keep.term(&[1]) {
+            lp -= half_nu * LN_2 + lgamma(half_nu);
+        }
+        lp
     }
 }
 
@@ -741,7 +883,16 @@ impl Kernel<0, 2> for InvChiSquare {
         param::positive_finite(Self::NAME, "nu", nu)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, nu]: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, nu]: [S; 2],
+        grad: Option<&mut [S; 2]>,
+        keep: Keep<2>,
+    ) -> S {
         if y.value() <= 0.0 {
             return neg_inf(grad);
         }
@@ -752,7 +903,17 @@ impl Kernel<0, 2> for InvChiSquare {
             g[0] = -(half_nu + 1.0) * inv_y + inv_y.square() * 0.5;
             g[1] = -(digamma(half_nu) + ln_y + LN_2) * 0.5;
         }
-        -(half_nu * LN_2) - lgamma(half_nu) - (half_nu + 1.0) * ln_y - inv_y * 0.5
+        let mut lp = S::zero();
+        if keep.term(&[1]) {
+            lp -= half_nu * LN_2 + lgamma(half_nu);
+        }
+        if keep.term(&[0, 1]) {
+            lp -= (half_nu + 1.0) * ln_y;
+        }
+        if keep.term(&[0]) {
+            lp -= inv_y * 0.5;
+        }
+        lp
     }
 }
 
@@ -809,7 +970,16 @@ impl Kernel<0, 3> for ScaledInvChiSquare {
         param::positive_finite(Self::NAME, "s", s)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, nu, s]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, nu, s]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         if y.value() <= 0.0 {
             return neg_inf(grad);
         }
@@ -825,9 +995,17 @@ impl Kernel<0, 3> for ScaledInvChiSquare {
                 - s2 * inv_y * 0.5;
             g[2] = nu / s - nu * s * inv_y;
         }
-        half_nu * half_nu.ln() - lgamma(half_nu) + nu * ln_s
-            - (half_nu + 1.0) * ln_y
-            - half_nu * s2 * inv_y
+        let mut lp = -(half_nu * s2 * inv_y);
+        if keep.term(&[1]) {
+            lp += half_nu * half_nu.ln() - lgamma(half_nu);
+        }
+        if keep.term(&[1, 2]) {
+            lp += nu * ln_s;
+        }
+        if keep.term(&[0, 1]) {
+            lp -= (half_nu + 1.0) * ln_y;
+        }
+        lp
     }
 }
 
@@ -892,7 +1070,16 @@ impl Kernel<0, 4> for ExpModNormal {
         check_exp_mod_normal(Self::NAME, x)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, mu, sigma, lambda]: [S; 4], grad: Option<&mut [S; 4]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 4], grad: Option<&mut [S; 4]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, mu, sigma, lambda]: [S; 4],
+        grad: Option<&mut [S; 4]>,
+        keep: Keep<4>,
+    ) -> S {
         // ln f = ln lambda + lambda (mu - y) + lambda^2 sigma^2 / 2 + ln Phi(-v),
         // v = (mu + lambda sigma^2 - y) / sigma, using erfc(v / sqrt 2) = 2 Phi(-v).
         let inv_sigma = sigma.recip();
@@ -905,7 +1092,15 @@ impl Kernel<0, 4> for ExpModNormal {
             g[2] = lambda.square() * sigma - m * (lambda * 2.0 - v * inv_sigma);
             g[3] = lambda.recip() + (mu - y) + lambda * sigma.square() - m * sigma;
         }
-        lambda.ln() + lambda * (mu - y) + (lambda * sigma).square() * 0.5 + log_Phi(-v)
+        let mut lp = lambda * (mu - y) + (lambda * sigma).square() * 0.5 + log_Phi(-v);
+        if keep.term(&[3]) {
+            lp += lambda.ln();
+        }
+        // Stan writes ln Phi(-v) as ln erfc(v / sqrt 2) - ln 2 and drops the constant.
+        if !keep.term(&[]) {
+            lp += LN_2;
+        }
+        lp
     }
 }
 
@@ -980,7 +1175,16 @@ impl Kernel<0, 4> for SkewDoubleExponential {
         check_skew_double_exponential(Self::NAME, x)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, mu, sigma, tau]: [S; 4], grad: Option<&mut [S; 4]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 4], grad: Option<&mut [S; 4]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, mu, sigma, tau]: [S; 4],
+        grad: Option<&mut [S; 4]>,
+        keep: Keep<4>,
+    ) -> S {
         // ln f = ln 2 + ln tau + ln(1 - tau) - ln sigma - 2 w k / sigma, where k = |y - mu| and
         // w = 1 - tau below mu, tau above.
         let inv_sigma = sigma.recip();
@@ -998,7 +1202,17 @@ impl Kernel<0, 4> for SkewDoubleExponential {
             g[2] = (w * k * inv_sigma * 2.0 - 1.0) * inv_sigma;
             g[3] = tau.recip() - (-tau + 1.0).recip() - k * inv_sigma * (2.0 * dir);
         }
-        tau.ln() + log1m(tau) - sigma.ln() - w * k * inv_sigma * 2.0 + LN_2
+        let mut lp = -(w * k * inv_sigma * 2.0);
+        if keep.term(&[3]) {
+            lp += tau.ln() + log1m(tau);
+        }
+        if keep.term(&[2]) {
+            lp -= sigma.ln();
+        }
+        if keep.term(&[]) {
+            lp += LN_2;
+        }
+        lp
     }
 }
 
@@ -1062,7 +1276,16 @@ impl Kernel<0, 3> for LogLogistic {
         param::positive_finite(Self::NAME, "beta", beta)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, alpha, beta]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, alpha, beta]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         let r = (y / alpha).ln();
         let br = beta * r;
         if let Some(g) = grad {
@@ -1072,7 +1295,20 @@ impl Kernel<0, 3> for LogLogistic {
             g[1] = beta * (s * 2.0 - 1.0) / alpha;
             g[2] = beta.recip() + r * (-(s * 2.0) + 1.0);
         }
-        beta.ln() - alpha.ln() + (beta - 1.0) * r - log1p_exp(br) * 2.0
+        let mut lp = -(log1p_exp(br) * 2.0);
+        if keep.term(&[2]) {
+            lp += beta.ln();
+        }
+        if keep.term(&[1]) {
+            lp -= alpha.ln();
+        }
+        match (keep.term(&[0, 2]), keep.term(&[1, 2])) {
+            (true, true) => lp += (beta - 1.0) * r,
+            (true, false) => lp += (beta - 1.0) * y.ln(),
+            (false, true) => lp -= (beta - 1.0) * alpha.ln(),
+            (false, false) => {}
+        }
+        lp
     }
 }
 
@@ -1126,7 +1362,16 @@ impl Kernel<0, 3> for BetaProportion {
         check_beta_proportion(Self::NAME, x)
     }
 
-    fn eval<S: Real>(_: [i64; 0], [y, mu, kappa]: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+    fn eval<S: Real>(ints: [i64; 0], x: [S; 3], grad: Option<&mut [S; 3]>) -> S {
+        Self::eval_propto(ints, x, grad, Keep::ALL)
+    }
+
+    fn eval_propto<S: Real>(
+        _: [i64; 0],
+        [y, mu, kappa]: [S; 3],
+        grad: Option<&mut [S; 3]>,
+        keep: Keep<3>,
+    ) -> S {
         let a = mu * kappa;
         let b = (-mu + 1.0) * kappa;
         let ln_y = y.ln();
@@ -1138,7 +1383,14 @@ impl Kernel<0, 3> for BetaProportion {
             g[1] = kappa * (da - db);
             g[2] = mu * da + (-mu + 1.0) * db;
         }
-        multiply_log(a - 1.0, ln_y) + multiply_log(b - 1.0, ln_1my) - lbeta(a, b)
+        let mut lp = multiply_log(a - 1.0, ln_y) + multiply_log(b - 1.0, ln_1my);
+        // -ln B(a, b) = ln Γ(kappa) - ln Γ(a) - ln Γ(b), each part kept by its own arguments.
+        if keep.term(&[2]) {
+            lp -= lbeta(a, b);
+        } else if keep.term(&[1]) {
+            lp -= lgamma(a) + lgamma(b);
+        }
+        lp
     }
 }
 
