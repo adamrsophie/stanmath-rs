@@ -7,7 +7,11 @@
 //! Math by `stan_reference.rs` and `stan_reference_extra.rs`.
 //!
 //! Left to the Stan reference tests: bernoulli_logit_glm_lpmf, binomial_logit_glm_lpmf, categorical_logit_glm_lpmf, categorical_logit_lpmf, categorical_lpmf, dirichlet_lpdf, dirichlet_multinomial_lpmf, gaussian_dlm_obs_lpdf, inv_wishart_cholesky_lpdf, inv_wishart_lpdf, lkj_corr_cholesky_lpdf, lkj_corr_lpdf, lkj_cov_lpdf, multi_gp_cholesky_lpdf, multi_gp_lpdf, multi_normal_cholesky_lpdf, multi_normal_lpdf, multi_normal_prec_lpdf, multi_student_t_cholesky_lpdf, multi_student_t_lpdf, multinomial_logit_lpmf, multinomial_lpmf, neg_binomial_2_log_glm_lpmf, normal_id_glm_lpdf, ordered_logistic_glm_lpmf, ordered_logistic_lpmf, ordered_probit_lpmf, poisson_binomial_cdf, poisson_binomial_lccdf, poisson_binomial_lcdf, poisson_binomial_lpmf, poisson_log_glm_lpmf, wishart_cholesky_lpdf, wishart_lpdf.
-#![allow(clippy::too_many_lines, clippy::unreadable_literal)]
+#![allow(
+    clippy::too_many_lines,
+    clippy::unreadable_literal,
+    clippy::identity_op
+)]
 
 use stanmath_rs_autodiff::{ValueAndGrad, try_value_and_grad};
 use stanmath_rs_core::Result;
@@ -57,7 +61,7 @@ fn bernoulli_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= bernoulli_cdf(1i64, x[0])?;
                 }
                 Ok(acc)
@@ -89,7 +93,7 @@ fn bernoulli_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc *= bernoulli_cdf(1i64, x[0])?;
                 }
                 Ok(acc)
@@ -128,7 +132,7 @@ fn bernoulli_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += bernoulli_lccdf(0i64, x[0])?;
                 }
                 Ok(acc)
@@ -160,7 +164,7 @@ fn bernoulli_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += bernoulli_lccdf(0i64, x[0])?;
                 }
                 Ok(acc)
@@ -199,7 +203,7 @@ fn bernoulli_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += bernoulli_lcdf(1i64, x[0])?;
                 }
                 Ok(acc)
@@ -231,7 +235,7 @@ fn bernoulli_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += bernoulli_lcdf(1i64, x[0])?;
                 }
                 Ok(acc)
@@ -270,7 +274,7 @@ fn bernoulli_logit_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += bernoulli_logit_lpmf(1i64, x[0])?;
                 }
                 Ok(acc)
@@ -302,7 +306,7 @@ fn bernoulli_logit_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += bernoulli_logit_lpmf(1i64, x[0])?;
                 }
                 Ok(acc)
@@ -341,7 +345,7 @@ fn bernoulli_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += bernoulli_lpmf(1i64, x[0])?;
                 }
                 Ok(acc)
@@ -373,7 +377,7 @@ fn bernoulli_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += bernoulli_lpmf(1i64, x[0])?;
                 }
                 Ok(acc)
@@ -412,7 +416,7 @@ fn beta_binomial_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= beta_binomial_cdf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -496,7 +500,7 @@ fn beta_binomial_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc *= beta_binomial_cdf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -589,7 +593,7 @@ fn beta_binomial_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc *= beta_binomial_cdf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -685,7 +689,7 @@ fn beta_binomial_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc *= beta_binomial_cdf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -780,7 +784,7 @@ fn beta_binomial_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += beta_binomial_lccdf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -867,7 +871,7 @@ fn beta_binomial_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += beta_binomial_lccdf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -963,7 +967,7 @@ fn beta_binomial_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += beta_binomial_lccdf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -1059,7 +1063,7 @@ fn beta_binomial_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += beta_binomial_lccdf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -1159,7 +1163,7 @@ fn beta_binomial_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += beta_binomial_lcdf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -1246,7 +1250,7 @@ fn beta_binomial_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += beta_binomial_lcdf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -1342,7 +1346,7 @@ fn beta_binomial_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += beta_binomial_lcdf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -1438,7 +1442,7 @@ fn beta_binomial_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += beta_binomial_lcdf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -1538,7 +1542,7 @@ fn beta_binomial_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += beta_binomial_lpmf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -1625,7 +1629,7 @@ fn beta_binomial_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += beta_binomial_lpmf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -1721,7 +1725,7 @@ fn beta_binomial_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += beta_binomial_lpmf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -1817,7 +1821,7 @@ fn beta_binomial_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += beta_binomial_lpmf(3i64, 10i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -1917,7 +1921,7 @@ fn beta_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= beta_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -2052,7 +2056,7 @@ fn beta_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += beta_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -2187,7 +2191,7 @@ fn beta_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += beta_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -2322,7 +2326,7 @@ fn beta_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += beta_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -2457,7 +2461,7 @@ fn beta_neg_binomial_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= beta_neg_binomial_cdf(3i64, x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -2666,7 +2670,7 @@ fn beta_neg_binomial_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc *= beta_neg_binomial_cdf(3i64, x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -2888,7 +2892,7 @@ fn beta_neg_binomial_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += beta_neg_binomial_lccdf(3i64, x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -3097,7 +3101,7 @@ fn beta_neg_binomial_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += beta_neg_binomial_lccdf(3i64, x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -3319,7 +3323,7 @@ fn beta_neg_binomial_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += beta_neg_binomial_lcdf(3i64, x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -3528,7 +3532,7 @@ fn beta_neg_binomial_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += beta_neg_binomial_lcdf(3i64, x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -3750,7 +3754,7 @@ fn beta_neg_binomial_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += beta_neg_binomial_lpmf(3i64, x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -3959,7 +3963,7 @@ fn beta_neg_binomial_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += beta_neg_binomial_lpmf(3i64, x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -4181,7 +4185,7 @@ fn beta_proportion_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += beta_proportion_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -4377,7 +4381,7 @@ fn beta_proportion_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += beta_proportion_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -4573,7 +4577,7 @@ fn beta_proportion_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += beta_proportion_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -4769,7 +4773,7 @@ fn binomial_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= binomial_cdf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -4801,7 +4805,7 @@ fn binomial_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc *= binomial_cdf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -4833,7 +4837,7 @@ fn binomial_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc *= binomial_cdf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -4865,7 +4869,7 @@ fn binomial_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc *= binomial_cdf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -4907,7 +4911,7 @@ fn binomial_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += binomial_lccdf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -4944,7 +4948,7 @@ fn binomial_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += binomial_lccdf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -4976,7 +4980,7 @@ fn binomial_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += binomial_lccdf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -5011,7 +5015,7 @@ fn binomial_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += binomial_lccdf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -5053,7 +5057,7 @@ fn binomial_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += binomial_lcdf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -5085,7 +5089,7 @@ fn binomial_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += binomial_lcdf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -5117,7 +5121,7 @@ fn binomial_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += binomial_lcdf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -5149,7 +5153,7 @@ fn binomial_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += binomial_lcdf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -5191,7 +5195,7 @@ fn binomial_logit_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += binomial_logit_lpmf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -5233,7 +5237,7 @@ fn binomial_logit_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += binomial_logit_lpmf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -5270,7 +5274,7 @@ fn binomial_logit_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += binomial_logit_lpmf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -5310,7 +5314,7 @@ fn binomial_logit_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += binomial_logit_lpmf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -5352,7 +5356,7 @@ fn binomial_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += binomial_lpmf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -5384,7 +5388,7 @@ fn binomial_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += binomial_lpmf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -5416,7 +5420,7 @@ fn binomial_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += binomial_lpmf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -5448,7 +5452,7 @@ fn binomial_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += binomial_lpmf(3i64, 10i64, x[0])?;
                 }
                 Ok(acc)
@@ -5490,7 +5494,7 @@ fn cauchy_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= cauchy_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -5625,7 +5629,7 @@ fn cauchy_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += cauchy_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -5760,7 +5764,7 @@ fn cauchy_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += cauchy_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -5895,7 +5899,7 @@ fn cauchy_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += cauchy_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -6030,7 +6034,7 @@ fn chi_square_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= chi_square_cdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -6101,7 +6105,7 @@ fn chi_square_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += chi_square_lccdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -6172,7 +6176,7 @@ fn chi_square_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += chi_square_lcdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -6243,7 +6247,7 @@ fn chi_square_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += chi_square_lpdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -6693,7 +6697,7 @@ fn double_exponential_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= double_exponential_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -6863,7 +6867,7 @@ fn double_exponential_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += double_exponential_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -7041,7 +7045,7 @@ fn double_exponential_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += double_exponential_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -7219,7 +7223,7 @@ fn double_exponential_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += double_exponential_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -7397,7 +7401,7 @@ fn exp_mod_normal_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= exp_mod_normal_cdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -7828,7 +7832,7 @@ fn exp_mod_normal_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += exp_mod_normal_lccdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -8259,7 +8263,7 @@ fn exp_mod_normal_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += exp_mod_normal_lcdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -8690,7 +8694,7 @@ fn exp_mod_normal_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += exp_mod_normal_lpdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -9121,7 +9125,7 @@ fn exponential_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= exponential_cdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -9192,7 +9196,7 @@ fn exponential_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += exponential_lccdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -9263,7 +9267,7 @@ fn exponential_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += exponential_lcdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -9334,7 +9338,7 @@ fn exponential_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += exponential_lpdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -9405,7 +9409,7 @@ fn frechet_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= frechet_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -9540,7 +9544,7 @@ fn frechet_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += frechet_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -9675,7 +9679,7 @@ fn frechet_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += frechet_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -9810,7 +9814,7 @@ fn frechet_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += frechet_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -9945,7 +9949,7 @@ fn gamma_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= gamma_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -10080,7 +10084,7 @@ fn gamma_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += gamma_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -10215,7 +10219,7 @@ fn gamma_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += gamma_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -10350,7 +10354,7 @@ fn gamma_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += gamma_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -10485,7 +10489,7 @@ fn gumbel_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= gumbel_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -10620,7 +10624,7 @@ fn gumbel_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += gumbel_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -10755,7 +10759,7 @@ fn gumbel_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += gumbel_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -10890,7 +10894,7 @@ fn gumbel_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += gumbel_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -11045,7 +11049,7 @@ fn inv_chi_square_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= inv_chi_square_cdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -11116,7 +11120,7 @@ fn inv_chi_square_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += inv_chi_square_lccdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -11187,7 +11191,7 @@ fn inv_chi_square_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += inv_chi_square_lcdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -11258,7 +11262,7 @@ fn inv_chi_square_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += inv_chi_square_lpdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -11329,7 +11333,7 @@ fn inv_gamma_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= inv_gamma_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -11464,7 +11468,7 @@ fn inv_gamma_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += inv_gamma_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -11604,7 +11608,7 @@ fn inv_gamma_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += inv_gamma_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -11744,7 +11748,7 @@ fn inv_gamma_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += inv_gamma_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -11884,7 +11888,7 @@ fn logistic_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= logistic_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -12019,7 +12023,7 @@ fn logistic_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += logistic_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -12159,7 +12163,7 @@ fn logistic_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += logistic_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -12294,7 +12298,7 @@ fn logistic_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += logistic_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -12429,7 +12433,7 @@ fn loglogistic_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= loglogistic_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -12569,7 +12573,7 @@ fn loglogistic_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += loglogistic_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -12709,7 +12713,7 @@ fn lognormal_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= lognormal_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -12870,7 +12874,7 @@ fn lognormal_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += lognormal_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -13036,7 +13040,7 @@ fn lognormal_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += lognormal_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -13202,7 +13206,7 @@ fn lognormal_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += lognormal_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -13368,7 +13372,7 @@ fn neg_binomial_2_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= neg_binomial_2_cdf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -13447,7 +13451,7 @@ fn neg_binomial_2_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc *= neg_binomial_2_cdf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -13526,7 +13530,7 @@ fn neg_binomial_2_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += neg_binomial_2_lccdf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -13610,7 +13614,7 @@ fn neg_binomial_2_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += neg_binomial_2_lccdf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -13699,7 +13703,7 @@ fn neg_binomial_2_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += neg_binomial_2_lcdf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -13778,7 +13782,7 @@ fn neg_binomial_2_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += neg_binomial_2_lcdf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -13857,7 +13861,7 @@ fn neg_binomial_2_log_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += neg_binomial_2_log_lpmf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -13941,7 +13945,7 @@ fn neg_binomial_2_log_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += neg_binomial_2_log_lpmf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -14041,7 +14045,7 @@ fn neg_binomial_2_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += neg_binomial_2_lpmf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -14120,7 +14124,7 @@ fn neg_binomial_2_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += neg_binomial_2_lpmf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -14199,7 +14203,7 @@ fn neg_binomial_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= neg_binomial_cdf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -14268,7 +14272,7 @@ fn neg_binomial_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc *= neg_binomial_cdf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -14339,7 +14343,7 @@ fn neg_binomial_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += neg_binomial_lccdf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -14418,7 +14422,7 @@ fn neg_binomial_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += neg_binomial_lccdf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -14497,7 +14501,7 @@ fn neg_binomial_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += neg_binomial_lcdf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -14576,7 +14580,7 @@ fn neg_binomial_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += neg_binomial_lcdf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -14655,7 +14659,7 @@ fn neg_binomial_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += neg_binomial_lpmf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -14734,7 +14738,7 @@ fn neg_binomial_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += neg_binomial_lpmf(3i64, x[0], x[1])?;
                 }
                 Ok(acc)
@@ -14813,7 +14817,7 @@ fn normal_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= normal_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -14948,7 +14952,7 @@ fn normal_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += normal_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -15083,7 +15087,7 @@ fn normal_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += normal_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -15218,7 +15222,7 @@ fn normal_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += normal_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -15353,7 +15357,7 @@ fn pareto_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= pareto_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -15488,7 +15492,7 @@ fn pareto_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += pareto_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -15623,7 +15627,7 @@ fn pareto_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += pareto_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -15758,7 +15762,7 @@ fn pareto_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += pareto_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -15893,7 +15897,7 @@ fn pareto_type_2_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= pareto_type_2_cdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -16248,7 +16252,7 @@ fn pareto_type_2_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += pareto_type_2_lccdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -16608,7 +16612,7 @@ fn pareto_type_2_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += pareto_type_2_lcdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -16968,7 +16972,7 @@ fn pareto_type_2_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += pareto_type_2_lpdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -17328,7 +17332,7 @@ fn poisson_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= poisson_cdf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -17360,7 +17364,7 @@ fn poisson_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc *= poisson_cdf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -17399,7 +17403,7 @@ fn poisson_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += poisson_lccdf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -17431,7 +17435,7 @@ fn poisson_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += poisson_lccdf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -17470,7 +17474,7 @@ fn poisson_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += poisson_lcdf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -17502,7 +17506,7 @@ fn poisson_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += poisson_lcdf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -17541,7 +17545,7 @@ fn poisson_log_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += poisson_log_lpmf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -17573,7 +17577,7 @@ fn poisson_log_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += poisson_log_lpmf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -17612,7 +17616,7 @@ fn poisson_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += poisson_lpmf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -17644,7 +17648,7 @@ fn poisson_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += poisson_lpmf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -17683,7 +17687,7 @@ fn rayleigh_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= rayleigh_cdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -17754,7 +17758,7 @@ fn rayleigh_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += rayleigh_lccdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -17825,7 +17829,7 @@ fn rayleigh_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += rayleigh_lcdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -17896,7 +17900,7 @@ fn rayleigh_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += rayleigh_lpdf(x[0], x[1])?;
                 }
                 Ok(acc)
@@ -17967,7 +17971,7 @@ fn scaled_inv_chi_square_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= scaled_inv_chi_square_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -18171,7 +18175,7 @@ fn scaled_inv_chi_square_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += scaled_inv_chi_square_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -18384,7 +18388,7 @@ fn scaled_inv_chi_square_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += scaled_inv_chi_square_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -18588,7 +18592,7 @@ fn scaled_inv_chi_square_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += scaled_inv_chi_square_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -18792,7 +18796,7 @@ fn skew_double_exponential_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= skew_double_exponential_cdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -19185,7 +19189,7 @@ fn skew_double_exponential_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += skew_double_exponential_lccdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -19575,7 +19579,7 @@ fn skew_double_exponential_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += skew_double_exponential_lcdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -19965,7 +19969,7 @@ fn skew_double_exponential_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += skew_double_exponential_lpdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -20355,7 +20359,7 @@ fn skew_normal_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= skew_normal_cdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -20698,7 +20702,7 @@ fn skew_normal_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += skew_normal_lccdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -21053,7 +21057,7 @@ fn skew_normal_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += skew_normal_lcdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -21405,7 +21409,7 @@ fn skew_normal_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += skew_normal_lpdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -21757,7 +21761,7 @@ fn std_normal_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= std_normal_cdf(x[0])?;
                 }
                 Ok(acc)
@@ -21796,7 +21800,7 @@ fn std_normal_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += std_normal_lccdf(x[0])?;
                 }
                 Ok(acc)
@@ -21835,7 +21839,7 @@ fn std_normal_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += std_normal_lcdf(x[0])?;
                 }
                 Ok(acc)
@@ -21874,7 +21878,7 @@ fn std_normal_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += std_normal_lpdf(x[0])?;
                 }
                 Ok(acc)
@@ -21913,7 +21917,7 @@ fn student_t_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= student_t_cdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -22236,7 +22240,7 @@ fn student_t_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += student_t_lccdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -22579,7 +22583,7 @@ fn student_t_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += student_t_lcdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -22902,7 +22906,7 @@ fn student_t_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += student_t_lpdf(x[0], x[1], x[2], x[3])?;
                 }
                 Ok(acc)
@@ -23225,7 +23229,7 @@ fn uniform_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= uniform_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -23360,7 +23364,7 @@ fn uniform_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += uniform_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -23495,7 +23499,7 @@ fn uniform_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += uniform_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -23630,7 +23634,7 @@ fn uniform_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += uniform_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -23765,7 +23769,7 @@ fn von_mises_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= von_mises_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -23900,7 +23904,7 @@ fn von_mises_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += von_mises_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -24040,7 +24044,7 @@ fn von_mises_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += von_mises_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -24180,7 +24184,7 @@ fn von_mises_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += von_mises_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -24320,7 +24324,7 @@ fn weibull_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= weibull_cdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -24455,7 +24459,7 @@ fn weibull_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += weibull_lccdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -24590,7 +24594,7 @@ fn weibull_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += weibull_lcdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -24725,7 +24729,7 @@ fn weibull_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += weibull_lpdf(x[0], x[1], x[2])?;
                 }
                 Ok(acc)
@@ -24860,7 +24864,7 @@ fn wiener_lpdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += wiener_lpdf(x[0], x[1], x[2], x[3], x[4])?;
                 }
                 Ok(acc)
@@ -25784,7 +25788,7 @@ fn yule_simon_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc *= yule_simon_cdf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -25816,7 +25820,7 @@ fn yule_simon_cdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc *= yule_simon_cdf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -25855,7 +25859,7 @@ fn yule_simon_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += yule_simon_lccdf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -25887,7 +25891,7 @@ fn yule_simon_lccdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += yule_simon_lccdf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -25926,7 +25930,7 @@ fn yule_simon_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += yule_simon_lcdf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -25958,7 +25962,7 @@ fn yule_simon_lcdf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += yule_simon_lcdf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -25997,7 +26001,7 @@ fn yule_simon_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..1 {
+                for _i in 0..1 {
                     acc += yule_simon_lpmf(3i64, x[0])?;
                 }
                 Ok(acc)
@@ -26029,7 +26033,7 @@ fn yule_simon_lpmf_signatures() {
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
-                for i in 0..3 {
+                for _i in 0..3 {
                     acc += yule_simon_lpmf(3i64, x[0])?;
                 }
                 Ok(acc)

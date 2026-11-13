@@ -35,6 +35,7 @@
 //! with [`Real::map_unary`] and friends. Operations with structured adjoints (matrix algebra) use
 //! [`Tape::custom_op`].
 
+mod apply;
 mod check;
 mod complex;
 mod drivers;

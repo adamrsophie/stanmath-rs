@@ -142,6 +142,7 @@ def call(name, shape, is_int, ints, reals):
                 sc_args.append(f"x[{off}]")
     n = N if any(shape) else 1
     va, sa = ", ".join(vec_args), ", ".join(sc_args)
+    iv = "i" if "+ i]" in sa else "_i"
     op = "*=" if prod else "+="
     if not params:
         va = va.replace("x[", "X[")
@@ -156,7 +157,7 @@ def call(name, shape, is_int, ints, reals):
         f"    {{\n        let p = [{p}];\n"
         f"        let v = try_value_and_grad(|x| {name}({va}), &p);\n"
         f"        let s = try_value_and_grad(\n            |x| {{\n                let mut acc = {init};\n"
-        f"                for i in 0..{n} {{\n                    acc {op} {name}({sa})?;\n                }}\n"
+        f"                for {iv} in 0..{n} {{\n                    acc {op} {name}({sa})?;\n                }}\n"
         f"                Ok(acc)\n            }},\n            &p,\n        );\n"
         f"        compare({label!r}, v, s, &mut failures);\n    }}\n"
     ).replace("'", '"')
@@ -171,7 +172,7 @@ HEADER = """//! Every vectorized distribution signature of the Stan language, ma
 //! Math by `stan_reference.rs` and `stan_reference_extra.rs`.
 //!
 //! Left to the Stan reference tests: {skipped}.
-#![allow(clippy::too_many_lines, clippy::unreadable_literal)]
+#![allow(clippy::too_many_lines, clippy::unreadable_literal, clippy::identity_op)]
 
 use stanmath_rs_autodiff::{{ValueAndGrad, try_value_and_grad}};
 use stanmath_rs_core::Result;

@@ -14,6 +14,7 @@
 use crate::primitives as p;
 use crate::real::Real;
 
+pub use crate::apply::*;
 pub use crate::complex::{
     arg, complex_abs, complex_arg, complex_norm, conj, get_imag, get_real, norm, polar, proj,
     to_complex,
