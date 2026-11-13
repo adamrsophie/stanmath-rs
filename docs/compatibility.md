@@ -254,6 +254,13 @@ gradient covers each one. `svd_U`, `svd_V`, and the `qr_*` factors match Stan's 
 `V diag(1, 2, 3) Vᵀ`. The comparison changed `corr_matrix_unconstrain` to read the diagonal as Stan
 does, which changes only its derivative with respect to the diagonal.
 
+`crates/stanmath-rs-distributions/tests/signatures.rs`, written by `tools/reference/gen_signatures.py`
+from the signature dump, maps every vectorized distribution signature (11953 Stan signatures over
+int, real, vector, row vector, and one dimensional arrays, in 1273 Rust shapes) to its Rust call,
+and requires each broadcast call to equal the sum (the product for `_cdf`) of the scalar calls in
+value and gradient. `tests/signatures_multivariate.rs` does the same for the `array[] vector` forms
+of the multivariate normal, Student t, Dirichlet, and ordered densities.
+
 The scalar sweep also fixed four conventions to match Stan: `fmax` and `fmin` return the second argument
 on ties (and take its derivative); `beta(a, b)` with a nonpositive argument is
 `|Γ(a) Γ(b) / Γ(a + b)|`; `log_falling_factorial` and `log_rising_factorial` reject `x <= 0`; and
