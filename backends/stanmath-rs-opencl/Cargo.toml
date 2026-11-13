@@ -16,6 +16,9 @@ stanmath-rs-core = { path = "../../crates/stanmath-rs-core" }
 stanmath-rs-autodiff = { path = "../../crates/stanmath-rs-autodiff" }
 opencl3 = "0.12.4"
 
+[dev-dependencies]
+stanmath-rs-distributions = { path = "../../crates/stanmath-rs-distributions" }
+
 [lints.rust]
 # OpenCL buffers and kernel launches are unsafe; each use is confined to `device.rs`.
 unsafe_code = "deny"
