@@ -72,7 +72,9 @@ def main():
         total += len(vec)
         for shape in sorted(shapes):
             body.append(call(base + "_rng", shape, is_int, ints, reals))
-    out = HEADER.format(total=total, shapes=len(body), skipped=", ".join(skipped))
+    used = sorted({int(m) for m in re.findall(r"apply_broadcast(\d)\(", "".join(body))})
+    imports = ", ".join(f"apply_broadcast{k}" for k in used)
+    out = HEADER.format(total=total, shapes=len(body), skipped=", ".join(skipped), imports=imports)
     out += "#[test]\nfn vectorized_rng_signatures() {\n    let mut failures = Vec::new();\n"
     out += "".join(body)
     out += '    assert!(failures.is_empty(), "\\n{}", failures.join("\\n"));\n}\n'
@@ -132,9 +134,7 @@ HEADER = """//! Every vectorized `_rng` signature of the Stan language, through 
 
 use rand::SeedableRng;
 use rand::rngs::StdRng;
-use stanmath_rs_autodiff::functions::{{
-    apply_broadcast1, apply_broadcast2, apply_broadcast3, apply_broadcast4,
-}};
+use stanmath_rs_autodiff::functions::{{{imports}}};
 use stanmath_rs_core::Result;
 use stanmath_rs_distributions::*;
 

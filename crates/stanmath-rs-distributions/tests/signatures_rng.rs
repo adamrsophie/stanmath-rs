@@ -16,9 +16,7 @@
 
 use rand::SeedableRng;
 use rand::rngs::StdRng;
-use stanmath_rs_autodiff::functions::{
-    apply_broadcast1, apply_broadcast2, apply_broadcast3, apply_broadcast4,
-};
+use stanmath_rs_autodiff::functions::{apply_broadcast1, apply_broadcast2, apply_broadcast3};
 use stanmath_rs_core::Result;
 use stanmath_rs_distributions::*;
 
