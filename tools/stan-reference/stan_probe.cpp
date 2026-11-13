@@ -637,5 +637,12 @@ int main() {
   probe1("laplace.nb.eta4_const", [&] { return laplace_marginal_neg_binomial_2_log_lpmf<false>(ly4, lidx4, eta4c, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
   probe1("laplace.nb.eta3_lupmf_var", [&] { return with_var(1.2, [&](const var& a) { return laplace_marginal_neg_binomial_2_log_lpmf<true>(ly4, lidx4, eta3, lm, 1, laplace_cov(), std::forward_as_tuple(lx, a, 0.7), nullptr); }); });
   probe1("laplace.poisson_log.repeated_index", [&] { return laplace_marginal_poisson_log_lpmf<false>(ly4, lidx4, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
+  const V eta1 = V::Constant(1, 1.5);
+  const std::vector<int> ly4b = {1, 0, 3, 7};
+  probe1("laplace.nb.eta1", [&] { return laplace_marginal_neg_binomial_2_log_lpmf<false>(ly, lidx, eta1, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
+  probe1("laplace.nb.eta1_repeated", [&] { return laplace_marginal_neg_binomial_2_log_lpmf<false>(ly4, lidx4, eta1, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
+  probe1("laplace.poisson_log.repeated_index_7", [&] { return laplace_marginal_poisson_log_lpmf<false>(ly4b, lidx4, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
+  const std::vector<int> lidx_perm = {3, 1, 2};
+  probe1("laplace.poisson_log.permuted_index", [&] { return laplace_marginal_poisson_log_lpmf<false>(ly, lidx_perm, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
   return 0;
 }
