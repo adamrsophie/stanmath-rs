@@ -9,12 +9,18 @@ mod cholesky;
 mod density;
 mod device;
 mod elementwise;
+mod glm;
 mod tri;
 
 pub use cholesky::cholesky_decompose_on_device;
 pub use density::{Density, lpdf_on_device, lpmf_on_device};
 
 pub use elementwise::{Binary, Unary, binary_on_device, unary_on_device};
+pub use glm::{
+    bernoulli_logit_glm_lpmf_on_device, categorical_logit_glm_lpmf_on_device,
+    neg_binomial_2_log_glm_lpmf_on_device, normal_id_glm_lpdf_on_device,
+    ordered_logistic_glm_lpmf_on_device, poisson_log_glm_lpmf_on_device,
+};
 pub use tri::mdivide_left_tri_low_on_device;
 
 use device::{Arg, DeviceBuffer, launch};
