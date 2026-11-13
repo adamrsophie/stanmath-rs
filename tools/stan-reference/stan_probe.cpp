@@ -622,5 +622,20 @@ int main() {
   probe1("laplace.options.3", [&] { return static_cast<double>(std::get<3>(generate_laplace_options(3))); });
   probe1("laplace.options.4", [&] { return static_cast<double>(std::get<4>(generate_laplace_options(3))); });
   probe1("laplace.options.5", [&] { return static_cast<double>(std::get<5>(generate_laplace_options(3))); });
+  // The negative binomial takes a vector eta in stanc 2.40; which index does it follow?
+  const std::vector<int> ly4 = {1, 0, 3, 2};
+  const std::vector<int> lidx4 = {1, 2, 3, 3};
+  V eta3(3);
+  eta3 << 0.8, 1.5, 2.5;
+  V eta4(4);
+  eta4 << 0.8, 1.5, 2.5, 4.0;
+  const V eta3c = V::Constant(3, 1.5);
+  const V eta4c = V::Constant(4, 1.5);
+  probe1("laplace.nb.eta3", [&] { return laplace_marginal_neg_binomial_2_log_lpmf<false>(ly4, lidx4, eta3, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
+  probe1("laplace.nb.eta4", [&] { return laplace_marginal_neg_binomial_2_log_lpmf<false>(ly4, lidx4, eta4, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
+  probe1("laplace.nb.eta3_const", [&] { return laplace_marginal_neg_binomial_2_log_lpmf<false>(ly4, lidx4, eta3c, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
+  probe1("laplace.nb.eta4_const", [&] { return laplace_marginal_neg_binomial_2_log_lpmf<false>(ly4, lidx4, eta4c, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
+  probe1("laplace.nb.eta3_lupmf_var", [&] { return with_var(1.2, [&](const var& a) { return laplace_marginal_neg_binomial_2_log_lpmf<true>(ly4, lidx4, eta3, lm, 1, laplace_cov(), std::forward_as_tuple(lx, a, 0.7), nullptr); }); });
+  probe1("laplace.poisson_log.repeated_index", [&] { return laplace_marginal_poisson_log_lpmf<false>(ly4, lidx4, lm, 1, laplace_cov(), std::forward_as_tuple(lx, 1.2, 0.7), nullptr); });
   return 0;
 }
