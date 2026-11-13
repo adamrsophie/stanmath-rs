@@ -10,6 +10,7 @@ mod density;
 mod device;
 mod elementwise;
 mod glm;
+mod gp;
 mod special;
 mod tri;
 
@@ -22,7 +23,8 @@ pub use glm::{
     neg_binomial_2_log_glm_lpmf_on_device, normal_id_glm_lpdf_on_device,
     ordered_logistic_glm_lpmf_on_device, poisson_log_glm_lpmf_on_device,
 };
-pub use tri::mdivide_left_tri_low_on_device;
+pub use gp::gp_exp_quad_cov_on_device;
+pub use tri::{mdivide_left_tri_low_on_device, mdivide_right_tri_low_on_device};
 
 use device::{Arg, DeviceBuffer, launch};
 use stanmath_rs_autodiff::{MultiFn, Real};

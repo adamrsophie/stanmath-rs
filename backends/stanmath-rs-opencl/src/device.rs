@@ -144,6 +144,7 @@ impl DeviceBuffer {
 pub(crate) enum Arg<'a> {
     Buffer(&'a DeviceBuffer),
     Size(usize),
+    Real(f64),
 }
 
 /// Runs kernel `kernel` of the program `program` over the index space `global` and waits for it.
@@ -181,17 +182,25 @@ pub(crate) fn launch(
         .iter()
         .map(|a| match a {
             Arg::Size(s) => *s as cl_ulong,
-            Arg::Buffer(_) => 0,
+            Arg::Buffer(_) | Arg::Real(_) => 0,
+        })
+        .collect();
+    let reals: Vec<f64> = args
+        .iter()
+        .map(|a| match a {
+            Arg::Real(v) => *v,
+            _ => 0.0,
         })
         .collect();
     let mut exec = ExecuteKernel::new(&kernel);
-    for (a, size) in args.iter().zip(&sizes) {
+    for ((a, size), real) in args.iter().zip(&sizes).zip(&reals) {
         match a {
             Arg::Buffer(b) => match &b.buffer {
                 Some(buffer) => unsafe { exec.set_arg(buffer) },
                 None => return Err(fail(function, "an empty buffer passed to a kernel")),
             },
             Arg::Size(_) => unsafe { exec.set_arg(size) },
+            Arg::Real(_) => unsafe { exec.set_arg(real) },
         };
     }
     let event = unsafe {
