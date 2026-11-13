@@ -16,6 +16,8 @@ import collections
 import re
 import sys
 
+import ledger
+
 MAX_DEPTH = 3
 FUNCS = {"dims", "num_elements", "size", "rep_array", "reverse", "append_array", "head", "tail",
          "segment"}
@@ -75,12 +77,14 @@ def main():
                 continue
             if r[0].count("Vec<") > MAX_DEPTH:
                 deep += 1
+                ledger.record("deep", name, args)
                 continue
             code = call(name, args, r)
             if code is None:
                 other += 1
                 continue
             total += 1
+            ledger.record("called", name, args)
             body.append(code)
     out = HEADER.format(total=total, deep=deep)
     out += "#[test]\nfn container_signatures() {\n"

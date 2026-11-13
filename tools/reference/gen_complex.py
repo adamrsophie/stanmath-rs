@@ -14,6 +14,8 @@ import collections
 import re
 import sys
 
+import ledger
+
 MAX_DEPTH = 3
 
 
@@ -66,8 +68,10 @@ def main():
             ra = [rust(t) for t in args]
             if any(r.count("Vec<") > MAX_DEPTH for r in ra):
                 deep += 1
+                ledger.record("deep", name, args)
                 continue
             total += 1
+            ledger.record("called", name, args)
             body.append(call(name, args, ra))
     out = HEADER.format(total=total, deep=deep) + "#[test]\nfn complex_signatures() {\n" + "".join(body) + "}\n"
     open("crates/stanmath-rs/tests/signatures_complex.rs", "w").write(out)

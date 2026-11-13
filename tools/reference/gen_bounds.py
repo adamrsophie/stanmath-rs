@@ -17,6 +17,8 @@ import collections
 import re
 import sys
 
+import ledger
+
 MAX_DEPTH = 3
 BASES = {"lower_bound": [-1.0], "upper_bound": [2.0], "lower_upper_bound": [-1.0, 2.0],
          "offset_multiplier": [0.5, 1.5]}
@@ -72,8 +74,10 @@ def main():
                 continue
             if ra[0].count("Vec<") > MAX_DEPTH:
                 deep += 1
+                ledger.record("deep", name, args)
                 continue
             shapes[(fam, kind, tuple(ra))] += 1
+            ledger.record("called", name, args)
         for (fam, kind, ra), n in sorted(shapes.items()):
             total += n
             body.append(call(name, fam, kind, ra))

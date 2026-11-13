@@ -16,6 +16,8 @@ import collections
 import re
 import sys
 
+import ledger
+
 NAMES = ["sum", "prod", "cumulative_sum", "to_vector", "to_row_vector", "to_array_1d",
          "to_array_2d", "to_vector_array", "to_row_vector_array", "to_matrix", "append_col",
          "append_row", "fma", "log_mix", "hypergeometric_3F2", "hypergeometric_pFq"]
@@ -374,6 +376,7 @@ def main():
             code = gen(name, args, ret)
             if code:
                 total += 1
+                ledger.record("called", name, args)
                 body.append(code)
     out = HEADER.format(total=total)
     out += "#[test]\nfn utility_signatures() {\n    let mut failures: Vec<String> = Vec::new();\n"

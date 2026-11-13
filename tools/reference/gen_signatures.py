@@ -23,6 +23,8 @@ import itertools
 import re
 import sys
 
+import ledger
+
 DIST = re.compile(r"_(lpdf|lpmf|lcdf|lccdf|cdf|lupdf|lupmf)$")
 SIMPLE = {"int", "real", "vector", "row_vector", "array[] int", "array[] real"}
 DATA = "crates/stanmath-rs-distributions/tests/data"
@@ -104,6 +106,8 @@ def main():
             continue
         shapes = collections.Counter(tuple(t not in ("int", "real") for t in s) for s in sigs)
         total += len(sigs)
+        for s in sigs:
+            ledger.record("called", name, s)
         body = []
         for shape in sorted(shapes):
             body.append(call(name, shape, is_int, ints, reals))

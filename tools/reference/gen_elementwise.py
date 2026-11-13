@@ -16,6 +16,8 @@ import collections
 import re
 import sys
 
+import ledger
+
 SCALAR = {"int", "real"}
 # Rust operators (+, -, *, /) or, for squared_distance, a reduction rather than an elementwise map.
 OPERATORS = {"add", "subtract", "multiply", "elt_multiply", "elt_divide", "squared_distance"}
@@ -120,8 +122,10 @@ def main():
                 continue
             if max(x[0].count("Vec<") for x in ra) > MAX_DEPTH:
                 deep[0] += 1
+                ledger.record("deep", name, a)
                 continue
             calls.setdefault(tuple(x[0] for x in ra), []).append(a)
+            ledger.record("called", name, a)
         if not calls:
             continue
         names += 1

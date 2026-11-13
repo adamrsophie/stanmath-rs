@@ -13,6 +13,8 @@ applied to the elements in order.
 import re
 import sys
 
+import ledger
+
 OPS = {"add": "+", "subtract": "-", "elt_multiply": "*", "elt_divide": "/"}
 
 
@@ -61,6 +63,7 @@ def main():
                     f"        let want: Vec<_> = {xs}.into_iter().zip({ys}).map(|(a, b)| a {op} b).collect();\n"
                     f"        assert_eq!(got, want[..got.len()], \"{label}\");\n    }}\n")
         total += 1
+        ledger.record("called", name, [a, b])
     out = HEADER.format(total=total) + "#[test]\nfn operator_signatures() {\n" + "".join(body) + "}\n"
     open("crates/stanmath-rs/tests/signatures_operators.rs", "w").write(out)
     print(total, "signatures")

@@ -15,6 +15,8 @@ import collections
 import re
 import sys
 
+import ledger
+
 SIMPLE = {"int", "real", "vector", "row_vector", "array[] int", "array[] real"}
 DATA = "crates/stanmath-rs-distributions/tests/data"
 EXTRA = {"discrete_range": ([1, 5], []), "hypergeometric": ([5, 4, 6], []), "yule_simon": ([], [2.5]),
@@ -70,6 +72,8 @@ def main():
             continue
         shapes = collections.Counter(tuple(t not in ("int", "real") for t in s) for s in vec)
         total += len(vec)
+        for s in sigs:
+            ledger.record("called", base + "_rng", s)
         for shape in sorted(shapes):
             body.append(call(base + "_rng", shape, is_int, ints, reals))
     used = sorted({int(m) for m in re.findall(r"apply_broadcast(\d)\(", "".join(body))})

@@ -302,6 +302,16 @@ any depth is `to_array_1d_nested`.
 container signatures of `add`, `subtract`, `elt_multiply`, and `elt_divide`: two real matrices
 through the library functions, every other form (vectors, complex containers, a scalar with a
 container) as the Rust operator through `apply_scalar_unary` or `apply_scalar_binary`.
+`tests/signatures_misc.rs` calls the signatures no generator covers (samplers with container
+arguments, comparisons, constructors, row and column dot products, eigen and Schur
+decompositions, the Wiener CDFs, `poisson_binomial_cdf`, the hidden Markov functions, and the
+deprecated functional solvers), each labeled with a `// stan:` comment and checked against its
+definition, a reconstruction, or its support.
+
+`tools/reference/coverage.py` sorts every line of the signature dump by how it is checked: called
+by a signature test (by a generator's ledger or a `// stan:` label), compared with Stan values in
+the reference CSVs, skipped only because its arrays nest deeper than the generators write calls
+for, or checked by name only. Run against CmdStan 2.40.0 it reports no unchecked line.
 
 The scalar sweep also fixed four conventions to match Stan: `fmax` and `fmin` return the second argument
 on ties (and take its derivative); `beta(a, b)` with a nonpositive argument is
