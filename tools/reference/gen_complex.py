@@ -1,5 +1,6 @@
 """Writes crates/stanmath-rs/tests/signatures_complex.rs: every signature of to_complex, get_real,
-get_imag, and conj in the Stan language, through apply_scalar_unary and apply_scalar_binary.
+get_imag, and conj in the Stan language, and the complex signatures of abs, minus, and pow, through
+apply_scalar_unary and apply_scalar_binary.
 
     stanc --dump-stan-math-signatures > sigs.txt
     python3 tools/reference/gen_complex.py sigs.txt && cargo fmt
@@ -7,7 +8,9 @@ get_imag, and conj in the Stan language, through apply_scalar_unary and apply_sc
 Stan types map to Rust as in gen_elementwise.py, with complex leaves Complex<f64>; calls stop at
 three Vec levels (deeper arrays share the same recursive impl). Each result is checked against the
 definition: to_complex(a, b) is a + bi, get_real and get_imag return the parts, and conj negates
-the imaginary part.
+the imaginary part. abs, minus, and pow of complex containers must equal the scalar method
+(Complex::abs, negation, Complex::pow) at every element; the scalar methods are compared with Stan
+Math by stan_reference_complex.rs.
 """
 
 import collections
@@ -59,8 +62,8 @@ def value(ty, start):
 def main():
     sigs = collections.defaultdict(list)
     for l in open(sys.argv[1]).read().splitlines():
-        m = re.fullmatch(r"(to_complex|get_real|get_imag|conj)\((.*)\) => (.*)", l)
-        if m:
+        m = re.fullmatch(r"(to_complex|get_real|get_imag|conj|abs|minus|pow)\((.*)\) => (.*)", l)
+        if m and (m.group(1) in ("to_complex", "get_real", "get_imag", "conj") or "complex" in m.group(2)):
             sigs[m.group(1)].append(m.group(2).split(", ") if m.group(2) else [])
     body, total, deep = [], 0, 0
     for name in sorted(sigs):
@@ -111,19 +114,41 @@ def call(name, args, ra):
                   f".map(|(x, y)| Complex::new({fa}, {fb})).collect();\n"
                   f"        assert_eq!(got, want, \"{label}\");\n    }}\n")
         return lines
+    if name == "pow":
+        a, b = ra
+        lines = f"    {{\n        let a: {a} = {value(a, 0)};\n        let b: {b} = {value(b, 10)};\n"
+        ca, cb = a != "Complex<f64>", b != "Complex<f64>"
+        if ca and cb:
+            assert a == b, label
+            lines += "        let got = leaves(&apply_scalar_binary(&a, &b, |z, w| z.pow(w)).unwrap());\n"
+        elif ca:
+            lines += "        let got = leaves(&apply_scalar_unary(&a, |z| z.pow(b)));\n"
+        elif cb:
+            lines += "        let got = leaves(&apply_scalar_unary(&b, |w| a.pow(w)));\n"
+        else:
+            lines += "        let got = vec![a.pow(b)];\n"
+        al = "leaves(&a)" if ca else "vec![a; got.len()]"
+        bl = "leaves(&b)" if cb else "vec![b; got.len()]"
+        return lines + (f"        let want: Vec<Complex<f64>> = {al}.into_iter().zip({bl}).map(|(z, w)| z.pow(w)).collect();\n"
+                        f"        assert_eq!(got, want, \"{label}\");\n    }}\n")
     (x,) = ra
-    spec = {"get_real": "z.re", "get_imag": "z.im", "conj": "Complex::new(z.re, -z.im)"}[name]
+    spec = {"get_real": "z.re", "get_imag": "z.im", "conj": "Complex::new(z.re, -z.im)", "abs": "z.abs()",
+            "minus": "-z"}[name]
+    f = {"abs": "|z: Complex<f64>| z.abs()", "minus": "|z: Complex<f64>| -z"}.get(name, name)
     return (f"    {{\n        let x: {x} = {value(x, 0)};\n"
-            f"        let got = leaves(&apply_scalar_unary(&x, {name}));\n"
+            f"        let got = leaves(&apply_scalar_unary(&x, {f}));\n"
             f"        let want: Vec<_> = leaves(&x).into_iter().map(|z| {spec}).collect();\n"
             f"        assert_eq!(got, want, \"{label}\");\n    }}\n")
 
 
-HEADER = """//! Every signature of `to_complex`, `get_real`, `get_imag`, and `conj` in the Stan language,
-//! through `apply_scalar_unary` and `apply_scalar_binary`.
+HEADER = """//! Every signature of `to_complex`, `get_real`, `get_imag`, and `conj` in the Stan language, and
+//! the complex signatures of `abs`, `minus`, and `pow`, through `apply_scalar_unary` and
+//! `apply_scalar_binary`. Over complex containers, `abs`, `minus`, and `pow` are the `Complex`
+//! methods (`abs`, negation, `pow`) at each element; `stan_reference_complex.rs` compares those
+//! with Stan Math.
 //!
 //! Written by `tools/reference/gen_complex.py` from the CmdStan 2.40.0 signature dump: {total} Stan
-//! signatures, each checked against the definition. The other {deep} signatures nest arrays more
+//! signatures, each checked against the definition or the scalar method at every element. The other {deep} signatures nest arrays more
 //! than three levels deep and share the same recursive impl.
 #![allow(
     clippy::too_many_lines,

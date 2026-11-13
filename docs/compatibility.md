@@ -313,8 +313,18 @@ by a signature test (by a generator's ledger or a `// stan:` label), compared wi
 the reference CSVs, skipped only because its arrays nest deeper than the generators write calls
 for, or checked by name only. A function whose signatures differ only in spelling a vector
 (vector, row vector, or one dimensional real array) is one Rust call, so a reference comparison of
-that call counts for each spelling. Run against CmdStan 2.40.0 it reports 18470 called, 237
-compared with Stan values, 4941 deeper than the calls, 643 by name, and no unchecked line.
+that call counts for each spelling. Run against CmdStan 2.40.0 it reports 18708 called, 210
+compared with Stan values, 5034 deeper than the calls, 339 by name, and no unchecked line.
+
+`tests/stan_reference_scalar_extra.rs` compares with Stan Math 5.4.0 the scalar signatures the
+one and two real sweep cannot reach (`tools/stan-reference/stan_reference_scalar_extra.cpp`): the
+constants, the Bessel functions, `binary_log_loss`, `lmgamma`, `ldexp`, and the factorials with
+their int arguments, the int functions (`choose`, `modulus`, the logical operators, `to_int`),
+`hypergeometric_2F1`, `inc_beta`, `inv_inc_beta`, `log_mix`, the scalar bound transforms, and
+the 6 to 9 argument Wiener densities. At Stan's default precision (1e-4) the eight argument
+Wiener density differs from ours by about 2e-6; at precision 1e-8 the two agree to 1e-15.
+`tests/stan_reference_matrix.rs` names the Stan signatures each of its cases calls, and
+`signatures_complex.rs` also calls the complex container forms of `abs`, `minus`, and `pow`.
 
 `tests/signatures_transforms.rs`, written by `tools/reference/gen_transforms.py`, calls the array
 forms of the structural transforms (`_constrain`, `_jacobian`, and `_unconstrain` of simplex,
