@@ -3,6 +3,8 @@
 
 // Dense matrix loops read more clearly with indices.
 #![allow(clippy::needless_range_loop)]
+// Values from the Stan probe keep all seventeen printed digits.
+#![allow(clippy::excessive_precision)]
 
 use stanmath_rs_autodiff::functions::lgamma;
 use stanmath_rs_autodiff::{Real, grad};
