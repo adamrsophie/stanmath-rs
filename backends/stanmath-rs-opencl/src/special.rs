@@ -3,10 +3,10 @@
 /// The fp64 pragma, then digamma, trigamma, tetragamma, and inv_Phi.
 pub(crate) const PRELUDE: &str = "#pragma OPENCL EXTENSION cl_khr_fp64 : enable
 // Polygamma functions: reflection below 0.5, the recurrence up to a bound, then the asymptotic
-// series.
+// series. OpenCL C has no recursion, so the reflection moves x and keeps its term in r.
 double digamma(double x) {
-  if (x < 0.5) return digamma(1.0 - x) - M_PI / tan(M_PI * x);
   double r = 0.0;
+  if (x < 0.5) { r = -M_PI / tan(M_PI * x); x = 1.0 - x; }
   while (x < 10.0) { r -= 1.0 / x; x += 1.0; }
   const double f = 1.0 / (x * x);
   return r + log(x) - 0.5 / x
@@ -14,22 +14,26 @@ double digamma(double x) {
          - f * (1.0 / 132.0)))));
 }
 double trigamma(double x) {
+  double sign = 1.0, extra = 0.0;
   if (x < 0.5) {
     const double s = sin(M_PI * x);
-    return M_PI * M_PI / (s * s) - trigamma(1.0 - x);
+    extra = M_PI * M_PI / (s * s);
+    sign = -1.0;
+    x = 1.0 - x;
   }
   double r = 0.0;
   while (x < 20.0) { r += 1.0 / (x * x); x += 1.0; }
   const double f = 1.0 / (x * x);
-  return r + 1.0 / x + 0.5 * f
-         + f / x * (1.0 / 6.0 - f * (1.0 / 30.0 - f * (1.0 / 42.0 - f * (1.0 / 30.0))));
+  return extra + sign * (r + 1.0 / x + 0.5 * f
+         + f / x * (1.0 / 6.0 - f * (1.0 / 30.0 - f * (1.0 / 42.0 - f * (1.0 / 30.0)))));
 }
 double tetragamma(double x) {
+  double r = 0.0;
   if (x < 0.5) {
     const double s = sin(M_PI * x);
-    return tetragamma(1.0 - x) - 2.0 * M_PI * M_PI * M_PI * cos(M_PI * x) / (s * s * s);
+    r = -2.0 * M_PI * M_PI * M_PI * cos(M_PI * x) / (s * s * s);
+    x = 1.0 - x;
   }
-  double r = 0.0;
   while (x < 20.0) { r -= 2.0 / (x * x * x); x += 1.0; }
   const double f = 1.0 / (x * x);
   return r - f - f / x - f * f * (0.5 - f * (1.0 / 6.0 - f * (1.0 / 6.0 - f * (0.3
