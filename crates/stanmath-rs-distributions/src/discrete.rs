@@ -487,6 +487,49 @@ impl Kernel<1, 2> for NegBinomial2Log {
     }
 }
 
+/// [`NegBinomial2Log`] with the terms grouped as in Stan's `neg_binomial_2_log_glm`, whose
+/// `propto` form drops `phi ln phi` and `-ln Γ(n + 1)` on their own: `n eta`,
+/// `-(n + phi) ln(exp(eta) + phi)`, `phi ln phi + ln Γ(n + phi) - ln Γ(phi)`, and `-ln Γ(n + 1)`.
+pub(crate) struct NegBinomial2LogGlm;
+
+impl Kernel<1, 2> for NegBinomial2LogGlm {
+    const NAME: &'static str = "neg_binomial_2_log_glm_lpmf";
+
+    fn check(ints: [Option<i64>; 1], x: [Option<f64>; 2]) -> Result<()> {
+        NegBinomial2Log::check(ints, x)
+    }
+
+    fn eval<S: Real>(ints: [i64; 1], x: [S; 2], grad: Option<&mut [S; 2]>) -> S {
+        NegBinomial2Log::eval(ints, x, grad)
+    }
+
+    fn eval_propto<S: Real>(
+        ints: [i64; 1],
+        x: [S; 2],
+        grad: Option<&mut [S; 2]>,
+        keep: Keep<2>,
+    ) -> S {
+        if keep.term(&[]) {
+            return NegBinomial2Log::eval(ints, x, grad);
+        }
+        if grad.is_some() {
+            // Dropped terms depend only on data, so the gradient is that of the full mass.
+            NegBinomial2Log::eval(ints, x, grad);
+        }
+        let ([n], [eta, phi]) = (ints, x);
+        let nf = n as f64;
+        let log_phi = phi.ln();
+        let mut lp = -((phi + nf) * log_sum_exp(eta, log_phi));
+        if keep.term(&[0]) {
+            lp += eta * nf;
+        }
+        if keep.term(&[1]) {
+            lp += phi * log_phi + neg_binomial_coef(nf, phi) + lgamma(nf + 1.0);
+        }
+        lp
+    }
+}
+
 /// Negative binomial log mass with log mean `eta` and dispersion `phi`.
 pub fn neg_binomial_2_log_lpmf<N, E, P>(n: N, eta: E, phi: P) -> Result<Promoted<(E, P), 2>>
 where

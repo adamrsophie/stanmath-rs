@@ -13,7 +13,7 @@ use stanmath_rs_linalg::{multiply, multiply_vector};
 
 use crate::check::param;
 use crate::continuous::Normal;
-use crate::discrete::{BernoulliLogit, BinomialLogit, NegBinomial2Log, PoissonLog};
+use crate::discrete::{BernoulliLogit, BinomialLogit, NegBinomial2LogGlm, PoissonLog};
 use crate::discrete_extra::{check_cutpoints, ordered_logistic_lpmf};
 use crate::kernel::sum_kernel_masked;
 
@@ -306,7 +306,7 @@ where
     let eta = linear_predictor(F, x, &alpha, beta)?;
     let phi: Vec<T> = broadcast_arg(F, "phi", &phi, x.nrows())?;
     let data = [eta_data::<T, X, A>(), <P::Elem as Lift<T>>::DATA];
-    sum_kernel_masked::<NegBinomial2Log, _, 1, 2>([&y], (&eta[..], &phi[..]), propto, data)
+    sum_kernel_masked::<NegBinomial2LogGlm, _, 1, 2>([&y], (&eta[..], &phi[..]), propto, data)
 }
 
 /// Negative binomial regression with log link:

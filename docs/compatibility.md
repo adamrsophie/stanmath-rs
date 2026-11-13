@@ -107,8 +107,10 @@ normal, Student's t, Cauchy, logistic, exponential, gamma, inverse gamma, beta, 
 Gumbel, binomial, Poisson, and both negative binomial 2 kernels drop their terms as Stan does, and
 their values match Stan Math 5.4.0 (probed with one argument a variable). As in Stan, the
 lognormal keeps its constant `-ln(2 pi) / 2`. The other kernels keep every term when any argument
-is a parameter, which differs from Stan's value by a constant only. Multivariate densities, the
-GLMs, and the full Wiener model have no `propto` form yet.
+is a parameter, which differs from Stan's value by a constant only. The seven GLMs have `propto`
+forms that match Stan's values; since `beta` fixes their scalar type, a GLM whose `phi` or `sigma`
+is a parameter treats `beta` as one too. Multivariate densities and the full Wiener model have no
+`propto` form yet.
 
 ### Boundary conventions
 

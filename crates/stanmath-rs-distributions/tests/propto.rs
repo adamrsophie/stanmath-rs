@@ -5,6 +5,7 @@
 #![allow(clippy::excessive_precision)]
 
 use stanmath_rs_autodiff::value_and_grad;
+use stanmath_rs_core::Matrix;
 use stanmath_rs_distributions::*;
 
 fn close(a: f64, b: f64) -> bool {
@@ -192,6 +193,116 @@ fn propto_values_of_the_other_kernels_match_stan() {
     for (name, got, want) in cases {
         assert!(close(got, want), "{name}: {got} vs {want}");
     }
+}
+
+#[test]
+fn glm_propto_values_match_stan() {
+    let x = Matrix::from_rows(&[[0.5, -1.0], [1.2, 0.3], [-0.4, 0.8]]);
+    let beta = [0.4, -0.3];
+    let (gy, gb, gn, gc) = ([2i64, 0, 5], [1i64, 0, 1], [4i64, 3, 6], [1i64, 3, 2]);
+    let gyr = [0.7, -1.1, 2.0];
+    let cuts = [-0.5, 0.7];
+    let alpha3 = [0.1, -0.2, 0.3];
+    let b23 = [[0.1, -0.2, 0.3], [0.4, 0.0, -0.1]];
+    let cases: [(&str, f64, f64); 9] = [
+        (
+            "poisson_log_glm",
+            value_and_grad(
+                |v| poisson_log_glm_lupmf(&gy[..], &x, 0.3, v).unwrap(),
+                &beta,
+            )
+            .value,
+            -4.0240938797715096,
+        ),
+        (
+            "bernoulli_logit_glm",
+            value_and_grad(
+                |v| bernoulli_logit_glm_lupmf(&gb[..], &x, 0.3, v).unwrap(),
+                &beta,
+            )
+            .value,
+            -2.2120125952279732,
+        ),
+        (
+            "binomial_logit_glm",
+            value_and_grad(
+                |v| binomial_logit_glm_lupmf(&gy[..], &gn[..], &x, 0.3, v).unwrap(),
+                &beta,
+            )
+            .value,
+            -10.740328431852411,
+        ),
+        (
+            "neg_binomial_2_log_glm",
+            value_and_grad(
+                |v| neg_binomial_2_log_glm_lupmf(&gy[..], &x, 0.3, v, 1.5).unwrap(),
+                &beta,
+            )
+            .value,
+            -11.083325835945297,
+        ),
+        (
+            "normal_id_glm, beta a variable",
+            value_and_grad(
+                |v| normal_id_glm_lupdf(&gyr[..], &x, 0.3, v, 0.8).unwrap(),
+                &beta,
+            )
+            .value,
+            -5.9563281250000006,
+        ),
+        (
+            // beta fixes the scalar type, so it is a variable here too; sigma's terms are kept.
+            "normal_id_glm, sigma a variable",
+            value_and_grad(
+                |v| normal_id_glm_lupdf(&gyr[..], &x, 0.3, &v[..2], v[2]).unwrap(),
+                &[0.4, -0.3, 0.8],
+            )
+            .value,
+            -5.2868974710573715,
+        ),
+        (
+            "categorical_logit_glm",
+            value_and_grad(
+                |v| {
+                    let b = Matrix::from_fn(2, 3, |i, j| v[3 + 3 * i + j]);
+                    categorical_logit_glm_lupmf(&gc[..], &x, &v[..3], &b).unwrap()
+                },
+                &[
+                    alpha3[0], alpha3[1], alpha3[2], b23[0][0], b23[0][1], b23[0][2], b23[1][0],
+                    b23[1][1], b23[1][2],
+                ],
+            )
+            .value,
+            -3.5269526559487634,
+        ),
+        (
+            "ordered_logistic_glm",
+            value_and_grad(
+                |v| ordered_logistic_glm_lupmf(&gc[..], &x, v, &cuts).unwrap(),
+                &beta,
+            )
+            .value,
+            -3.4634879770063729,
+        ),
+        (
+            "neg_binomial_2_log_glm full",
+            neg_binomial_2_log_glm_lpmf(&gy[..], &x, 0.3, &beta, 1.5).unwrap(),
+            -7.6342716353258435,
+        ),
+    ];
+    for (name, got, want) in cases {
+        assert!(close(got, want), "{name}: {got} vs {want}");
+    }
+    // Every argument data gives zero.
+    assert_eq!(poisson_log_glm_lupmf(&gy[..], &x, 0.3, &beta).unwrap(), 0.0);
+    assert_eq!(
+        normal_id_glm_lupdf(&gyr[..], &x, 0.3, &beta, 0.8).unwrap(),
+        0.0
+    );
+    assert_eq!(
+        ordered_logistic_glm_lupmf(&gc[..], &x, &beta, &cuts).unwrap(),
+        0.0
+    );
 }
 
 /// `full - propto` at `x` and at a second point, with the argument `j` the only variable: the
