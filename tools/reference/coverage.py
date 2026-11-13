@@ -8,7 +8,8 @@ same) and assigns each signature the first category that applies:
 
     called      a generated signature test calls this exact signature, or a hand-written test
                 names it in a `// stan:` comment
-    reference   all arguments int or real, and the function is in the Stan reference CSVs
+    reference   the function is in the Stan reference CSVs, and its arguments are all int or real
+                or all its signatures are one Rust call (they differ only in spelling a vector)
     deep        a generator skipped it only because the arrays nest deeper than it writes calls
     by-name     not called by its exact types, but the function name is compared with Stan values
                 (reference CSVs) or called in a test file
@@ -65,6 +66,13 @@ def main():
         if "tests" in f or "#[cfg(test)]" in src:
             tested |= set(re.findall(r"\b([a-z_][A-Za-z_0-9]*)\s*(?:::<[^>]*>)?\s*\(", src))
 
+    # Signatures of one function that differ only in spelling a vector (vector, row_vector, or
+    # array[] real) are one Rust call, so a reference comparison of that call covers them all.
+    shapes = collections.defaultdict(set)
+    for l in open(dump).read().splitlines():
+        m = re.fullmatch(r"([A-Za-z_0-9]+)\((.*)\) => (.*)", l)
+        shapes[m.group(1)].add(canonical(m.group(2)))
+
     cats = collections.Counter()
     rest = collections.defaultdict(list)
     for l in open(dump).read().splitlines():
@@ -74,7 +82,7 @@ def main():
         scalar = all(t in ("int", "real") for t in (args.split(", ") if args else []))
         if name == "student_t_qf" or marks.get(key) == "called":
             cat = "called"
-        elif scalar and base(name) in ref:
+        elif base(name) in ref and (scalar or len(shapes[name]) == 1):
             cat = "reference"
         elif marks.get(key) == "deep":
             cat = "deep"
@@ -94,6 +102,11 @@ def main():
             for c in ("unchecked", "by-name", "deep"):
                 f.write(f"## {c} ({len(rest[c])})\n")
                 f.writelines(l + "\n" for l in rest[c])
+
+
+def canonical(args):
+    """The Rust shape of a Stan argument list: vectors, row vectors, and 1-d real arrays are slices."""
+    return re.sub(r"\b(row_vector|vector|array\[\] real)\b", "slice", args)
 
 
 def base(name):

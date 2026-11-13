@@ -269,9 +269,10 @@ impl<T: Real> Complex<T> {
     }
 
     /// Inverse hyperbolic tangent, `(log(1 + z) - log(1 - z)) / 2`, cuts along real `|x| > 1`.
+    /// Adding the real one keeps the sign of a zero imaginary part, which picks the side of the
+    /// cut (`1 - z` built as `0 - z` would turn `-0` into `+0`).
     pub fn atanh(self) -> Self {
-        let one = Self::one();
-        ((one + self).ln() - (one - self).ln()).scale(0.5)
+        ((self + T::one()).ln() - ((-self) + T::one()).ln()).scale(0.5)
     }
 
     /// Inverse sine, `-i asinh(i z)`.

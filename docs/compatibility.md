@@ -311,7 +311,21 @@ definition, a reconstruction, or its support.
 `tools/reference/coverage.py` sorts every line of the signature dump by how it is checked: called
 by a signature test (by a generator's ledger or a `// stan:` label), compared with Stan values in
 the reference CSVs, skipped only because its arrays nest deeper than the generators write calls
-for, or checked by name only. Run against CmdStan 2.40.0 it reports no unchecked line.
+for, or checked by name only. A function whose signatures differ only in spelling a vector
+(vector, row vector, or one dimensional real array) is one Rust call, so a reference comparison of
+that call counts for each spelling. Run against CmdStan 2.40.0 it reports 18258 called, 237
+compared with Stan values, 4797 deeper than the calls, 999 by name, and no unchecked line.
+
+`tests/stan_reference_complex.rs` compares the complex scalar functions (the elementary and
+inverse trigonometric and hyperbolic functions, `exp`, `log`, `log10`, `sqrt`, `pow`, `abs`, `arg`,
+`norm`, `conj`, `proj`, and the arithmetic operators) with Stan Math 5.4.0 in value and gradient,
+at points on and off the branch cuts, approached from both signed zeros
+(`tools/stan-reference/stan_reference_complex.cpp`). Stan differs from C99 Annex G in the sign of
+some zero outputs, and at points on a cut its gradient is taken on the other side of the cut than
+its value. Where they differ, stanmath-rs follows `tests/data/c99_reference_complex.csv`
+(`tools/reference/complex.py`: Python's `cmath` values and mpmath gradients on the side the
+input's signed zero picks). The sweep fixed `atanh` (so also `atan`) on the cuts: `1 - z` was
+built as `0 - z + 1`, which turned an imaginary `-0` into `+0` and put the result on the wrong side.
 
 The scalar sweep also fixed four conventions to match Stan: `fmax` and `fmin` return the second argument
 on ties (and take its derivative); `beta(a, b)` with a nonpositive argument is

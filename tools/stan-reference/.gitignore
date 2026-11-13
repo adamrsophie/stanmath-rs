@@ -6,3 +6,4 @@ stan_probe
 stan_reference_extra
 stan_reference_scalar
 stan_reference_matrix
+stan_reference_complex

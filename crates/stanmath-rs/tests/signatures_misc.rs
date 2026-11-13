@@ -8,7 +8,9 @@
 //! scalar draws from the same seed.
 #![allow(clippy::too_many_lines, clippy::float_cmp, clippy::cast_precision_loss)]
 
+#[cfg(feature = "rand")]
 use rand::SeedableRng;
+#[cfg(feature = "rand")]
 use rand::rngs::StdRng;
 use stanmath_rs::autodiff::Complex;
 use stanmath_rs::prelude::*;
@@ -23,6 +25,7 @@ fn close_c(a: C, b: C) -> bool {
     close(a.re, b.re) && close(a.im, b.im)
 }
 
+#[cfg(feature = "rand")]
 fn rng() -> StdRng {
     StdRng::seed_from_u64(7)
 }
@@ -36,6 +39,7 @@ fn mc(r: usize, c: usize, v: &[f64]) -> Matrix<C> {
 }
 
 /// A symmetric positive definite 3 by 3 matrix.
+#[cfg(feature = "rand")]
 fn spd() -> Matrix<f64> {
     m(3, 3, &[2.0, 0.3, 0.1, 0.3, 1.5, 0.2, 0.1, 0.2, 1.2])
 }
@@ -635,10 +639,14 @@ fn poisson_binomial() {
     // stan: poisson_binomial_rng(vector)
     // stan: poisson_binomial_rng(row_vector)
     // stan: poisson_binomial_rng(array[] real)
-    let mut r = rng();
-    assert!((0..200).all(|_| (0..=3).contains(&poisson_binomial_rng(&theta, &mut r).unwrap())));
+    #[cfg(feature = "rand")]
+    {
+        let mut r = rng();
+        assert!((0..200).all(|_| (0..=3).contains(&poisson_binomial_rng(&theta, &mut r).unwrap())));
+    }
 }
 
+#[cfg(feature = "rand")]
 #[test]
 fn samplers() {
     let s = spd();
@@ -779,8 +787,11 @@ fn hidden_markov() {
     let probs = hmm_hidden_state_prob(&log_omegas, &gamma, &rho).unwrap();
     assert!((0..3).all(|t| close(probs[(0, t)] + probs[(1, t)], 1.0)));
     // stan: hmm_latent_rng(matrix, matrix, vector)
-    let states = hmm_latent_rng(&log_omegas, &gamma, &rho, &mut rng()).unwrap();
-    assert!(states.len() == 3 && states.iter().all(|&s| s == 1 || s == 2));
+    #[cfg(feature = "rand")]
+    {
+        let states = hmm_latent_rng(&log_omegas, &gamma, &rho, &mut rng()).unwrap();
+        assert!(states.len() == 3 && states.iter().all(|&s| s == 1 || s == 2));
+    }
 }
 
 /// `y_i^2 - theta_i - x_r[0] = 0`, solved by `y_i = sqrt(theta_i + x_r[0])`.
