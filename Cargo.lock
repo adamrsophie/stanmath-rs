@@ -728,72 +728,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "probgrad"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "nuts-rs",
- "probgrad-autodiff",
- "probgrad-core",
- "probgrad-distributions",
- "probgrad-linalg",
- "probgrad-solvers",
- "probgrad-transforms",
- "rand 0.10.3",
-]
-
-[[package]]
-name = "probgrad-autodiff"
-version = "0.1.0"
-dependencies = [
- "probgrad-core",
- "proptest",
-]
-
-[[package]]
-name = "probgrad-core"
-version = "0.1.0"
-dependencies = [
- "libm",
-]
-
-[[package]]
-name = "probgrad-distributions"
-version = "0.1.0"
-dependencies = [
- "probgrad-autodiff",
- "probgrad-core",
- "probgrad-linalg",
- "rand 0.10.3",
- "rand_distr",
-]
-
-[[package]]
-name = "probgrad-linalg"
-version = "0.1.0"
-dependencies = [
- "probgrad-autodiff",
- "probgrad-core",
-]
-
-[[package]]
-name = "probgrad-solvers"
-version = "0.1.0"
-dependencies = [
- "probgrad-autodiff",
- "probgrad-core",
-]
-
-[[package]]
-name = "probgrad-transforms"
-version = "0.1.0"
-dependencies = [
- "probgrad-autodiff",
- "probgrad-core",
- "probgrad-linalg",
-]
-
-[[package]]
 name = "proc-macro2"
 version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1092,6 +1026,74 @@ name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
+
+[[package]]
+name = "stanmath-rs"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "nuts-rs",
+ "rand 0.10.3",
+ "stanmath-rs-autodiff",
+ "stanmath-rs-core",
+ "stanmath-rs-distributions",
+ "stanmath-rs-linalg",
+ "stanmath-rs-solvers",
+ "stanmath-rs-transforms",
+]
+
+[[package]]
+name = "stanmath-rs-autodiff"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "stanmath-rs-core",
+]
+
+[[package]]
+name = "stanmath-rs-core"
+version = "0.1.0"
+dependencies = [
+ "libm",
+]
+
+[[package]]
+name = "stanmath-rs-distributions"
+version = "0.1.0"
+dependencies = [
+ "rand 0.10.3",
+ "rand_distr",
+ "stanmath-rs-autodiff",
+ "stanmath-rs-core",
+ "stanmath-rs-linalg",
+]
+
+[[package]]
+name = "stanmath-rs-linalg"
+version = "0.1.0"
+dependencies = [
+ "stanmath-rs-autodiff",
+ "stanmath-rs-core",
+]
+
+[[package]]
+name = "stanmath-rs-solvers"
+version = "0.1.0"
+dependencies = [
+ "rand 0.10.3",
+ "rand_distr",
+ "stanmath-rs-autodiff",
+ "stanmath-rs-core",
+]
+
+[[package]]
+name = "stanmath-rs-transforms"
+version = "0.1.0"
+dependencies = [
+ "stanmath-rs-autodiff",
+ "stanmath-rs-core",
+ "stanmath-rs-linalg",
+]
 
 [[package]]
 name = "syn"

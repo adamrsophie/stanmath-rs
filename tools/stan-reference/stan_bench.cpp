@@ -1,9 +1,9 @@
-// Timing of the probgrad benchmark workloads in Stan Math, on the same data.
+// Timing of the stanmath-rs benchmark workloads in Stan Math, on the same data.
 //
 //   make STAN_MATH=/path/to/stan_math/ stan_bench && ./stan_bench
 //
 // Prints one line per workload: name, n, nanoseconds per gradient evaluation (the median of 15
-// batches, each at least 20 ms long). The workloads mirror crates/probgrad/benches/probgrad.rs.
+// batches, each at least 20 ms long). The workloads mirror crates/stanmath-rs/benches/stanmath_rs.rs.
 
 #include <stan/math.hpp>
 

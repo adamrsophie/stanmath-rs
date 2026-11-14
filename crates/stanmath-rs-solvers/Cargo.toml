@@ -1,0 +1,26 @@
+[package]
+name = "stanmath-rs-solvers"
+description = "Differentiable root finding, algebraic solvers, and quadrature for stanmath-rs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[features]
+default = ["rand"]
+## Random number generation (`laplace_latent_*_rng`).
+rand = ["dep:rand", "dep:rand_distr"]
+
+[dependencies]
+stanmath-rs-core.workspace = true
+stanmath-rs-autodiff.workspace = true
+rand = { workspace = true, optional = true, features = ["alloc"] }
+rand_distr = { workspace = true, optional = true }
+
+[lints]
+workspace = true

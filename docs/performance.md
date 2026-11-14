@@ -2,7 +2,7 @@
 
 ## Status
 
-Benchmarks exist and run (`cargo bench -p probgrad`), but **no trustworthy timing results have been
+Benchmarks exist and run (`cargo bench -p stanmath-rs`), but **no trustworthy timing results have been
 recorded yet**. The only runs so far were made on a development machine whose load average was
 between 100 and 230 on 8 cores, caused by unrelated processes. Timings from those runs vary by a
 factor of two to three between repetitions and are not reported as performance claims. They should
@@ -46,7 +46,7 @@ Stan Math yet.
 
 ## Benchmarks
 
-`crates/probgrad/benches/probgrad.rs` measures, for each workload, plain `f64` evaluation, a gradient
+`crates/stanmath-rs/benches/stanmath_rs.rs` measures, for each workload, plain `f64` evaluation, a gradient
 on a fresh tape, and a gradient with a reused `GradientWorkspace` (the steady state of a sampler):
 
 | Group | Workloads |
@@ -62,7 +62,7 @@ in Stan Math 5.4.0 on the same data, built with Stan's standalone makefile flags
 To reproduce on an idle machine:
 
 ```sh
-cargo bench -p probgrad --bench probgrad
+cargo bench -p stanmath-rs --bench stanmath_rs
 cd tools/stan-reference
 make STAN_MATH=$CMDSTAN/stan/lib/stan_math/ stan_bench
 ./stan_bench

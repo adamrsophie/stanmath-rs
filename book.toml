@@ -1,5 +1,5 @@
 [book]
-title = "probgrad"
+title = "stanmath-rs"
 description = "Differentiable mathematics for Bayesian computation in Rust"
 authors = ["Adam R Sophie"]
 language = "en"
@@ -9,8 +9,8 @@ src = "docs"
 build-dir = "target/book"
 
 [output.html]
-git-repository-url = "https://github.com/adamrsophie/probgrad"
-edit-url-template = "https://github.com/adamrsophie/probgrad/edit/main/{path}"
+git-repository-url = "https://github.com/adamrsophie/stanmath-rs"
+edit-url-template = "https://github.com/adamrsophie/stanmath-rs/edit/main/{path}"
 
 [output.html.playground]
 runnable = false

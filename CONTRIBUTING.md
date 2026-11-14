@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for helping. probgrad values correctness over breadth: a new function is complete when
+Thank you for helping. stanmath-rs values correctness over breadth: a new function is complete when
 it is tested against an independent reference in every differentiation mode.
 
 ## Development checks
@@ -20,18 +20,18 @@ the reason next to it and in `docs/numerical-accuracy.md`.
 
 ## Adding a function
 
-1. Add the `f64` value to `probgrad-core::special` (or use an existing one).
-2. Add a primitive in `probgrad-autodiff` implementing `UnaryFn`, `BinaryFn`, or `NaryFn`. Write the
+1. Add the `f64` value to `stanmath-rs-core::special` (or use an existing one).
+2. Add a primitive in `stanmath-rs-autodiff` implementing `UnaryFn`, `BinaryFn`, or `NaryFn`. Write the
    derivative against `Real`, not `f64`, so that nested modes differentiate it. Check that the rule
    does not cancel when differentiated again.
 3. Add reference points to `tools/reference/*.py`, regenerate with
    `uv run --with mpmath python tools/reference/<script>.py`, and add the function to the dispatch
-   in `crates/probgrad-autodiff/tests/reference.rs`.
+   in `crates/stanmath-rs-autodiff/tests/reference.rs`.
 4. Update `docs/compatibility.md`.
 
 ## Adding a distribution
 
-1. Implement a `Kernel` in `probgrad-distributions`: argument checks that mirror the Stan Math
+1. Implement a `Kernel` in `stanmath-rs-distributions`: argument checks that mirror the Stan Math
    function, and a log density with analytic partials, generic over `Real`.
 2. Add CDFs by composing differentiable special functions; choose the tail that does not cancel.
 3. Add cases to `tools/stan-reference/stan_reference.cpp` and `tools/reference/distributions.py`,
@@ -43,7 +43,7 @@ Regenerating the Stan fixture needs CmdStan or Stan Math:
 ```sh
 cd tools/stan-reference
 make STAN_MATH=$CMDSTAN/stan/lib/stan_math/ stan_reference
-./stan_reference > ../../crates/probgrad-distributions/tests/data/stan_reference.csv
+./stan_reference > ../../crates/stanmath-rs-distributions/tests/data/stan_reference.csv
 ```
 
 (prepend the provenance comment lines as in the existing file).

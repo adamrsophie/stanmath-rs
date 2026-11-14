@@ -1,10 +1,10 @@
-"""High-precision reference values for probgrad's elementary functions.
+"""High-precision reference values for stanmath-rs's elementary functions.
 
 Run from the repository root:
 
     uv run --with mpmath python tools/reference/elementary.py
 
-Writes crates/probgrad-autodiff/tests/data/unary_reference.csv and binary_reference.csv with the
+Writes crates/stanmath-rs-autodiff/tests/data/unary_reference.csv and binary_reference.csv with the
 value, first derivatives, and second derivatives computed by mpmath at 50 significant digits and
 rounded once to the nearest double.
 """
@@ -16,7 +16,7 @@ from mpmath import mp, mpf, diff
 mp.dps = 60
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-OUT = os.path.join(ROOT, "crates", "probgrad-autodiff", "tests", "data")
+OUT = os.path.join(ROOT, "crates", "stanmath-rs-autodiff", "tests", "data")
 
 
 def inv_logit(x):

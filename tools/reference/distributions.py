@@ -4,7 +4,7 @@ Run from the repository root after regenerating stan_reference.csv:
 
     uv run --with mpmath python tools/reference/distributions.py
 
-Reads crates/probgrad-distributions/tests/data/stan_reference.csv and writes mpmath_reference.csv
+Reads crates/stanmath-rs-distributions/tests/data/stan_reference.csv and writes mpmath_reference.csv
 next to it, with the same columns. Values and gradients are computed at 320 significant digits, enough for
 tails such as log Phi(30) = -4.9e-198; gradients are central differences with a 1e-80 step.
 """
@@ -15,7 +15,7 @@ from mpmath import mp, mpf, diff, log, log1p, exp, ncdf, gammainc, betainc, logg
 
 mp.dps = 320
 
-DATA = os.path.join(os.path.dirname(__file__), "..", "..", "crates", "probgrad-distributions", "tests", "data")
+DATA = os.path.join(os.path.dirname(__file__), "..", "..", "crates", "stanmath-rs-distributions", "tests", "data")
 
 
 def P(a, x):
