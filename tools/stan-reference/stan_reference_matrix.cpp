@@ -403,6 +403,14 @@ int main() {
     for (int k = 0; k < tm.rows(); ++k) s += abs(tm(k, k)) + tm(k, k).real() * tm(k, k).real();
     return s; };
   continuous("complex_schur_decompose_t", {g9}, [&](const Vars& v) { return tdiag(complex_schur_decompose_t(A)); });
+  // With the eigenvalues in the same order on the diagonal of T, U is unique up to a phase per
+  // column, so the reduction uses |u_ij|^2.
+  continuous("complex_schur_decompose_u", {g9}, [&](const Vars& v) {
+    CM u = complex_schur_decompose_u(A);
+    var s = 0;
+    for (int j = 0; j < u.cols(); ++j)
+      for (int i = 0; i < u.rows(); ++i) s += (1.0 + 0.1 * (3 * j + i)) * norm(u(i, j));
+    return s; });
   continuous("complex_schur_decompose", {g9}, [&](const Vars& v) {
     return tdiag(std::get<1>(complex_schur_decompose(A))); });
   // Constructors, accessors, and conversions: these check index and fill order conventions.

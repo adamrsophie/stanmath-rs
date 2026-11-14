@@ -242,6 +242,7 @@ rows, where stanmath-rs matches a 40 digit mpmath reference (`tools/reference/ex
 | `gamma_cdf`, `inv_gamma_cdf`, `scaled_inv_chi_square_cdf`, d/d shape | 1e-8 to 1.4e-4 | about 1e-15 |
 | `beta_cdf`, `neg_binomial_cdf`, `neg_binomial_2_cdf`, `beta_neg_binomial_cdf`, shape gradient | 4e-10 to 1.4e-4 | about 1e-15 |
 | `wiener_lcdf_unnorm`, `wiener_lccdf_unnorm`, d/d t0 and d/d v | 6e-6 to 8e-5 | within 1e-12 |
+| `hypergeometric_rng(5, 4, 6)`, distribution of draws | mean 2.97, never 0 | follows the pmf, mean 2 |
 
 Stan Math 5.4.0's `poisson_log_glm_lpmf` with an int response and several rows of `x` adds
 `-lgamma(y + 1)` once rather than once per row; stanmath-rs returns the sum over rows, and the
@@ -284,7 +285,8 @@ constructors, accessors, and conversions whose index and fill order conventions 
 sign conventions of the QR and SVD factors match Stan's. The general `eigenvectors` are reduced as
 `sum_k |l_k| sum_i (1 + i / 10) |v_ik|^2`, which pairs each unit length column with its eigenvalue
 and does not depend on column order or phase; `eigendecompose` and the Schur factor `T` are
-compared through their eigenvalues.
+compared through their eigenvalues. The eigenvalues fall on the diagonal of `T` in Stan's order, so
+the Schur factor `U` is unique up to a phase per column and is compared through `|u_ij|^2`.
 
 `crates/stanmath-rs/tests/stan_reference_solvers.rs` compares `integrate_ode_rk45`,
 `integrate_ode_adams`, `integrate_ode_bdf` (a Lotka Volterra system), `algebra_solver`,
@@ -295,11 +297,17 @@ sensitivities agree to `1e-4`), `map_rect` over two jobs, and every field of bot
 `generate_laplace_options` forms. Stan writes the default Laplace tolerance as the literal
 `1.49012e-08`; stanmath-rs uses the same literal rather than `sqrt(f64::EPSILON)`.
 
-Of the 571 function names in the signature dump, 509 have at least one comparison with a value
-Stan Math computed. The rest are the 61 `_rng` functions, which cannot match Stan's draws (each
-scalar sampler is checked against its own CDF or moments in `tests/samplers.rs` and elsewhere),
-and `complex_schur_decompose_u`, whose unitary factor is not unique and is checked by
-reconstruction.
+`crates/stanmath-rs/tests/stan_reference_rng.rs` compares every one of the 61 `_rng` functions with
+draws from Stan Math (`tools/stan-reference/stan_reference_rng.cpp`). Stan's generator cannot be
+matched draw for draw, so each output element is compared by a two sample Kolmogorov Smirnov test
+between 1000 draws from Stan and 4000 from stanmath-rs, at a level of about `1e-6` per element.
+All agree except `hypergeometric_rng`: Stan 5.4.0's draws disagree with its own
+`hypergeometric_lpmf`. For 5 draws from 4 successes and 6 failures they never return 0 and have
+mean 2.97 where the distribution has mean 2; they follow `min(k + 1, a)` for a correct draw `k`.
+stanmath-rs samples from the pmf, and the test applies that map to document the difference.
+
+Every one of the 571 function names in the signature dump has at least one comparison with values
+Stan Math computed.
 
 `crates/stanmath-rs-distributions/tests/signatures.rs`, written by `tools/reference/gen_signatures.py`
 from the signature dump, maps every vectorized distribution signature (11953 Stan signatures over

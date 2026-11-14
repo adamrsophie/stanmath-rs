@@ -216,6 +216,7 @@ fn with_lp<'t, W: WSum<'t>>(x: &[Var<'t>], f: impl FnOnce(&mut Var<'t>) -> W) ->
 // stan: eigenvectors(matrix)
 // stan: complex_schur_decompose_t(matrix)
 // stan: complex_schur_decompose(matrix)
+// stan: complex_schur_decompose_u(matrix)
 // stan: ones_int_array(int)
 // stan: zeros_array(int)
 // stan: ones_vector(int)
@@ -600,6 +601,15 @@ fn eval<'t>(name: &str, x: &[Var<'t>]) -> Result<Var<'t>> {
         }
         // The diagonal of T holds the eigenvalues, reduced as eigenvalues.
         "complex_schur_decompose_t" => Ok(schur_diag(&complex_schur_decompose_t(&a())?)),
+        // With the eigenvalues in the same order on T's diagonal, U is unique up to a phase per
+        // column, so the reduction uses |u_ij|^2.
+        "complex_schur_decompose_u" => {
+            let u = complex_schur_decompose_u(&a())?;
+            Ok((0..3)
+                .flat_map(|j| (0..3).map(move |i| (i, j)))
+                .map(|(i, j)| (1.0 + 0.1 * (3 * j + i) as f64) * u[(i, j)].norm())
+                .sum())
+        }
         "complex_schur_decompose" => Ok(schur_diag(&complex_schur_decompose(&a())?.1)),
         "zeros_ones" => Ok(iws(&zeros_int_array(3))
             + 2.0 * iws(&ones_int_array(3))
