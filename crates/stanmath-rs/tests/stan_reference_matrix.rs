@@ -206,6 +206,31 @@ fn with_lp<'t, W: WSum<'t>>(x: &[Var<'t>], f: impl FnOnce(&mut Var<'t>) -> W) ->
 // stan: cov_matrix_jacobian(vector, int)
 // stan: cov_matrix_unconstrain(matrix)
 // stan: fma(real, real, real)
+// stan: qr(matrix)
+// stan: qr_thin(matrix)
+// stan: svd(matrix)
+// stan: eigendecompose_sym(matrix)
+// stan: eigendecompose(matrix)
+// stan: zeros_int_array(int)
+// stan: zeros_vector(int)
+// stan: eigenvectors(matrix)
+// stan: complex_schur_decompose_t(matrix)
+// stan: complex_schur_decompose(matrix)
+// stan: ones_int_array(int)
+// stan: zeros_array(int)
+// stan: ones_vector(int)
+// stan: ones_row_vector(int)
+// stan: zeros_row_vector(int)
+// stan: ones_array(int)
+// stan: linspaced_array(int, real, real)
+// stan: linspaced_row_vector(int, real, real)
+// stan: one_hot_array(int, int)
+// stan: one_hot_row_vector(int, int)
+// stan: rep_row_vector(real, int)
+// stan: to_vector_array(matrix)
+// stan: to_row_vector_array(matrix)
+// stan: qr_thin(matrix)
+// stan: csr_extract(matrix)
 // stan: append_array(array[] real, array[] real)
 // stan: append_col(matrix, matrix)
 // stan: append_row(matrix, matrix)
@@ -313,6 +338,12 @@ fn csr<'t>(x: &[Var<'t>]) -> CsrMatrix<Var<'t>> {
 fn sparse<'t>(x: &[Var<'t>]) -> Matrix<Var<'t>> {
     let z = Var::constant(0.0);
     Matrix::from_rows(&[[x[0], z, x[1]], [z, x[2], z], [x[3], z, x[4]]])
+}
+
+fn schur_diag<'t>(t: &Matrix<Complex<Var<'t>>>) -> Var<'t> {
+    (0..t.nrows())
+        .map(|k| t[(k, k)].abs() + t[(k, k)].re * t[(k, k)].re)
+        .sum()
 }
 
 fn one_based(v: Vec<usize>) -> Vec<usize> {
@@ -530,6 +561,65 @@ fn eval<'t>(name: &str, x: &[Var<'t>]) -> Result<Var<'t>> {
         // stanmath-rs's CSR indices are zero based; Stan's are one based.
         "csr_extract_v" => Ok(iws(&one_based(csr_extract_v(&sparse(x))))),
         "csr_extract_u" => Ok(iws(&one_based(csr_extract_u(&sparse(x))))),
+        // Tuple forms: each part reduced and summed, with weights so a swapped part is caught.
+        "qr" => {
+            let (q, r) = qr(&a());
+            Ok(q.wsum()? + 2.0 * r.wsum()?)
+        }
+        "qr_thin" => {
+            let (q, r) = qr_thin(&a());
+            Ok(q.wsum()? + 2.0 * r.wsum()?)
+        }
+        "svd" => {
+            let (u, d, v) = svd(&a())?;
+            Ok(u.wsum()? + 2.0 * d.wsum()? + 3.0 * v.wsum()?)
+        }
+        "eigendecompose_sym" => {
+            let (v, l) = eigendecompose_sym(&sym(x))?;
+            let d = Matrix::from_rows(&[[1.0, 0.0, 0.0], [0.0, 2.0, 0.0], [0.0, 0.0, 3.0]]);
+            let vd = multiply(&v, &d.map(|v| Var::constant(*v)))?;
+            Ok(multiply(&vd, &transpose(&v)).wsum()? + 2.0 * l.wsum()?)
+        }
+        // Eigenvectors of a general matrix are not unique; the values part is reduced as eigenvalues.
+        "eigendecompose" => Ok(eigendecompose(&a())?
+            .1
+            .iter()
+            .map(|l| l.abs() + l.re * l.re)
+            .sum()),
+        // Order and phase free: sum_k |l_k| sum_i (1 + i / 10) |v_ik|^2 over unit length columns.
+        "eigenvectors" => {
+            let (l, v) = (eigenvalues(&a())?, eigenvectors(&a())?);
+            Ok((0..l.len())
+                .map(|k| {
+                    let c: Var = (0..v.nrows())
+                        .map(|i| (1.0 + 0.1 * i as f64) * v[(i, k)].norm())
+                        .sum();
+                    l[k].abs() * c
+                })
+                .sum())
+        }
+        // The diagonal of T holds the eigenvalues, reduced as eigenvalues.
+        "complex_schur_decompose_t" => Ok(schur_diag(&complex_schur_decompose_t(&a())?)),
+        "complex_schur_decompose" => Ok(schur_diag(&complex_schur_decompose(&a())?.1)),
+        "zeros_ones" => Ok(iws(&zeros_int_array(3))
+            + 2.0 * iws(&ones_int_array(3))
+            + zeros_array(2).wsum()?
+            + ones_vector(3).wsum()?
+            + 3.0 * ones_row_vector(4).wsum()?
+            + zeros_row_vector(2).wsum()?
+            + 5.0 * ones_array(2).wsum()?
+            + 7.0 * zeros_vector(2).wsum()?),
+        "linspaced_array" => linspaced_array(5, -1.0, 2.0).wsum(),
+        "linspaced_row_vector" => linspaced_row_vector(5, -1.0, 2.0).wsum(),
+        "one_hot_array" => one_hot_array(4, 2).wsum(),
+        "one_hot_row_vector" => one_hot_row_vector(4, 2).wsum(),
+        "rep_row_vector" => rep_row_vector(x[0], 3).wsum(),
+        "to_vector_array" => to_vector_array(&a()).concat().wsum(),
+        "to_row_vector_array" => to_row_vector_array(&a()).concat().wsum(),
+        "csr_extract" => {
+            let c = csr_extract(&sparse(x));
+            Ok(c.values.wsum()? + iws(&one_based(c.columns)) + 2.0 * iws(&one_based(c.row_starts)))
+        }
         "identity_matrix" => identity_matrix(3).wsum(),
         "linspaced_vector" => linspaced_vector(5, -1.0, 2.0).wsum(),
         "linspaced_int_array" => Ok(iws(&linspaced_int_array(5, 1, 9)?)),
@@ -608,6 +698,6 @@ fn matrix_functions_match_stan() {
             }
         }
     }
-    assert!(count > 170);
+    assert!(count > 185);
     assert!(failures.is_empty(), "\n{}", failures.join("\n"));
 }

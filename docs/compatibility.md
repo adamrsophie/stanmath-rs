@@ -260,7 +260,7 @@ stanmath-rs matches a 40 digit mpmath reference (`tools/reference/scalar.py`) to
 | `gamma_q`, d/d a | 1.7e-7 to 1.3e-5 | about 1e-15 |
 | chi-square and inverse chi-square CDFs, d/d nu | 4e-9 to 4e-6 | about 1e-15 |
 
-`crates/stanmath-rs/tests/stan_reference_matrix.rs` checks 174 cases of the matrix functions
+`crates/stanmath-rs/tests/stan_reference_matrix.rs` checks 190 cases of the matrix functions
 (decompositions, inverses, solves, products, reductions, `matrix_exp`, `svd_*`, `qr_*`, sorting and
 softmax) and every constraining transform's `_constrain`, `_jacobian`, and `_unconstrain` form
 against Stan to `1e-10`; a matrix result is reduced to a weighted sum of its entries, so the
@@ -279,7 +279,12 @@ constructors, accessors, and conversions whose index and fill order conventions 
 `to_complex`, `get_real`, `get_imag`, `csr_extract_*`, `identity_matrix`, `linspaced_*`,
 `one_hot_*`, `uniform_simplex`, `dims`, `size`, `num_elements`, `rows`, `cols`, `int_step`,
 `is_inf`, and the logical operators, NaN included). stanmath-rs's `csr_extract_v` and
-`csr_extract_u` are zero based where Stan's are one based; the test adds one.
+`csr_extract_u` are zero based where Stan's are one based; the test adds one. The tuple forms
+`qr`, `qr_thin`, `svd`, `eigendecompose_sym`, and `csr_extract` are compared part by part, so the
+sign conventions of the QR and SVD factors match Stan's. The general `eigenvectors` are reduced as
+`sum_k |l_k| sum_i (1 + i / 10) |v_ik|^2`, which pairs each unit length column with its eigenvalue
+and does not depend on column order or phase; `eigendecompose` and the Schur factor `T` are
+compared through their eigenvalues.
 
 `crates/stanmath-rs/tests/stan_reference_solvers.rs` compares `integrate_ode_rk45`,
 `integrate_ode_adams`, `integrate_ode_bdf` (a Lotka Volterra system), `algebra_solver`,
@@ -290,14 +295,10 @@ sensitivities agree to `1e-4`), `map_rect` over two jobs, and every field of bot
 `generate_laplace_options` forms. Stan writes the default Laplace tolerance as the literal
 `1.49012e-08`; stanmath-rs uses the same literal rather than `sqrt(f64::EPSILON)`.
 
-Of the 571 function names in the signature dump, 485 have at least one comparison with a value
+Of the 571 function names in the signature dump, 509 have at least one comparison with a value
 Stan Math computed. The rest are the 61 `_rng` functions, which cannot match Stan's draws (each
-scalar sampler is checked against its own CDF or moments in `tests/samplers.rs` and elsewhere);
-the other spellings of compared constructors (`zeros_*`, `ones_*`, the row vector and array forms
-of `linspaced_*`, `one_hot_*`, and `rep_*`, `to_vector_array`, `to_row_vector_array`, and the
-tuple `csr_extract`), checked against their definitions; the tuple forms `eigendecompose`,
-`eigendecompose_sym`, `svd`, `qr`, and `qr_thin`, whose parts are compared one by one;
-and the eigenvectors and complex Schur factors, which are not unique and are checked by
+scalar sampler is checked against its own CDF or moments in `tests/samplers.rs` and elsewhere),
+and `complex_schur_decompose_u`, whose unitary factor is not unique and is checked by
 reconstruction.
 
 `crates/stanmath-rs-distributions/tests/signatures.rs`, written by `tools/reference/gen_signatures.py`
