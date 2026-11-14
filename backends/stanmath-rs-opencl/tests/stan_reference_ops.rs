@@ -5,9 +5,14 @@
 //! is decided by the mpmath value instead, as in the main crates' comparisons.
 
 use stanmath_rs_autodiff::{Var, try_value_and_grad};
-use stanmath_rs_core::Result;
+use stanmath_rs_core::{Matrix, Result};
 use stanmath_rs_opencl::{
     Binary, Density, Unary, binary_on_device, lpmf_on_device, unary_on_device,
+};
+use stanmath_rs_opencl::{
+    bernoulli_logit_glm_lpmf_on_device, categorical_logit_glm_lpmf_on_device,
+    neg_binomial_2_log_glm_lpmf_on_device, normal_id_glm_lpdf_on_device,
+    ordered_logistic_glm_lpmf_on_device, poisson_log_glm_lpmf_on_device,
 };
 
 const DATA: [&str; 4] = [
@@ -122,6 +127,11 @@ fn compare(
     n
 }
 
+/// The 3 by 2 design matrix at `v[o..o + 6]`, column major.
+fn xm<'t>(v: &[Var<'t>], o: usize) -> Matrix<Var<'t>> {
+    Matrix::from_column_major(3, 2, v[o..o + 6].to_vec())
+}
+
 #[test]
 fn every_device_operation_matches_stan() {
     let mut failures = Vec::new();
@@ -169,6 +179,51 @@ fn every_device_operation_matches_stan() {
         );
         if n == 0 {
             unmatched.push(op.name());
+        }
+    }
+    // The GLM rows lay out x (3 by 2, column major) first, as the host comparison does.
+    let glms: [(&str, usize, usize, usize); 6] = [
+        ("normal_id_glm_lpdf", 0, 13, 0),
+        ("bernoulli_logit_glm_lpmf", 3, 9, 1),
+        ("poisson_log_glm_lpmf", 3, 9, 2),
+        ("neg_binomial_2_log_glm_lpmf", 3, 10, 3),
+        ("ordered_logistic_glm_lpmf", 3, 10, 4),
+        ("categorical_logit_glm_lpmf", 3, 15, 5),
+    ];
+    for (name, ints, arity, k) in glms {
+        let n = compare(
+            name,
+            ints,
+            arity,
+            |i, x| match k {
+                0 => normal_id_glm_lpdf_on_device(
+                    &x[0..3],
+                    &xm(x, 3),
+                    &x[9..10],
+                    &x[10..12],
+                    &x[12..13],
+                ),
+                1 => bernoulli_logit_glm_lpmf_on_device(i, &xm(x, 0), &x[6..7], &x[7..9]),
+                2 => poisson_log_glm_lpmf_on_device(i, &xm(x, 0), &x[6..7], &x[7..9]),
+                3 => neg_binomial_2_log_glm_lpmf_on_device(
+                    i,
+                    &xm(x, 0),
+                    &x[6..7],
+                    &x[7..9],
+                    &x[9..10],
+                ),
+                4 => ordered_logistic_glm_lpmf_on_device(i, &xm(x, 0), &x[6..8], &x[8..10]),
+                _ => categorical_logit_glm_lpmf_on_device(
+                    i,
+                    &xm(x, 0),
+                    &x[6..9],
+                    &Matrix::from_column_major(2, 3, x[9..15].to_vec()),
+                ),
+            },
+            &mut failures,
+        );
+        if n == 0 {
+            unmatched.push(name);
         }
     }
     assert!(unmatched.is_empty(), "no Stan rows for {unmatched:?}");
