@@ -80,7 +80,8 @@ impl Default for LaplaceOptions {
     fn default() -> Self {
         LaplaceOptions {
             theta_init: None,
-            tolerance: f64::EPSILON.sqrt(),
+            // Stan writes the default as the literal 1.49012e-08, not sqrt(epsilon).
+            tolerance: 1.49012e-08,
             max_num_steps: 500,
             hessian_block_size: 1,
             max_steps_line_search: 1000,

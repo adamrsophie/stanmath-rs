@@ -284,18 +284,21 @@ constructors, accessors, and conversions whose index and fill order conventions 
 `crates/stanmath-rs/tests/stan_reference_solvers.rs` compares `integrate_ode_rk45`,
 `integrate_ode_adams`, `integrate_ode_bdf` (a Lotka Volterra system), `algebra_solver`,
 `algebra_solver_newton`, and `integrate_1d` with Stan in value and in the gradient with respect to
-every parameter, at tight tolerances on both sides, to `1e-7`.
+every parameter, at tight tolerances on both sides, to `1e-7`. It also compares `integrate_ode`
+(which stanc compiles to `integrate_ode_rk45` at the default tolerances of `1e-6`, so the
+sensitivities agree to `1e-4`), `map_rect` over two jobs, and every field of both
+`generate_laplace_options` forms. Stan writes the default Laplace tolerance as the literal
+`1.49012e-08`; stanmath-rs uses the same literal rather than `sqrt(f64::EPSILON)`.
 
-Of the 571 function names in the signature dump, 482 have at least one comparison with a value
+Of the 571 function names in the signature dump, 485 have at least one comparison with a value
 Stan Math computed. The rest are the 61 `_rng` functions, which cannot match Stan's draws (each
 scalar sampler is checked against its own CDF or moments in `tests/samplers.rs` and elsewhere);
 the other spellings of compared constructors (`zeros_*`, `ones_*`, the row vector and array forms
 of `linspaced_*`, `one_hot_*`, and `rep_*`, `to_vector_array`, `to_row_vector_array`, and the
 tuple `csr_extract`), checked against their definitions; the tuple forms `eigendecompose`,
-`eigendecompose_sym`, `svd`, `qr`, and `qr_thin`, whose parts are compared one by one; the
-eigenvectors and complex Schur factors, which are not unique and are checked by reconstruction;
-`integrate_ode` (the `rk45` solver at default tolerances), `map_rect`, and
-`generate_laplace_options`.
+`eigendecompose_sym`, `svd`, `qr`, and `qr_thin`, whose parts are compared one by one;
+and the eigenvectors and complex Schur factors, which are not unique and are checked by
+reconstruction.
 
 `crates/stanmath-rs-distributions/tests/signatures.rs`, written by `tools/reference/gen_signatures.py`
 from the signature dump, maps every vectorized distribution signature (11953 Stan signatures over

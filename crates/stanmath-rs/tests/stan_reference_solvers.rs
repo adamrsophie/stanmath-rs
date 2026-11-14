@@ -2,7 +2,8 @@
 //! `tests/data/stan_reference_solvers.csv` is written by
 //! `tools/stan-reference/stan_reference_solvers.cpp`, which documents the systems. Each solution is
 //! reduced to `sum_k (1 + k / 10) r_k` over its entries (time major for the ODEs). Both sides solve
-//! at tight tolerances, so the comparison allows a relative difference of `1e-7`.
+//! at tight tolerances, so the comparison allows a relative difference of `1e-7` (`1e-4` for
+//! `integrate_ode`, which uses the default tolerances).
 
 use stanmath_rs::prelude::*;
 
@@ -11,6 +12,10 @@ use stanmath_rs::prelude::*;
 // stan: integrate_ode_bdf((real, array[] real, array[] real, data array[] real, data array[] int) => array[] real, array[] real, real, array[] real, array[] real, array[] real, array[] int, real, real, real)
 // stan: algebra_solver((vector, vector, data array[] real, data array[] int) => vector, vector, vector, array[] real, array[] int, real, real, real)
 // stan: algebra_solver_newton((vector, vector, data array[] real, data array[] int) => vector, vector, vector, array[] real, array[] int, real, real, real)
+// stan: integrate_ode((real, array[] real, array[] real, data array[] real, data array[] int) => array[] real, array[] real, real, array[] real, array[] real, array[] real, array[] int)
+// stan: map_rect((vector, vector, data array[] real, data array[] int) => vector, vector, array[] vector, array[,] real, array[,] int)
+// stan: generate_laplace_options(int)
+// stan: generate_laplace_options(vector)
 // stan: integrate_1d((real, real, array[] real, data array[] real, data array[] int) => real, real, real, array[] real, array[] real, array[] int, real)
 
 /// Lotka Volterra: `y0' = t0 y0 - t1 y0 y1`, `y1' = -t2 y1 + t1 y0 y1`.
@@ -81,6 +86,20 @@ fn eval<'t>(name: &str, x: &[Var<'t>]) -> Result<Var<'t>> {
         "algebra_solver_newton" => {
             algebra_solver_newton(&Sys, &[1.0, 1.0], x, &[], &[], Some(&sys)).map(wsum)
         }
+        "integrate_ode" => integrate_ode(&Lv, y0, 0.0, &ts, th, &[], &[], None).map(flat),
+        "map_rect" => map_rect(
+            |phi: &[Var<'t>], t: &[Var<'t>], xr: &[f64], xi: &[i64]| {
+                Ok(vec![
+                    phi[0] * t[0] + xr[0],
+                    phi[1] * exp(t[1]) * xi[0] as f64,
+                ])
+            },
+            &x[0..2],
+            &[x[2..4].to_vec(), x[4..6].to_vec()],
+            &[vec![0.5], vec![0.25]],
+            &[vec![2], vec![3]],
+        )
+        .map(wsum),
         "integrate_1d" => integrate_1d(&Damped, Var::constant(0.0), x[0], &x[1..3], 1e-10),
         other => panic!("no dispatch for {other}"),
     }
@@ -90,8 +109,11 @@ fn list(s: &str) -> Vec<f64> {
     s.split(';').map(|v| v.parse().unwrap()).collect()
 }
 
-fn close(a: f64, b: f64) -> bool {
-    (a - b).abs() <= 1e-7 * b.abs().max(1.0)
+/// `integrate_ode` runs at the default tolerances (`1e-6`), where the two step size controllers
+/// give sensitivities that differ by up to `6e-5`; the others run at `1e-10`.
+fn close(name: &str, a: f64, b: f64) -> bool {
+    let rtol = if name == "integrate_ode" { 1e-4 } else { 1e-7 };
+    (a - b).abs() <= rtol * b.abs().max(1.0)
 }
 
 #[test]
@@ -105,15 +127,22 @@ fn solvers_match_stan() {
     let mut count = 0;
     for line in text.lines().filter(|l| !l.starts_with('#')) {
         count += 1;
+        if let Some(rest) = line.strip_prefix("generate_laplace_options,") {
+            laplace_options(rest, &mut failures);
+            continue;
+        }
         let f: Vec<&str> = line.split(',').collect();
         match try_value_and_grad(|x| eval(f[0], x), &list(f[2])) {
             Err(e) => failures.push(format!("{}: we reject: {e}", f[0])),
             Ok(r) => {
                 let want: f64 = f[3].parse().unwrap();
                 let grad = list(f[4]);
-                if !close(r.value, want)
+                if !close(f[0], r.value, want)
                     || r.gradient.len() != grad.len()
-                    || r.gradient.iter().zip(&grad).any(|(a, b)| !close(*a, *b))
+                    || r.gradient
+                        .iter()
+                        .zip(&grad)
+                        .any(|(a, b)| !close(f[0], *a, *b))
                 {
                     failures.push(format!(
                         "{}: ours {} {:?}, Stan {want} {grad:?}",
@@ -123,6 +152,38 @@ fn solvers_match_stan() {
             }
         }
     }
-    assert_eq!(count, 6);
+    assert_eq!(count, 10);
     assert!(failures.is_empty(), "\n{}", failures.join("\n"));
+}
+
+/// A `generate_laplace_options` row: `dimension,,weighted theta_init,tolerance;max_num_steps;
+/// hessian_block_size;max_steps_line_search;solver`. Dimension 3 is the int form, 2 the vector
+/// form with `[1.5, 0.2]`.
+fn laplace_options(rest: &str, failures: &mut Vec<String>) {
+    let f: Vec<&str> = rest.split(',').collect();
+    let o = if f[0] == "3" {
+        generate_laplace_options(3)
+    } else {
+        generate_laplace_options_from(&[1.5, 0.2])
+    };
+    let init = o.theta_init.clone().unwrap_or_default();
+    let got = vec![
+        init.iter()
+            .enumerate()
+            .map(|(k, v)| v * (1.0 + 0.1 * k as f64))
+            .sum::<f64>(),
+        o.tolerance,
+        o.max_num_steps as f64,
+        o.hessian_block_size as f64,
+        o.max_steps_line_search as f64,
+        f64::from(o.solver),
+    ];
+    let mut want = vec![f[2].parse::<f64>().unwrap()];
+    want.extend(list(f[3]));
+    if init.len().to_string() != f[0] || got != want {
+        failures.push(format!(
+            "generate_laplace_options({}): {got:?} vs {want:?}",
+            f[0]
+        ));
+    }
 }
