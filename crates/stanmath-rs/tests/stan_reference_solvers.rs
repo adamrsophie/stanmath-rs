@@ -100,6 +100,15 @@ impl EquationSystem for SysV {
     }
 }
 
+/// Fixed point map `G(x) = [cos(x1) / 2 + t0, 0.3 sin(x0) t1 + 0.2]`.
+struct Gfp;
+
+impl EquationSystem for Gfp {
+    fn eval<S: Real>(&self, x: &[S], th: &[S]) -> Vec<S> {
+        vec![x[1].cos() * 0.5 + th[0], x[0].sin() * th[1] * 0.3 + 0.2]
+    }
+}
+
 /// DAE residual `y0' + k y0 = 0`, `y1 - 2 y0 = 0`.
 struct Res;
 
@@ -241,6 +250,17 @@ fn eval<'t>(name: &str, x: &[Var<'t>]) -> Result<Var<'t>> {
         "solve_powell" => solve_powell(&SysV, &[1.0, 1.0], x).map(wsum),
         "solve_newton_tol" => solve_newton_tol(&SysV, &[1.0, 1.0], x, &sys).map(wsum),
         "solve_powell_tol" => solve_powell_tol(&SysV, &[1.0, 1.0], x, &sys).map(wsum),
+        "algebra_solver_fp" => solve_fixed_point_tol(
+            &Gfp,
+            &[0.0, 0.0],
+            x,
+            &FixedPointOptions {
+                function_tolerance: 1e-12,
+                max_iterations: 200,
+                memory: 5,
+            },
+        )
+        .map(wsum),
         "reduce_sum" | "reduce_sum_static" => {
             let s = [0.1, 0.4, -0.3, 1.2, 0.8];
             let part = |sl: &[f64], _: usize, _: usize| normal_lpdf(sl, x[0], x[1]);
@@ -348,7 +368,7 @@ fn solvers_match_stan() {
             check(name, &f, &mut failures);
         }
     }
-    assert_eq!(count, 38);
+    assert_eq!(count, 39);
     assert!(failures.is_empty(), "\n{}", failures.join("\n"));
 }
 

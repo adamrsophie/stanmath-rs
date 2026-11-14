@@ -216,10 +216,11 @@ density_table! {
         "",
         "(0.5 * nu - 1.0) * log(y) - 0.5 * y - 0.5 * nu * M_LN2 - lgamma(0.5 * nu)",
         ["(0.5 * nu - 1.0) / y - 0.5", "0.5 * (log(y) - M_LN2 - digamma(0.5 * nu))"];
-    InvChiSquare "inv_chi_square_lpdf" () ["y" Positive, "nu" PositiveFinite]
-        "",
-        "-0.5 * nu * M_LN2 - lgamma(0.5 * nu) - (0.5 * nu + 1.0) * log(y) - 0.5 / y",
-        ["(0.5 / y - 0.5 * nu - 1.0) / y", "-0.5 * (M_LN2 + digamma(0.5 * nu) + log(y))"];
+    InvChiSquare "inv_chi_square_lpdf" () ["y" NotNan, "nu" PositiveFinite]
+        "const int inside = y > 0.0;",
+        "inside ? -0.5 * nu * M_LN2 - lgamma(0.5 * nu) - (0.5 * nu + 1.0) * log(y) - 0.5 / y : -INFINITY",
+        ["inside ? (0.5 / y - 0.5 * nu - 1.0) / y : 0.0",
+         "inside ? -0.5 * (M_LN2 + digamma(0.5 * nu) + log(y)) : 0.0"];
     ScaledInvChiSquare "scaled_inv_chi_square_lpdf" () ["y" Positive, "nu" PositiveFinite, "s" PositiveFinite]
         "const double h = 0.5 * nu;",
         "h * log(h) - lgamma(h) + nu * log(s) - (h + 1.0) * log(y) - h * s * s / y",
