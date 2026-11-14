@@ -163,7 +163,7 @@ All with `*_constrain`, `*_constrain_lp` (log Jacobian), and `*_free`.
 | `integrate_1d` | `integrate` (tanh-sinh, finite and infinite limits), derivatives with respect to parameters | tested |
 | derivatives of `integrate_1d` with respect to the integration limits | same function | tested |
 | `solve_newton`, `solve_powell`, their `_tol` forms, `algebra_solver` (Powell) | `solve_newton`, `solve_powell`, `solve_*_tol`, `algebra_solver` | tested |
-| fixed point iteration (internal to Stan Math, not in the Stan language) | `solve_fixed_point`, `solve_fixed_point_tol` | experimental |
+| fixed point iteration (internal to Stan Math, not in the Stan language) | `solve_fixed_point`, `solve_fixed_point_tol`, compared with Stan Math's `algebra_solver_fp` | tested |
 | `laplace_marginal*`, `laplace_latent*` | same names | tested |
 | `ode_rk45`, `ode_ckrk`, `ode_adams`, `ode_bdf`, adjoint ODE solvers, DAE solvers | Dormand and Prince, Cash and Karp, variable order Adams (orders 1 to 12, PECE), and Radau IIA; Stan uses CVODES for Adams and BDF, so results agree to the tolerance, not to rounding error. Derivatives are those of the numerical solution | tested |
 

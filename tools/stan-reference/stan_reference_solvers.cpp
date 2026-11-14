@@ -130,6 +130,18 @@ struct SysV {
   }
 };
 
+// Fixed point map G(x) = [cos(x1) / 2 + th0, 0.3 sin(x0) th1 + 0.2], a contraction.
+struct Gfp {
+  template <typename T0, typename T1>
+  Eigen::Matrix<stan::return_type_t<T0, T1>, -1, 1> operator()(
+      const Eigen::Matrix<T0, -1, 1>& x, const Eigen::Matrix<T1, -1, 1>& th,
+      const std::vector<double>&, const std::vector<int>&, std::ostream*) const {
+    Eigen::Matrix<stan::return_type_t<T0, T1>, -1, 1> r(2);
+    r << 0.5 * stan::math::cos(x(1)) + th(0), 0.3 * stan::math::sin(x(0)) * th(1) + 0.2;
+    return r;
+  }
+};
+
 // DAE residual: y0' + k y0 = 0, y1 - 2 y0 = 0, so y0 = c exp(-k t) and y1 = 2 y0.
 struct Res {
   template <typename T0, typename T1, typename T2, typename T3>
@@ -256,6 +268,12 @@ int main() {
     return wsum(solve_newton_tol(SysV(), guess, 1e-12, 1e-12, 1000, nullptr, theta(v))); });
   emit("solve_powell_tol", {2.0, 0.5}, [&](const Vars& v) {
     return wsum(solve_powell_tol(SysV(), guess, 1e-12, 1e-12, 1000, nullptr, theta(v))); });
+  // Stan Math's internal fixed point solver (not in the Stan language), unit scales.
+  emit("algebra_solver_fp", {0.4, 1.3}, [&](const Vars& v) {
+    Eigen::VectorXd g0 = Eigen::VectorXd::Zero(2);
+    return wsum(algebra_solver_fp(Gfp(), g0, theta(v), std::vector<double>{}, std::vector<int>{},
+                                  std::vector<double>{1, 1}, std::vector<double>{1, 1}, nullptr,
+                                  1e-12, 200)); });
   const std::vector<double> rs = {0.1, 0.4, -0.3, 1.2, 0.8};
   emit("reduce_sum", {0.3, 1.4}, [&](const Vars& v) { return reduce_sum<Part>(rs, 2, nullptr, v[0], v[1]); });
   emit("reduce_sum_static", {0.3, 1.4}, [&](const Vars& v) {
