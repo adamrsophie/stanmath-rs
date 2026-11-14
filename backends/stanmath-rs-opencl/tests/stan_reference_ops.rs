@@ -1,6 +1,8 @@
 //! Every device elementwise function and density against values and gradients that Stan Math
 //! computed, from the scalar and distribution reference rows of the main crates. Each operation
-//! runs on every row with its name and arity; `fabs` uses the `abs` rows.
+//! runs on every row with its name and arity; `fabs` uses the `abs` rows. Where Stan Math is less
+//! accurate than we are (`docs/compatibility.md`, "Measured differences from Stan Math"), the row
+//! is decided by the mpmath value instead, as in the main crates' comparisons.
 
 use stanmath_rs_autodiff::{Var, try_value_and_grad};
 use stanmath_rs_core::Result;
@@ -15,8 +17,33 @@ const DATA: [&str; 4] = [
     include_str!("../../../crates/stanmath-rs-distributions/tests/data/stan_reference_extra.csv"),
 ];
 
-/// `(ints, reals, value, gradient)` of one reference row.
-type Row = (Vec<i64>, Vec<f64>, f64, Vec<f64>);
+/// High precision values for the rows where Stan Math and stanmath-rs disagree.
+const EXACT: [&str; 3] = [
+    include_str!("../../../crates/stanmath-rs/tests/data/mpmath_reference_scalar.csv"),
+    include_str!("../../../crates/stanmath-rs-distributions/tests/data/mpmath_reference.csv"),
+    include_str!("../../../crates/stanmath-rs-distributions/tests/data/mpmath_reference_extra.csv"),
+];
+
+/// `(key, ints, reals, value, gradient)` of one reference row; the key is its first three fields.
+type Row = (String, Vec<i64>, Vec<f64>, f64, Vec<f64>);
+
+/// The mpmath `(value, gradient)` for the row with `key`.
+fn exact(key: &str) -> Option<(f64, Vec<f64>)> {
+    EXACT.iter().flat_map(|t| t.lines()).find_map(|l| {
+        let f: Vec<&str> = l.split(',').collect();
+        if f.len() < 5 || f[..3].join(",") != key {
+            return None;
+        }
+        let g = if f[4].is_empty() {
+            vec![]
+        } else {
+            f[4].split(';')
+                .map(|v| v.parse().ok())
+                .collect::<Option<_>>()?
+        };
+        Some((f[3].parse().ok()?, g))
+    })
+}
 
 /// The rows named `name`.
 fn rows(name: &str) -> Vec<Row> {
@@ -41,13 +68,25 @@ fn rows(name: &str) -> Vec<Row> {
                     .map(|v| v.parse().ok())
                     .collect::<Option<_>>()?
             };
-            Some((ints, list(f[2])?, f[3].parse().ok()?, list(f[4])?))
+            Some((
+                f[..3].join(","),
+                ints,
+                list(f[2])?,
+                f[3].parse().ok()?,
+                list(f[4])?,
+            ))
         })
         .collect()
 }
 
-fn close(a: f64, b: f64) -> bool {
-    a == b || (a.is_nan() && b.is_nan()) || (a - b).abs() <= 1e-9 * b.abs().max(1.0)
+fn close(a: f64, b: f64, rtol: f64) -> bool {
+    a == b || (a.is_nan() && b.is_nan()) || (a - b).abs() <= rtol * b.abs().max(1.0)
+}
+
+fn agrees(value: f64, grad: &[f64], want: f64, want_grad: &[f64], rtol: f64) -> bool {
+    close(value, want, rtol)
+        && grad.len() == want_grad.len()
+        && grad.iter().zip(want_grad).all(|(a, b)| close(*a, *b, rtol))
 }
 
 /// Compares `f` on every row of `name` with `arity` reals; returns the number of rows compared.
@@ -59,7 +98,7 @@ fn compare(
     failures: &mut Vec<String>,
 ) -> usize {
     let mut n = 0;
-    for (i, x, want, grad) in rows(name) {
+    for (key, i, x, want, grad) in rows(name) {
         if i.len() != ints || x.len() != arity || grad.len() != arity {
             continue;
         }
@@ -67,13 +106,15 @@ fn compare(
         match try_value_and_grad(|v| f(&i, v), &x) {
             Err(e) => failures.push(format!("{name} {i:?} {x:?}: we reject: {e}")),
             Ok(r) => {
-                if !close(r.value, want)
-                    || r.gradient.iter().zip(&grad).any(|(a, b)| !close(*a, *b))
-                {
-                    failures.push(format!(
+                if agrees(r.value, &r.gradient, want, &grad, 1e-9) {
+                    continue;
+                }
+                match exact(&key) {
+                    Some((v, g)) if agrees(r.value, &r.gradient, v, &g, 1e-12) => {}
+                    _ => failures.push(format!(
                         "{name} {i:?} {x:?}: ours {} {:?}, Stan {want} {grad:?}",
                         r.value, r.gradient
-                    ));
+                    )),
                 }
             }
         }
