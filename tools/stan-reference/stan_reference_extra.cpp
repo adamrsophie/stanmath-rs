@@ -219,4 +219,108 @@ int main() {
              [&](const Vars& v) { return multi_gp_lpdf(gp_y(v), sym(v, 6), vec(v, 12, 2)); });
   continuous("multi_gp_cholesky_lpdf", {cat({{0.3, -0.5, 1.2, 0.1, 0.0, 0.8}, l6, {1.5, 0.7}})},
              [&](const Vars& v) { return multi_gp_cholesky_lpdf(gp_y(v), low(v, 6), vec(v, 12, 2)); });
+
+  // Probability scale CDFs, the remaining discrete families, GLMs, the dynamic linear model, hidden
+  // Markov models, the Wiener CDFs, and the Student t quantile function.
+#define CDF3(f, pts) continuous(#f, pts, [](const Vars& v) { return f(v[0], v[1], v[2]); })
+#define CDF4(f, pts) continuous(#f, pts, [](const Vars& v) { return f(v[0], v[1], v[2], v[3]); })
+  CDF3(normal_cdf, (Pts{{1.3, 0.5, 1.2}, {-6.0, 0.0, 1.0}, {4.0, 0.0, 1.0}}));
+  CDF3(lognormal_cdf, (Pts{{1.5, 0.2, 0.7}, {0.05, 0.0, 1.0}}));
+  CDF3(cauchy_cdf, (Pts{{1.5, 0.5, 2.0}, {-30.0, 0.0, 1.0}}));
+  CDF3(logistic_cdf, (Pts{{1.5, 0.5, 2.0}, {-20.0, 0.0, 1.0}}));
+  CDF3(gumbel_cdf, (Pts{{1.3, 0.5, 1.2}, {-3.0, 0.0, 0.5}}));
+  CDF3(double_exponential_cdf, (Pts{{1.3, 0.5, 1.2}, {-4.0, 0.0, 0.5}}));
+  CDF3(gamma_cdf, (Pts{{1.5, 2.5, 0.5}, {0.01, 0.3, 2.0}}));
+  CDF3(inv_gamma_cdf, (Pts{{1.5, 2.5, 0.5}, {0.2, 3.0, 1.0}}));
+  CDF3(beta_cdf, (Pts{{0.3, 2.0, 5.0}, {0.01, 30.0, 2.0}}));
+  CDF3(weibull_cdf, (Pts{{1.5, 2.5, 1.2}, {0.01, 0.5, 2.0}}));
+  CDF3(frechet_cdf, (Pts{{1.3, 2.0, 1.2}, {0.4, 0.7, 2.0}}));
+  CDF3(pareto_cdf, (Pts{{2.5, 1.0, 3.0}, {1.1, 0.5, 0.7}}));
+  CDF3(uniform_cdf, (Pts{{0.3, 0.0, 1.0}, {1.5, -1.0, 2.0}}));
+  CDF3(scaled_inv_chi_square_cdf, (Pts{{0.5, 3.0, 0.8}, {2.0, 0.7, 1.5}}));
+  CDF3(loglogistic_cdf, (Pts{{1.3, 2.0, 3.0}, {0.2, 0.7, 1.5}}));
+  CDF3(von_mises_cdf, (Pts{{1.3, 0.5, 1.2}, {-2.0, 0.0, 0.3}}));
+  CDF4(student_t_cdf, (Pts{{1.5, 3.0, 0.5, 2.0}, {-20.0, 0.7, 0.0, 1.0}}));
+  CDF4(exp_mod_normal_cdf, (Pts{{1.3, 0.5, 1.2, 0.8}, {-2.0, 0.0, 0.5, 3.0}}));
+  CDF4(skew_normal_cdf, (Pts{{1.3, 0.5, 1.2, 0.8}, {-1.0, 0.0, 0.5, -2.0}}));
+  CDF4(skew_double_exponential_cdf, (Pts{{1.3, 0.5, 1.2, 0.3}, {-1.0, 0.0, 0.5, 0.8}}));
+  CDF4(pareto_type_2_cdf, (Pts{{1.5, 0.0, 2.0, 3.0}, {4.0, 1.0, 0.5, 1.5}}));
+  CDF4(student_t_qf, (Pts{{0.3, 3.0, 0.5, 2.0}, {0.99, 0.7, 0.0, 1.0}, {0.001, 12.0, -1.0, 0.4}}));
+  using IP = std::vector<std::pair<std::vector<int>, std::vector<double>>>;
+  using Ints = std::vector<int>;
+  discrete("bernoulli_cdf", IP{{{0}, {0.3}}}, [](const Ints& k, const Vars& v) { return bernoulli_cdf(k[0], v[0]); });
+  discrete("binomial_cdf", IP{{{3, 10}, {0.4}}, {{0, 5}, {0.01}}}, [](const Ints& k, const Vars& v) { return binomial_cdf(k[0], k[1], v[0]); });
+  discrete("poisson_cdf", IP{{{3}, {2.5}}, {{100}, {80.0}}}, [](const Ints& k, const Vars& v) { return poisson_cdf(k[0], v[0]); });
+  discrete("neg_binomial_cdf", IP{{{3}, {2.5, 0.7}}, {{12}, {4.0, 0.3}}}, [](const Ints& k, const Vars& v) { return neg_binomial_cdf(k[0], v[0], v[1]); });
+  discrete("neg_binomial_2_cdf", IP{{{3}, {2.5, 4.0}}, {{50}, {40.0, 1e3}}}, [](const Ints& k, const Vars& v) { return neg_binomial_2_cdf(k[0], v[0], v[1]); });
+  discrete("beta_binomial_cdf", IP{{{3, 10}, {2.5, 0.7}}, {{12, 20}, {4.0, 0.3}}}, [](const Ints& k, const Vars& v) { return beta_binomial_cdf(k[0], k[1], v[0], v[1]); });
+  discrete("beta_neg_binomial_cdf", IP{{{3}, {2.5, 3.7, 1.5}}, {{12}, {4.0, 5.3, 2.0}}}, [](const Ints& k, const Vars& v) { return beta_neg_binomial_cdf(k[0], v[0], v[1], v[2]); });
+  discrete("poisson_binomial_cdf", IP{{{1}, {0.2, 0.5, 0.7}}}, [](const Ints& k, const Vars& v) { return poisson_binomial_cdf(k[0], vec(v, 0, 3)); });
+  const IP ys = {{{1}, {0.5}}, {{4}, {2.5}}, {{20}, {0.8}}};
+  discrete("yule_simon_lpmf", ys, [](const Ints& k, const Vars& v) { return yule_simon_lpmf(k[0], v[0]); });
+  discrete("yule_simon_cdf", ys, [](const Ints& k, const Vars& v) { return yule_simon_cdf(k[0], v[0]); });
+  discrete("yule_simon_lcdf", ys, [](const Ints& k, const Vars& v) { return yule_simon_lcdf(k[0], v[0]); });
+  discrete("yule_simon_lccdf", ys, [](const Ints& k, const Vars& v) { return yule_simon_lccdf(k[0], v[0]); });
+  const IP dr = {{{3, 1, 6}, {}}, {{1, 1, 6}, {}}, {{6, 1, 6}, {}}, {{0, 1, 6}, {}}};
+  discrete("discrete_range_lpmf", dr, [](const Ints& k, const Vars&) { return var(discrete_range_lpmf(k[0], k[1], k[2])); });
+  discrete("discrete_range_cdf", dr, [](const Ints& k, const Vars&) { return var(discrete_range_cdf(k[0], k[1], k[2])); });
+  discrete("discrete_range_lcdf", dr, [](const Ints& k, const Vars&) { return var(discrete_range_lcdf(k[0], k[1], k[2])); });
+  discrete("discrete_range_lccdf", dr, [](const Ints& k, const Vars&) { return var(discrete_range_lccdf(k[0], k[1], k[2])); });
+  discrete("hypergeometric_lpmf", IP{{{2, 5, 4, 6}, {}}, {{0, 3, 2, 8}, {}}, {{4, 5, 4, 6}, {}}},
+           [](const Ints& k, const Vars&) { return var(hypergeometric_lpmf(k[0], k[1], k[2], k[3])); });
+  const Pts wien = {{1.2, 1.5, 0.2, 0.5, 0.8}, {0.6, 2.0, 0.3, 0.4, -0.5}};
+  continuous("wiener_lcdf_unnorm", wien, [](const Vars& v) { return wiener_lcdf_unnorm(v[0], v[1], v[2], v[3], v[4]); });
+  continuous("wiener_lccdf_unnorm", wien, [](const Vars& v) { return wiener_lccdf_unnorm(v[0], v[1], v[2], v[3], v[4]); });
+
+  // GLMs with three observations; x is 3 by 2, column major, at reals 0..6 unless noted.
+  const std::vector<double> gx = {0.3, -0.8, 1.4, 0.2, 0.6, -0.5};
+  auto xm = [](const Vars& v, int o) { M3 m(3, 2); for (int k = 0; k < 6; ++k) m(k % 3, k / 3) = v[o + k]; return m; };
+  continuous("normal_id_glm_lpdf", {cat({{0.4, -1.1, 2.0}, gx, {0.3}, {0.7, -0.4}, {1.3}})},
+             [&](const Vars& v) { return normal_id_glm_lpdf(vec(v, 0, 3), xm(v, 3), v[9], vec(v, 10, 2), v[12]); });
+  discrete("bernoulli_logit_glm_lpmf", IP{{{1, 0, 1}, cat({gx, {0.3}, {0.7, -0.4}})}},
+           [&](const Ints& k, const Vars& v) { return bernoulli_logit_glm_lpmf(k, xm(v, 0), v[6], vec(v, 7, 2)); });
+  discrete("poisson_log_glm_lpmf", IP{{{2, 0, 3}, cat({gx, {0.3}, {0.7, -0.4}})}},
+           [&](const Ints& k, const Vars& v) { return poisson_log_glm_lpmf(k, xm(v, 0), v[6], vec(v, 7, 2)); });
+  // An int response shared by three rows: Stan adds -lgamma(y + 1) once (see the Rust test).
+  discrete("poisson_log_glm_lpmf_int", IP{{{2}, cat({gx, {0.3}, {0.7, -0.4}})}},
+           [&](const Ints& k, const Vars& v) { return poisson_log_glm_lpmf(k[0], xm(v, 0), v[6], vec(v, 7, 2)); });
+  discrete("neg_binomial_2_log_glm_lpmf", IP{{{2, 0, 3}, cat({gx, {0.3}, {0.7, -0.4}, {2.5}})}},
+           [&](const Ints& k, const Vars& v) { return neg_binomial_2_log_glm_lpmf(k, xm(v, 0), v[6], vec(v, 7, 2), v[9]); });
+  discrete("binomial_logit_glm_lpmf", IP{{{1, 3, 2, 4, 5, 6}, cat({gx, {0.3}, {0.7, -0.4}})}},
+           [&](const Ints& k, const Vars& v) {
+             return binomial_logit_glm_lpmf(Ints(k.begin(), k.begin() + 3), Ints(k.begin() + 3, k.end()), xm(v, 0), v[6], vec(v, 7, 2)); });
+  discrete("ordered_logistic_glm_lpmf", IP{{{1, 3, 2}, cat({gx, {0.7, -0.4}, {-0.5, 0.6}})}},
+           [&](const Ints& k, const Vars& v) { return ordered_logistic_glm_lpmf(k, xm(v, 0), vec(v, 6, 2), vec(v, 8, 2)); });
+  discrete("categorical_logit_glm_lpmf", IP{{{1, 3, 2}, cat({gx, {0.3, -0.2, 0.5}, {0.7, -0.4, 0.1, 0.9, -1.2, 0.4}})}},
+           [&](const Ints& k, const Vars& v) {
+             M3 b(2, 3); for (int j = 0; j < 6; ++j) b(j % 2, j / 2) = v[9 + j];
+             return categorical_logit_glm_lpmf(k, xm(v, 0), vec(v, 6, 3), b); });
+
+  // Gaussian dynamic linear model: y is 2 by 3 (reals 0..6), then V, then m0; F, G, W, C0 are data.
+  Eigen::MatrixXd F(2, 2), G(2, 2), W(2, 2), C0 = Eigen::MatrixXd::Identity(2, 2);
+  F << 1.0, 0.0, 0.2, 1.0;
+  G << 0.9, 0.1, 0.0, 0.8;
+  W << 0.3, 0.05, 0.05, 0.2;
+  const std::vector<double> dy = {0.3, -0.2, 0.8, 0.1, -0.4, 0.6};
+  continuous("gaussian_dlm_obs_lpdf", {cat({dy, {0.5, 0.7}, {0.0, 0.1}})}, [&](const Vars& v) {
+    return gaussian_dlm_obs_lpdf(gp_y(v), F, G, vec(v, 6, 2), W, vec(v, 8, 2), C0); });
+  continuous("gaussian_dlm_obs_lpdf_matrix", {cat({dy, {0.5, 0.1, 0.7}, {0.0, 0.1}})}, [&](const Vars& v) {
+    M3 V(2, 2); V(0, 0) = v[6]; V(1, 0) = V(0, 1) = v[7]; V(1, 1) = v[8];
+    return gaussian_dlm_obs_lpdf(gp_y(v), F, G, V, W, vec(v, 9, 2), C0); });
+
+  // Hidden Markov model: log_omegas 2 by 3, Gamma 2 by 2 (rows are simplexes), rho.
+  const std::vector<double> lo = {-0.5, -1.2, -2.0, -0.3, -0.8, -1.1};
+  const std::vector<double> gam = {0.7, 0.4, 0.3, 0.6};
+  continuous("hmm_marginal", {cat({lo, gam, {0.6, 0.4}})}, [&](const Vars& v) {
+    M3 g(2, 2); for (int k = 0; k < 4; ++k) g(k % 2, k / 2) = v[6 + k];
+    return hmm_marginal(gp_y(v), g, vec(v, 10, 2)); });
+  continuous("hmm_hidden_state_prob", {{}}, [&](const Vars&) {
+    Eigen::MatrixXd o(2, 3), g(2, 2);
+    for (int k = 0; k < 6; ++k) o(k % 2, k / 2) = lo[k];
+    for (int k = 0; k < 4; ++k) g(k % 2, k / 2) = gam[k];
+    Eigen::VectorXd rho(2); rho << 0.6, 0.4;
+    Eigen::MatrixXd p = hmm_hidden_state_prob(o, g, rho);
+    var s = 0;
+    for (int k = 0; k < p.size(); ++k) s += (1.0 + 0.1 * k) * p(k % p.rows(), k / p.rows());
+    return s; });
 }

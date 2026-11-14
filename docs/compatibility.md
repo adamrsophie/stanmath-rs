@@ -214,15 +214,23 @@ components disagree, and all 45 are resolved in stanmath-rs's favor. The largest
 
 Run `cargo test -p stanmath-rs-distributions --test stan_reference -- --nocapture` for the full list.
 
-`tests/stan_reference_extra.rs` adds 189 cases for 34 more families: chi-square, inverse and scaled
+`tests/stan_reference_extra.rs` adds 296 cases. The first 189 cover 34 more families: chi-square, inverse and scaled
 inverse chi-square, double exponential, exponentially modified normal, Frechet, Gumbel, Pareto,
 Pareto type 2, Rayleigh, skew normal, skew double exponential, von Mises, beta proportion,
 log-logistic, negative binomial, beta binomial, beta negative binomial, and Poisson binomial (each
 `_lpdf`/`_lpmf` and, where Stan has them, `_lcdf` and `_lccdf`), and the ordered logistic and
 probit, multinomial, multinomial logit, Dirichlet multinomial, multi normal precision, multi
 Student t and its Cholesky form, Wishart, inverse Wishart and their Cholesky forms, LKJ correlation
-and covariance, and multi GP and its Cholesky form. They agree with Stan to `1e-10` except 29 rows, where stanmath-rs matches a 40 digit mpmath reference (`tools/reference/extra.py`)
-to `1e-12` and Stan does not:
+and covariance, and multi GP and its Cholesky form. The other 107 cover the probability scale
+`_cdf` functions (normal, lognormal, Cauchy, logistic, Gumbel, double exponential, gamma, inverse
+gamma, beta, Weibull, Frechet, Pareto, uniform, scaled inverse chi-square, log-logistic, von Mises,
+Student t, exponentially modified normal, skew normal, skew double exponential, Pareto type 2, and
+the Bernoulli, binomial, Poisson, negative binomial, beta binomial, beta negative binomial, and
+Poisson binomial CDFs), `student_t_qf`, the Yule-Simon, discrete range, and hypergeometric families,
+`wiener_lcdf_unnorm` and `wiener_lccdf_unnorm`, every GLM, `gaussian_dlm_obs_lpdf` (vector and
+matrix V), `hmm_marginal`, and `hmm_hidden_state_prob`. They agree with Stan to `1e-10` except 42
+rows, where stanmath-rs matches a 40 digit mpmath reference (`tools/reference/extra.py`) to
+`1e-12` and Stan does not:
 
 | Case | Stan relative error | stanmath-rs |
 | --- | --- | --- |
@@ -231,6 +239,13 @@ to `1e-12` and Stan does not:
 | `exp_mod_normal_lcdf(-2 \| 0, 0.5, 3)`, value and gradient | 1.6e-10 to 2e-8 | about 1e-15 |
 | `poisson_binomial_lccdf(3 \| [0.6, 0.4, 0.8])`, value | NaN (the exact value is `log 0`) | `-inf`, zero gradient |
 | `ordered_probit_lpmf`, d/d eta and cutpoints | 7e-7 to 3e-6 | about 1e-16 |
+| `gamma_cdf`, `inv_gamma_cdf`, `scaled_inv_chi_square_cdf`, d/d shape | 1e-8 to 1.4e-4 | about 1e-15 |
+| `beta_cdf`, `neg_binomial_cdf`, `neg_binomial_2_cdf`, `beta_neg_binomial_cdf`, shape gradient | 4e-10 to 1.4e-4 | about 1e-15 |
+| `wiener_lcdf_unnorm`, `wiener_lccdf_unnorm`, d/d t0 and d/d v | 6e-6 to 8e-5 | within 1e-12 |
+
+Stan Math 5.4.0's `poisson_log_glm_lpmf` with an int response and several rows of `x` adds
+`-lgamma(y + 1)` once rather than once per row; stanmath-rs returns the sum over rows, and the
+test compares the two with that difference added back.
 
 `crates/stanmath-rs/tests/stan_reference_scalar.rs` covers every function of one or two reals in the
 Stan language (from `stanc --dump-stan-math-signatures`) except the `_rng` and bound transform
@@ -245,14 +260,37 @@ stanmath-rs matches a 40 digit mpmath reference (`tools/reference/scalar.py`) to
 | `gamma_q`, d/d a | 1.7e-7 to 1.3e-5 | about 1e-15 |
 | chi-square and inverse chi-square CDFs, d/d nu | 4e-9 to 4e-6 | about 1e-15 |
 
-`crates/stanmath-rs/tests/stan_reference_matrix.rs` checks 97 cases of the matrix functions
+`crates/stanmath-rs/tests/stan_reference_matrix.rs` checks 131 cases of the matrix functions
 (decompositions, inverses, solves, products, reductions, `matrix_exp`, `svd_*`, `qr_*`, sorting and
 softmax) and every constraining transform's `_constrain`, `_jacobian`, and `_unconstrain` form
 against Stan to `1e-10`; a matrix result is reduced to a weighted sum of its entries, so the
 gradient covers each one. `svd_U`, `svd_V`, and the `qr_*` factors match Stan's signs.
 `eigenvectors_sym` signs are arbitrary (Stan's follow Eigen's solver), so that case checks
 `V diag(1, 2, 3) Vᵀ`. The comparison changed `corr_matrix_unconstrain` to read the diagonal as Stan
-does, which changes only its derivative with respect to the diagonal.
+does, which changes only its derivative with respect to the diagonal. The later cases add `fma`,
+`matrix_power`, `scale_matrix_exp_multiply`, the trace and quadratic forms, the row and column dot
+products, `diag_pre_multiply`, `diag_post_multiply`, `add_diag`, the CSR product and expansion,
+`fft`, `inv_fft`, `fft2`, `inv_fft2`, `polar`, the general `eigenvalues` (reduced by
+`sum |l| + re(l)^2`, which does not depend on their order), every Gaussian process kernel,
+`hypergeometric_3F2`, `hypergeometric_pFq`, `quantile`, `rank`, and `sort_indices_*`.
+
+`crates/stanmath-rs/tests/stan_reference_solvers.rs` compares `integrate_ode_rk45`,
+`integrate_ode_adams`, `integrate_ode_bdf` (a Lotka Volterra system), `algebra_solver`,
+`algebra_solver_newton`, and `integrate_1d` with Stan in value and in the gradient with respect to
+every parameter, at tight tolerances on both sides, to `1e-7`.
+
+Of the 571 function names in the signature dump, 437 have at least one comparison with a value
+Stan Math computed. The rest are the 61 `_rng` functions, which cannot match Stan's draws (each
+scalar sampler is checked against its own CDF or moments in `tests/samplers.rs` and elsewhere);
+the constructors, accessors, and conversions (`rep_*`, `zeros_*`, `ones_*`, `one_hot_*`,
+`linspaced_*`, `identity_matrix`, `diag_matrix`, `uniform_simplex`, `block`, `row`, `col`,
+`sub_row`, `sub_col`, `head`, `tail`, `segment`, `append_*`, `dims`, `size`, `num_elements`,
+`rows`, `cols`, `to_*`, `get_real`, `get_imag`, `csr_extract*`, the logical operators, `is_inf`,
+`int_step`), checked against their definitions; the tuple forms `eigendecompose`,
+`eigendecompose_sym`, `svd`, `qr`, and `qr_thin`, whose parts are compared one by one; the
+eigenvectors and complex Schur factors, which are not unique and are checked by reconstruction;
+`integrate_ode` (the `rk45` solver at default tolerances), `map_rect`, and
+`generate_laplace_options`.
 
 `crates/stanmath-rs-distributions/tests/signatures.rs`, written by `tools/reference/gen_signatures.py`
 from the signature dump, maps every vectorized distribution signature (11953 Stan signatures over

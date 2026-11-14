@@ -63,6 +63,11 @@ fn continuous_samplers_match_their_cdfs() {
     );
     ks_check!(rng, loglogistic_rng(2.0, 3.0), loglogistic_lcdf);
     ks_check!(rng, beta_proportion_rng(0.3, 8.0), beta_proportion_lcdf);
+    ks_check!(rng, cauchy_rng(0.5, 2.0), cauchy_lcdf);
+    ks_check!(rng, inv_gamma_rng(3.0, 2.0), inv_gamma_lcdf);
+    ks_check!(rng, logistic_rng(1.0, 0.7), logistic_lcdf);
+    ks_check!(rng, lognormal_rng(0.3, 0.6), lognormal_lcdf);
+    ks_check!(rng, uniform_rng(-1.0, 2.5), uniform_lcdf);
 }
 
 /// Sample mean within five standard errors and sample variance within 5%.
@@ -121,4 +126,21 @@ fn discrete_samplers_have_the_right_moments() {
     // Poisson with log rate.
     let xs = draw(&mut |r| poisson_log_rng(1.2, r).unwrap());
     moments("poisson_log", &xs, 1.2f64.exp(), 1.2f64.exp());
+    let xs = draw(&mut |r| bernoulli_rng(0.3, r).unwrap());
+    moments("bernoulli", &xs, 0.3, 0.21);
+    let xs = draw(&mut |r| bernoulli_logit_rng(0.4, r).unwrap());
+    moments("bernoulli_logit", &xs, p, p * (1.0 - p));
+    // Negative binomial with log mean eta: variance mu + mu^2 / phi.
+    let mu = 1.0f64.exp();
+    let xs = draw(&mut |r| neg_binomial_2_log_rng(1.0, 3.0, r).unwrap());
+    moments("neg_binomial_2_log", &xs, mu, mu + mu * mu / 3.0);
+    // Beta negative binomial (r, alpha, beta): mean r beta / (alpha - 1), variance
+    // r beta (r + alpha - 1) (beta + alpha - 1) / ((alpha - 2) (alpha - 1)^2).
+    let xs = draw(&mut |r| beta_neg_binomial_rng(3.0, 12.0, 2.0, r).unwrap());
+    moments(
+        "beta_neg_binomial",
+        &xs,
+        6.0 / 11.0,
+        6.0 * 14.0 * 13.0 / (10.0 * 121.0),
+    );
 }

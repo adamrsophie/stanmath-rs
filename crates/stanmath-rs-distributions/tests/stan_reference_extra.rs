@@ -88,8 +88,116 @@ fn eval<'t>(name: &str, n: &[i64], x: &[Var<'t>]) -> Result<Var<'t>> {
         "lkj_cov_lpdf" => lkj_cov_lpdf(&sym(&x[0..6]), &x[6..9], &x[9..12], x[12]),
         "multi_gp_lpdf" => multi_gp_lpdf(&gp_y(x), &sym(&x[6..12]), &x[12..14]),
         "multi_gp_cholesky_lpdf" => multi_gp_cholesky_lpdf(&gp_y(x), &low(&x[6..12]), &x[12..14]),
+        "normal_cdf" => normal_cdf(x[0], x[1], x[2]),
+        "lognormal_cdf" => lognormal_cdf(x[0], x[1], x[2]),
+        "cauchy_cdf" => cauchy_cdf(x[0], x[1], x[2]),
+        "logistic_cdf" => logistic_cdf(x[0], x[1], x[2]),
+        "gumbel_cdf" => gumbel_cdf(x[0], x[1], x[2]),
+        "double_exponential_cdf" => double_exponential_cdf(x[0], x[1], x[2]),
+        "gamma_cdf" => gamma_cdf(x[0], x[1], x[2]),
+        "inv_gamma_cdf" => inv_gamma_cdf(x[0], x[1], x[2]),
+        "beta_cdf" => beta_cdf(x[0], x[1], x[2]),
+        "weibull_cdf" => weibull_cdf(x[0], x[1], x[2]),
+        "frechet_cdf" => frechet_cdf(x[0], x[1], x[2]),
+        "pareto_cdf" => pareto_cdf(x[0], x[1], x[2]),
+        "uniform_cdf" => uniform_cdf(x[0], x[1], x[2]),
+        "scaled_inv_chi_square_cdf" => scaled_inv_chi_square_cdf(x[0], x[1], x[2]),
+        "loglogistic_cdf" => loglogistic_cdf(x[0], x[1], x[2]),
+        "von_mises_cdf" => von_mises_cdf(x[0], x[1], x[2]),
+        "student_t_cdf" => student_t_cdf(x[0], x[1], x[2], x[3]),
+        "exp_mod_normal_cdf" => exp_mod_normal_cdf(x[0], x[1], x[2], x[3]),
+        "skew_normal_cdf" => skew_normal_cdf(x[0], x[1], x[2], x[3]),
+        "skew_double_exponential_cdf" => skew_double_exponential_cdf(x[0], x[1], x[2], x[3]),
+        "pareto_type_2_cdf" => pareto_type_2_cdf(x[0], x[1], x[2], x[3]),
+        "student_t_qf" => student_t_qf(x[0], x[1], x[2], x[3]),
+        "bernoulli_cdf" => bernoulli_cdf(n[0], x[0]),
+        "binomial_cdf" => binomial_cdf(n[0], n[1], x[0]),
+        "poisson_cdf" => poisson_cdf(n[0], x[0]),
+        "neg_binomial_cdf" => neg_binomial_cdf(n[0], x[0], x[1]),
+        "neg_binomial_2_cdf" => neg_binomial_2_cdf(n[0], x[0], x[1]),
+        "beta_binomial_cdf" => beta_binomial_cdf(n[0], n[1], x[0], x[1]),
+        "beta_neg_binomial_cdf" => beta_neg_binomial_cdf(n[0], x[0], x[1], x[2]),
+        "poisson_binomial_cdf" => poisson_binomial_cdf(n[0], x),
+        "yule_simon_lpmf" => yule_simon_lpmf(n[0], x[0]),
+        "yule_simon_cdf" => yule_simon_cdf(n[0], x[0]),
+        "yule_simon_lcdf" => yule_simon_lcdf(n[0], x[0]),
+        "yule_simon_lccdf" => yule_simon_lccdf(n[0], x[0]),
+        "discrete_range_lpmf" => discrete_range_lpmf(n[0], n[1], n[2]).map(Var::constant),
+        "discrete_range_cdf" => discrete_range_cdf(n[0], n[1], n[2]).map(Var::constant),
+        "discrete_range_lcdf" => discrete_range_lcdf(n[0], n[1], n[2]).map(Var::constant),
+        "discrete_range_lccdf" => discrete_range_lccdf(n[0], n[1], n[2]).map(Var::constant),
+        "hypergeometric_lpmf" => hypergeometric_lpmf(n[0], n[1], n[2], n[3]).map(Var::constant),
+        "wiener_lcdf_unnorm" => wiener_lcdf_unnorm(x[0], x[1], x[2], x[3], x[4]),
+        "wiener_lccdf_unnorm" => wiener_lccdf_unnorm(x[0], x[1], x[2], x[3], x[4]),
+        "normal_id_glm_lpdf" => normal_id_glm_lpdf(&x[0..3], &xm(x, 3), x[9], &x[10..12], x[12]),
+        "bernoulli_logit_glm_lpmf" => bernoulli_logit_glm_lpmf(n, &xm(x, 0), x[6], &x[7..9]),
+        "poisson_log_glm_lpmf" => poisson_log_glm_lpmf(n, &xm(x, 0), x[6], &x[7..9]),
+        // Stan Math 5.4.0 adds -lgamma(y + 1) once for an int response shared by the three rows;
+        // stanmath-rs adds it for every row, so it is lower by 2 lgamma(y + 1).
+        "poisson_log_glm_lpmf_int" => poisson_log_glm_lpmf(n[0], &xm(x, 0), x[6], &x[7..9])
+            .map(|v| v + 2.0 * (1..=n[0]).map(|k| (k as f64).ln()).sum::<f64>()),
+        "neg_binomial_2_log_glm_lpmf" => {
+            neg_binomial_2_log_glm_lpmf(n, &xm(x, 0), x[6], &x[7..9], x[9])
+        }
+        "binomial_logit_glm_lpmf" => {
+            binomial_logit_glm_lpmf(&n[0..3], &n[3..6], &xm(x, 0), x[6], &x[7..9])
+        }
+        "ordered_logistic_glm_lpmf" => ordered_logistic_glm_lpmf(n, &xm(x, 0), &x[6..8], &x[8..10]),
+        "categorical_logit_glm_lpmf" => categorical_logit_glm_lpmf(
+            n,
+            &xm(x, 0),
+            &x[6..9],
+            &Matrix::from_column_major(2, 3, x[9..15].to_vec()),
+        ),
+        "gaussian_dlm_obs_lpdf" => {
+            let v = Matrix::from_rows(&[[x[6], c(0.0)], [c(0.0), x[7]]]);
+            dlm(x, &v, &x[8..10])
+        }
+        "gaussian_dlm_obs_lpdf_matrix" => {
+            let v = Matrix::from_rows(&[[x[6], x[7]], [x[7], x[8]]]);
+            dlm(x, &v, &x[9..11])
+        }
+        "hmm_marginal" => hmm_marginal(
+            &gp_y(x),
+            &Matrix::from_column_major(2, 2, x[6..10].to_vec()),
+            &x[10..12],
+        ),
+        "hmm_hidden_state_prob" => {
+            let o = Matrix::from_column_major(2, 3, vec![-0.5, -1.2, -2.0, -0.3, -0.8, -1.1]);
+            let g = Matrix::from_column_major(2, 2, vec![0.7, 0.4, 0.3, 0.6]);
+            let p = hmm_hidden_state_prob(&o, &g, &[0.6, 0.4])?;
+            let s = p
+                .as_slice()
+                .iter()
+                .enumerate()
+                .map(|(k, v)| v * (1.0 + 0.1 * k as f64));
+            Ok(Var::constant(s.sum()))
+        }
         other => panic!("no dispatch for {other}"),
     }
+}
+
+fn c<'t>(v: f64) -> Var<'t> {
+    Var::constant(v)
+}
+
+/// The 3 by 2 GLM design matrix at `x[o..o + 6]`, column major.
+fn xm<'t>(x: &[Var<'t>], o: usize) -> Matrix<Var<'t>> {
+    Matrix::from_column_major(3, 2, x[o..o + 6].to_vec())
+}
+
+/// The dynamic linear model cases: y is `x[0..6]`; F, G, W, and C0 are data.
+fn dlm<'t>(x: &[Var<'t>], v: &Matrix<Var<'t>>, m0: &[Var<'t>]) -> Result<Var<'t>> {
+    let m = |r: [[f64; 2]; 2]| Matrix::from_rows(&r.map(|row| row.map(c)));
+    gaussian_dlm_obs_lpdf(
+        &gp_y(x),
+        &m([[1.0, 0.0], [0.2, 1.0]]),
+        &m([[0.9, 0.1], [0.0, 0.8]]),
+        v,
+        &m([[0.3, 0.05], [0.05, 0.2]]),
+        m0,
+        &m([[1.0, 0.0], [0.0, 1.0]]),
+    )
 }
 
 /// A 3 by 3 lower triangular matrix from six values, row by row.
@@ -182,6 +290,6 @@ fn extra_distributions_match_stan_or_beat_it() {
         }
     }
     println!("{adjudicated} disagreements with Stan resolved in stanmath-rs's favor");
-    assert!(count > 150);
+    assert!(count > 290);
     assert!(failures.is_empty(), "\n{}", failures.join("\n"));
 }

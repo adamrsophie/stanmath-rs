@@ -4,6 +4,7 @@
 //! result is reduced to `sum_k (1 + k / 10) r_k` over its column major entries; a `_jacobian` case
 //! adds the log Jacobian to that sum.
 
+use stanmath_rs::autodiff::Complex;
 use stanmath_rs::prelude::*;
 
 /// The weighted sum of a result's column major entries.
@@ -204,6 +205,70 @@ fn with_lp<'t, W: WSum<'t>>(x: &[Var<'t>], f: impl FnOnce(&mut Var<'t>) -> W) ->
 // stan: cov_matrix_constrain(vector, int)
 // stan: cov_matrix_jacobian(vector, int)
 // stan: cov_matrix_unconstrain(matrix)
+// stan: fma(real, real, real)
+// stan: polar(real, real)
+// stan: trace_dot(matrix, matrix)
+// stan: eigenvalues(matrix)
+// stan: matrix_power(matrix, int)
+// stan: scale_matrix_exp_multiply(real, matrix, matrix)
+// stan: trace_quad_form(matrix, matrix)
+// stan: trace_gen_quad_form(matrix, matrix, matrix)
+// stan: quad_form_diag(matrix, vector)
+// stan: columns_dot_product(matrix, matrix)
+// stan: rows_dot_product(matrix, matrix)
+// stan: columns_dot_self(matrix)
+// stan: diag_pre_multiply(vector, matrix)
+// stan: diag_post_multiply(matrix, vector)
+// stan: add_diag(matrix, real)
+// stan: add_diag(matrix, vector)
+// stan: csr_matrix_times_vector(int, int, vector, array[] int, array[] int, vector)
+// stan: csr_to_dense_matrix(int, int, vector, array[] int, array[] int)
+// stan: fft(complex_vector)
+// stan: inv_fft(complex_vector)
+// stan: fft2(complex_matrix)
+// stan: inv_fft2(complex_matrix)
+// stan: gp_exp_quad_cov(array[] real, real, real)
+// stan: gp_matern32_cov(array[] real, real, real)
+// stan: gp_matern52_cov(array[] real, real, real)
+// stan: gp_exponential_cov(array[] real, real, real)
+// stan: gp_periodic_cov(array[] real, real, real, real)
+// stan: gp_dot_prod_cov(array[] real, real)
+// stan: hypergeometric_3F2(vector, vector, real)
+// stan: hypergeometric_pFq(vector, vector, real)
+// stan: quantile(data vector, data real)
+// stan: rank(vector, int)
+// stan: sort_indices_asc(vector)
+// stan: sort_indices_desc(vector)
+/// Four complex values from `x[0..8]`, (re, im) pairs.
+fn cvec<'t>(x: &[Var<'t>]) -> Vec<Complex<Var<'t>>> {
+    x[..8].chunks(2).map(|p| Complex::new(p[0], p[1])).collect()
+}
+
+/// `sum_k (1 + k / 10) re_k + (1 / 2 + k / 10) im_k` over column major entries.
+fn cwsum<'t>(e: &[Complex<Var<'t>>]) -> Var<'t> {
+    e.iter()
+        .enumerate()
+        .map(|(k, z)| z.re * (1.0 + 0.1 * k as f64) + z.im * (0.5 + 0.1 * k as f64))
+        .sum()
+}
+
+/// The sparse matrix of the CSR cases: nonzeros `x[0..5]` at (1,1), (1,3), (2,2), (3,1), (3,3).
+fn csr<'t>(x: &[Var<'t>]) -> CsrMatrix<Var<'t>> {
+    let z = Var::constant(0.0);
+    csr_extract(&Matrix::from_rows(&[
+        [x[0], z, x[1]],
+        [z, x[2], z],
+        [x[3], z, x[4]],
+    ]))
+}
+
+/// Four one based indices packed as decimal digits, first index lowest.
+fn digits<'t>(r: Vec<usize>) -> Result<Var<'t>> {
+    Ok(Var::constant(
+        (r[0] + 10 * r[1] + 100 * r[2] + 1000 * r[3]) as f64,
+    ))
+}
+
 fn eval<'t>(name: &str, x: &[Var<'t>]) -> Result<Var<'t>> {
     let a = || mat(x, 3, 3);
     let b = || mat(&x[9..], 3, 2);
@@ -317,6 +382,57 @@ fn eval<'t>(name: &str, x: &[Var<'t>]) -> Result<Var<'t>> {
         "cov_matrix_constrain" => cov_matrix_constrain(x, 3).wsum(),
         "cov_matrix_jacobian" => with_lp(x, |lp| cov_matrix_jacobian(x, 3, lp)),
         "cov_matrix_unconstrain" => cov_matrix_unconstrain(&sym(x)).wsum(),
+        "fma" => Ok(fma(x[0], x[1], x[2])),
+        "matrix_power" => matrix_power(&a(), 3).wsum(),
+        "scale_matrix_exp_multiply" => scale_matrix_exp_multiply(x[15], &a(), &b()).wsum(),
+        "trace_quad_form" => trace_quad_form(&sym(x), &mat(&x[6..], 3, 2)).wsum(),
+        "trace_gen_quad_form" => {
+            trace_gen_quad_form(&mat(x, 2, 2), &mat(&x[4..], 3, 3), &mat(&x[13..], 3, 2)).wsum()
+        }
+        "quad_form_diag" => quad_form_diag(&a(), &x[9..12]).wsum(),
+        "columns_dot_product" => columns_dot_product(&mat(x, 3, 2), &mat(&x[6..], 3, 2)).wsum(),
+        "rows_dot_product" => rows_dot_product(&mat(x, 3, 2), &mat(&x[6..], 3, 2)).wsum(),
+        "columns_dot_self" => columns_dot_self(&mat(x, 3, 2)).wsum(),
+        "diag_pre_multiply" => diag_pre_multiply(&x[0..3], &mat(&x[3..], 3, 3)).wsum(),
+        "diag_post_multiply" => diag_post_multiply(&a(), &x[9..12]).wsum(),
+        "add_diag" => add_diag(&a(), x[9]).wsum(),
+        "add_diag_vector" => add_diag_vector(&a(), &x[9..12]).wsum(),
+        "csr_matrix_times_vector" => csr_matrix_times_vector(&csr(x), &x[5..8]).wsum(),
+        "csr_to_dense_matrix" => csr_to_dense_matrix(&csr(x)).wsum(),
+        "fft" => Ok(cwsum(&fft(&cvec(x)))),
+        "inv_fft" => Ok(cwsum(&inv_fft(&cvec(x)))),
+        "fft2" => Ok(cwsum(
+            fft2(&Matrix::from_column_major(2, 2, cvec(x))).as_slice(),
+        )),
+        "inv_fft2" => Ok(cwsum(
+            inv_fft2(&Matrix::from_column_major(2, 2, cvec(x))).as_slice(),
+        )),
+        "gp_exp_quad_cov" => gp_exp_quad_cov(&gp_points_1d(&x[0..3]), x[3], x[4]).wsum(),
+        "gp_matern32_cov" => gp_matern32_cov(&gp_points_1d(&x[0..3]), x[3], x[4]).wsum(),
+        "gp_matern52_cov" => gp_matern52_cov(&gp_points_1d(&x[0..3]), x[3], x[4]).wsum(),
+        "gp_exponential_cov" => gp_exponential_cov(&gp_points_1d(&x[0..3]), x[3], x[4]).wsum(),
+        "gp_periodic_cov" => gp_periodic_cov(&gp_points_1d(&x[0..3]), x[3], x[4], x[5]).wsum(),
+        "gp_dot_prod_cov" => gp_dot_prod_cov(&gp_points_1d(&x[0..3]), x[3]).wsum(),
+        "hypergeometric_3F2" => Ok(hypergeometric_3F2([x[0], x[1], x[2]], [x[3], x[4]], x[5])),
+        "hypergeometric_pFq" => Ok(hypergeometric_pFq(&x[0..2], &x[2..3], x[3])),
+        "quantile" => {
+            let d = [0.3, -0.5, 1.2, 0.7, 2.0, -1.1];
+            Ok(Var::constant(
+                quantile(&d, 0.3)? + 2.0 * quantile(&d, 0.85)?,
+            ))
+        }
+        "rank" => {
+            let d = [0.3, -0.5, 1.2, 0.7];
+            Ok(Var::constant((rank(&d, 1)? + 10 * rank(&d, 3)?) as f64))
+        }
+        "sort_indices_asc" => digits(sort_indices_asc(&[0.3, -0.5, 1.2, 0.7])?),
+        "sort_indices_desc" => digits(sort_indices_desc(&[0.3, -0.5, 1.2, 0.7])?),
+        "polar" => Ok(cwsum(&[polar(x[0], x[1])])),
+        "trace_dot" => trace_dot(&mat(x, 3, 2), &mat(&x[6..], 2, 3)).wsum(),
+        "eigenvalues" => Ok(eigenvalues(&a())?
+            .iter()
+            .map(|l| l.abs() + l.re * l.re)
+            .sum()),
         other => panic!("no dispatch for {other}"),
     }
 }
@@ -362,6 +478,6 @@ fn matrix_functions_match_stan() {
             }
         }
     }
-    assert!(count > 90);
+    assert!(count > 125);
     assert!(failures.is_empty(), "\n{}", failures.join("\n"));
 }

@@ -1,7 +1,8 @@
 """High-precision values and gradients for the rows of stan_reference_extra.csv where Stan Math
 and stanmath-rs disagree: the shape derivatives of the chi-square family CDFs, the beta negative
 binomial CDFs, one exp_mod_normal CDF in the tail, the Poisson binomial CCDF at its upper
-bound, and the ordered probit gradients.
+bound, the ordered probit gradients, the shape derivatives of the probability scale CDFs built on
+the incomplete gamma and beta functions, and the Wiener first passage CDFs.
 
 Run from the repository root:
 
@@ -13,7 +14,7 @@ format.
 
 import csv
 import os
-from mpmath import mp, mpf, diff, log, exp, erfc, sqrt, gammainc, loggamma, beta, inf, ncdf
+from mpmath import mp, mpf, diff, log, exp, erfc, sqrt, gammainc, loggamma, beta, betainc, inf, ncdf, pi, quad
 
 mp.dps = 40
 DATA = "crates/stanmath-rs-distributions/tests/data"
@@ -65,7 +66,41 @@ def ordered_probit(k, eta, c):
     return log(ncdf(eta - c[k - 2]) - ncdf(eta - c[k - 1]))
 
 
+def I(a, b, x):
+    return betainc(a, b, 0, x, regularized=True)
+
+
+def wiener_upper(y, a, t0, w, v):
+    """The defective CDF of first passage through the upper boundary by time y, and the
+    probability of ever passing through it (Stan's wiener_lcdf_unnorm and wiener_lccdf_unnorm are
+    the logs of the CDF and of the difference). The upper boundary is the lower one with w and v
+    reflected; the density is the small time series, which is exact at every time."""
+    w, v = 1 - w, -v
+
+    def dens(t):
+        u = t / a**2
+        s = sum((w + 2 * k) * exp(-(w + 2 * k) ** 2 / (2 * u)) for k in range(-30, 31))
+        return exp(-v * a * w - v * v * t / 2) / a**2 * u ** mpf(-1.5) / sqrt(2 * pi) * s
+
+    cdf = quad(dens, [0, y - t0])
+    hit = (exp(-2 * v * a * w) - exp(-2 * v * a)) / (1 - exp(-2 * v * a))
+    return cdf, hit
+
+
+def nb_cdf(n, alpha, beta_):
+    return I(alpha, n + 1, beta_ / (1 + beta_))
+
+
 F = {
+    "gamma_cdf": lambda n, x: P(x[1], x[2] * x[0]),
+    "inv_gamma_cdf": lambda n, x: Q(x[1], x[2] / x[0]),
+    "beta_cdf": lambda n, x: I(x[1], x[2], x[0]),
+    "scaled_inv_chi_square_cdf": lambda n, x: Q(x[1] / 2, x[1] * x[2] ** 2 / (2 * x[0])),
+    "neg_binomial_cdf": lambda n, x: nb_cdf(n[0], x[0], x[1]),
+    "neg_binomial_2_cdf": lambda n, x: nb_cdf(n[0], x[1], x[1] / x[0]),
+    "beta_neg_binomial_cdf": lambda n, x: bnb_cdf(n[0], *x),
+    "wiener_lcdf_unnorm": lambda n, x: log(wiener_upper(*x)[0]),
+    "wiener_lccdf_unnorm": lambda n, x: (lambda c, h: log(h - c))(*wiener_upper(*x)),
     "chi_square_lcdf": lambda n, x: log(P(x[1] / 2, x[0] / 2)),
     "chi_square_lccdf": lambda n, x: log(Q(x[1] / 2, x[0] / 2)),
     "inv_chi_square_lcdf": lambda n, x: log(Q(x[1] / 2, 1 / (2 * x[0]))),

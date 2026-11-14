@@ -131,6 +131,28 @@ var wsum(const std::vector<var>& e) {
 
 var wsum(const var& e) { return e; }
 
+using CV = Eigen::Matrix<std::complex<var>, -1, 1>;
+using CM = Eigen::Matrix<std::complex<var>, -1, -1>;
+
+// n complex values from 2 n reals, (re, im) pairs.
+CV cvec(const Vars& v, int o, int n) {
+  CV r(n);
+  for (int i = 0; i < n; ++i) r(i) = std::complex<var>(v[o + 2 * i], v[o + 2 * i + 1]);
+  return r;
+}
+
+// A complex result reduced to sum_k (1 + k / 10) re_k + (1 / 2 + k / 10) im_k, column major.
+template <typename E>
+var cwsum(const E& e) {
+  CM m = e;
+  var s = 0;
+  for (int k = 0; k < m.size(); ++k) {
+    std::complex<var> z = m(k % m.rows(), k / m.rows());
+    s += (1.0 + 0.1 * k) * z.real() + (0.5 + 0.1 * k) * z.imag();
+  }
+  return s;
+}
+
 }  // namespace
 
 int main() {
@@ -292,4 +314,74 @@ int main() {
     return s + lp;
   });
   U("cov_matrix_unconstrain", {s6}, cov_matrix_free(sym(v, 0)));
+  // Further matrix functions, the Gaussian process kernels, Fourier transforms, sparse
+  // products, and hypergeometric functions.
+  U("fma", (Pts{{1.3, -0.7, 0.4}}), fma(v[0], v[1], v[2]));
+  U("matrix_power", {a}, matrix_power(A, 3));
+  U("scale_matrix_exp_multiply", {cat({a, b, {0.7}})}, scale_matrix_exp_multiply(v[15], A, mat(v, 9, 3, 2)));
+  U("trace_quad_form", {cat({s6, b})}, trace_quad_form(sym(v, 0), mat(v, 6, 3, 2)));
+  U("trace_gen_quad_form", {cat({{1.1, 0.2, -0.3, 0.8}, a, b})},
+    trace_gen_quad_form(mat(v, 0, 2, 2), mat(v, 4, 3, 3), mat(v, 13, 3, 2)));
+  U("quad_form_diag", {cat({a, {0.5, 1.2, -0.7}})}, quad_form_diag(A, VEC(9, 3)));
+  U("columns_dot_product", {cat({b, {0.4, 1.1, -0.2, 0.6, -0.9, 0.3}})},
+    columns_dot_product(mat(v, 0, 3, 2), mat(v, 6, 3, 2)));
+  U("rows_dot_product", {cat({b, {0.4, 1.1, -0.2, 0.6, -0.9, 0.3}})},
+    rows_dot_product(mat(v, 0, 3, 2), mat(v, 6, 3, 2)));
+  U("columns_dot_self", {b}, columns_dot_self(mat(v, 0, 3, 2)));
+  U("diag_pre_multiply", {cat({{0.5, 1.2, -0.7}, a})}, diag_pre_multiply(VEC(0, 3), mat(v, 3, 3, 3)));
+  U("diag_post_multiply", {cat({a, {0.5, 1.2, -0.7}})}, diag_post_multiply(A, VEC(9, 3)));
+  U("add_diag", {cat({a, {0.6}})}, add_diag(A, v[9]));
+  U("add_diag_vector", {cat({a, {0.5, 1.2, -0.7}})}, add_diag(A, VEC(9, 3)));
+  // A 3 by 3 sparse matrix with nonzeros at (1,1), (1,3), (2,2), (3,1), (3,3): w is reals 0..5.
+  const std::vector<int> csr_v = {1, 3, 2, 1, 3}, csr_u = {1, 3, 4, 6};
+  U("csr_matrix_times_vector", (Pts{{1.2, -0.4, 0.8, 0.3, 1.5, 0.7, -0.2, 0.9}}),
+    csr_matrix_times_vector(3, 3, VEC(0, 5), csr_v, csr_u, VEC(5, 3)));
+  U("csr_to_dense_matrix", (Pts{{1.2, -0.4, 0.8, 0.3, 1.5}}), csr_to_dense_matrix(3, 3, VEC(0, 5), csr_v, csr_u));
+  const std::vector<double> z8 = {0.3, -0.5, 1.2, 0.1, -0.4, 0.8, 0.7, -0.2};
+  continuous("fft", {z8}, [&](const Vars& v) { return cwsum(fft(cvec(v, 0, 4))); });
+  continuous("inv_fft", {z8}, [&](const Vars& v) { return cwsum(inv_fft(cvec(v, 0, 4))); });
+  continuous("fft2", {z8}, [&](const Vars& v) {
+    CV c = cvec(v, 0, 4);
+    CM m(2, 2); m << c(0), c(2), c(1), c(3);
+    return cwsum(fft2(m)); });
+  continuous("inv_fft2", {z8}, [&](const Vars& v) {
+    CV c = cvec(v, 0, 4);
+    CM m(2, 2); m << c(0), c(2), c(1), c(3);
+    return cwsum(inv_fft2(m)); });
+  // Kernels over three one dimensional points (reals 0..3), then sigma, length scale, period.
+  const std::vector<double> gp = {0.3, -0.8, 1.4, 1.3, 0.7, 2.5};
+  U("gp_exp_quad_cov", {gp}, gp_exp_quad_cov(arr(v, 0, 3), v[3], v[4]));
+  U("gp_matern32_cov", {gp}, gp_matern32_cov(arr(v, 0, 3), v[3], v[4]));
+  U("gp_matern52_cov", {gp}, gp_matern52_cov(arr(v, 0, 3), v[3], v[4]));
+  U("gp_exponential_cov", {gp}, gp_exponential_cov(arr(v, 0, 3), v[3], v[4]));
+  U("gp_periodic_cov", {gp}, gp_periodic_cov(arr(v, 0, 3), v[3], v[4], v[5]));
+  U("gp_dot_prod_cov", {gp}, gp_dot_prod_cov(arr(v, 0, 3), v[3]));
+  U("hypergeometric_3F2", (Pts{{1.5, 2.0, 0.7, 3.5, 2.2, 0.4}}),
+    hypergeometric_3F2(VEC(0, 3), VEC(3, 2), v[5]));
+  U("hypergeometric_pFq", (Pts{{1.5, 2.0, 3.5, 0.4}}), hypergeometric_pFq(VEC(0, 2), VEC(2, 1), v[3]));
+  continuous("polar", {{1.3, 0.7}}, [&](const Vars& v) {
+    CV c(1); c(0) = polar(v[0], v[1]); return cwsum(c); });
+  U("trace_dot", (Pts{cat({b, {0.4, 1.1, -0.2, 0.6, -0.9, 0.3}})}),
+    trace_dot(mat(v, 0, 3, 2), mat(v, 6, 2, 3)));
+  // Eigenvalue order is the solver's, so the check reduces sum_k |l_k| + re(l_k)^2.
+  continuous("eigenvalues", {{1.2, 0.5, -0.9, 0.3, 2.0, 0.6, 1.4, 0.1, 1.5}}, [&](const Vars& v) {
+    CV l = eigenvalues(A);
+    var s = 0;
+    for (int k = 0; k < l.size(); ++k) s += abs(l(k)) + l(k).real() * l(k).real();
+    return s; });
+  // Data only functions: the value is reduced like the others, with no gradient.
+  continuous("quantile", {{}}, [&](const Vars&) {
+    std::vector<double> d = {0.3, -0.5, 1.2, 0.7, 2.0, -1.1};
+    return var(quantile(d, 0.3) + 2 * quantile(d, 0.85)); });
+  continuous("rank", {{}}, [&](const Vars&) {
+    std::vector<double> d = {0.3, -0.5, 1.2, 0.7};
+    return var(rank(d, 1) + 10 * rank(d, 3)); });
+  continuous("sort_indices_asc", {{}}, [&](const Vars&) {
+    std::vector<double> d = {0.3, -0.5, 1.2, 0.7};
+    std::vector<int> r = sort_indices_asc(d);
+    return var(r[0] + 10 * r[1] + 100 * r[2] + 1000 * r[3]); });
+  continuous("sort_indices_desc", {{}}, [&](const Vars&) {
+    std::vector<double> d = {0.3, -0.5, 1.2, 0.7};
+    std::vector<int> r = sort_indices_desc(d);
+    return var(r[0] + 10 * r[1] + 100 * r[2] + 1000 * r[3]); });
 }

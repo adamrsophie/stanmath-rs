@@ -6404,9 +6404,9 @@ fn discrete_range_lccdf_signatures() {
     let mut failures = Vec::new();
 
     {
-        let v = discrete_range_lccdf(3i64, 1i64, 5i64);
+        let v = discrete_range_lccdf(3i64, 1i64, 6i64);
         let s = (0..1).try_fold(0.0, |acc, _i| {
-            discrete_range_lccdf(3i64, 1i64, 5i64).map(|r| acc + r)
+            discrete_range_lccdf(3i64, 1i64, 6i64).map(|r| acc + r)
         });
         compare_data(
             "discrete_range_lccdf(scalar, scalar, scalar)",
@@ -6417,9 +6417,9 @@ fn discrete_range_lccdf_signatures() {
     }
 
     {
-        let v = discrete_range_lccdf(3i64, 1i64, &[5i64; 3][..]);
+        let v = discrete_range_lccdf(3i64, 1i64, &[6i64; 3][..]);
         let s = (0..3).try_fold(0.0, |acc, _i| {
-            discrete_range_lccdf(3i64, 1i64, 5i64).map(|r| acc + r)
+            discrete_range_lccdf(3i64, 1i64, 6i64).map(|r| acc + r)
         });
         compare_data(
             "discrete_range_lccdf(scalar, scalar, vec)",
@@ -6430,9 +6430,9 @@ fn discrete_range_lccdf_signatures() {
     }
 
     {
-        let v = discrete_range_lccdf(3i64, &[1i64; 3][..], 5i64);
+        let v = discrete_range_lccdf(3i64, &[1i64; 3][..], 6i64);
         let s = (0..3).try_fold(0.0, |acc, _i| {
-            discrete_range_lccdf(3i64, 1i64, 5i64).map(|r| acc + r)
+            discrete_range_lccdf(3i64, 1i64, 6i64).map(|r| acc + r)
         });
         compare_data(
             "discrete_range_lccdf(scalar, vec, scalar)",
@@ -6443,9 +6443,9 @@ fn discrete_range_lccdf_signatures() {
     }
 
     {
-        let v = discrete_range_lccdf(3i64, &[1i64; 3][..], &[5i64; 3][..]);
+        let v = discrete_range_lccdf(3i64, &[1i64; 3][..], &[6i64; 3][..]);
         let s = (0..3).try_fold(0.0, |acc, _i| {
-            discrete_range_lccdf(3i64, 1i64, 5i64).map(|r| acc + r)
+            discrete_range_lccdf(3i64, 1i64, 6i64).map(|r| acc + r)
         });
         compare_data(
             "discrete_range_lccdf(scalar, vec, vec)",
@@ -6456,9 +6456,9 @@ fn discrete_range_lccdf_signatures() {
     }
 
     {
-        let v = discrete_range_lccdf(&[3i64; 3][..], 1i64, 5i64);
+        let v = discrete_range_lccdf(&[3i64; 3][..], 1i64, 6i64);
         let s = (0..3).try_fold(0.0, |acc, _i| {
-            discrete_range_lccdf(3i64, 1i64, 5i64).map(|r| acc + r)
+            discrete_range_lccdf(3i64, 1i64, 6i64).map(|r| acc + r)
         });
         compare_data(
             "discrete_range_lccdf(vec, scalar, scalar)",
@@ -6469,9 +6469,9 @@ fn discrete_range_lccdf_signatures() {
     }
 
     {
-        let v = discrete_range_lccdf(&[3i64; 3][..], 1i64, &[5i64; 3][..]);
+        let v = discrete_range_lccdf(&[3i64; 3][..], 1i64, &[6i64; 3][..]);
         let s = (0..3).try_fold(0.0, |acc, _i| {
-            discrete_range_lccdf(3i64, 1i64, 5i64).map(|r| acc + r)
+            discrete_range_lccdf(3i64, 1i64, 6i64).map(|r| acc + r)
         });
         compare_data(
             "discrete_range_lccdf(vec, scalar, vec)",
@@ -6482,9 +6482,9 @@ fn discrete_range_lccdf_signatures() {
     }
 
     {
-        let v = discrete_range_lccdf(&[3i64; 3][..], &[1i64; 3][..], 5i64);
+        let v = discrete_range_lccdf(&[3i64; 3][..], &[1i64; 3][..], 6i64);
         let s = (0..3).try_fold(0.0, |acc, _i| {
-            discrete_range_lccdf(3i64, 1i64, 5i64).map(|r| acc + r)
+            discrete_range_lccdf(3i64, 1i64, 6i64).map(|r| acc + r)
         });
         compare_data(
             "discrete_range_lccdf(vec, vec, scalar)",
@@ -6495,9 +6495,9 @@ fn discrete_range_lccdf_signatures() {
     }
 
     {
-        let v = discrete_range_lccdf(&[3i64; 3][..], &[1i64; 3][..], &[5i64; 3][..]);
+        let v = discrete_range_lccdf(&[3i64; 3][..], &[1i64; 3][..], &[6i64; 3][..]);
         let s = (0..3).try_fold(0.0, |acc, _i| {
-            discrete_range_lccdf(3i64, 1i64, 5i64).map(|r| acc + r)
+            discrete_range_lccdf(3i64, 1i64, 6i64).map(|r| acc + r)
         });
         compare_data("discrete_range_lccdf(vec, vec, vec)", v, s, &mut failures);
     }
@@ -25783,13 +25783,13 @@ fn yule_simon_cdf_signatures() {
     let mut failures = Vec::new();
 
     {
-        let p = [2.5];
-        let v = try_value_and_grad(|x| yule_simon_cdf(3i64, x[0]), &p);
+        let p = [0.5];
+        let v = try_value_and_grad(|x| yule_simon_cdf(1i64, x[0]), &p);
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
                 for _i in 0..1 {
-                    acc *= yule_simon_cdf(3i64, x[0])?;
+                    acc *= yule_simon_cdf(1i64, x[0])?;
                 }
                 Ok(acc)
             },
@@ -25799,13 +25799,13 @@ fn yule_simon_cdf_signatures() {
     }
 
     {
-        let p = [2.5, 2.55, 2.6];
-        let v = try_value_and_grad(|x| yule_simon_cdf(3i64, &x[0..3]), &p);
+        let p = [0.5, 0.51, 0.52];
+        let v = try_value_and_grad(|x| yule_simon_cdf(1i64, &x[0..3]), &p);
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
                 for i in 0..3 {
-                    acc *= yule_simon_cdf(3i64, x[0 + i])?;
+                    acc *= yule_simon_cdf(1i64, x[0 + i])?;
                 }
                 Ok(acc)
             },
@@ -25815,13 +25815,13 @@ fn yule_simon_cdf_signatures() {
     }
 
     {
-        let p = [2.5];
-        let v = try_value_and_grad(|x| yule_simon_cdf(&[3i64; 3][..], x[0]), &p);
+        let p = [0.5];
+        let v = try_value_and_grad(|x| yule_simon_cdf(&[1i64; 3][..], x[0]), &p);
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
                 for _i in 0..3 {
-                    acc *= yule_simon_cdf(3i64, x[0])?;
+                    acc *= yule_simon_cdf(1i64, x[0])?;
                 }
                 Ok(acc)
             },
@@ -25831,13 +25831,13 @@ fn yule_simon_cdf_signatures() {
     }
 
     {
-        let p = [2.5, 2.55, 2.6];
-        let v = try_value_and_grad(|x| yule_simon_cdf(&[3i64; 3][..], &x[0..3]), &p);
+        let p = [0.5, 0.51, 0.52];
+        let v = try_value_and_grad(|x| yule_simon_cdf(&[1i64; 3][..], &x[0..3]), &p);
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0 + 1.0;
                 for i in 0..3 {
-                    acc *= yule_simon_cdf(3i64, x[0 + i])?;
+                    acc *= yule_simon_cdf(1i64, x[0 + i])?;
                 }
                 Ok(acc)
             },
@@ -25854,13 +25854,13 @@ fn yule_simon_lccdf_signatures() {
     let mut failures = Vec::new();
 
     {
-        let p = [2.5];
-        let v = try_value_and_grad(|x| yule_simon_lccdf(3i64, x[0]), &p);
+        let p = [0.5];
+        let v = try_value_and_grad(|x| yule_simon_lccdf(1i64, x[0]), &p);
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
                 for _i in 0..1 {
-                    acc += yule_simon_lccdf(3i64, x[0])?;
+                    acc += yule_simon_lccdf(1i64, x[0])?;
                 }
                 Ok(acc)
             },
@@ -25870,13 +25870,13 @@ fn yule_simon_lccdf_signatures() {
     }
 
     {
-        let p = [2.5, 2.55, 2.6];
-        let v = try_value_and_grad(|x| yule_simon_lccdf(3i64, &x[0..3]), &p);
+        let p = [0.5, 0.51, 0.52];
+        let v = try_value_and_grad(|x| yule_simon_lccdf(1i64, &x[0..3]), &p);
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
                 for i in 0..3 {
-                    acc += yule_simon_lccdf(3i64, x[0 + i])?;
+                    acc += yule_simon_lccdf(1i64, x[0 + i])?;
                 }
                 Ok(acc)
             },
@@ -25886,13 +25886,13 @@ fn yule_simon_lccdf_signatures() {
     }
 
     {
-        let p = [2.5];
-        let v = try_value_and_grad(|x| yule_simon_lccdf(&[3i64; 3][..], x[0]), &p);
+        let p = [0.5];
+        let v = try_value_and_grad(|x| yule_simon_lccdf(&[1i64; 3][..], x[0]), &p);
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
                 for _i in 0..3 {
-                    acc += yule_simon_lccdf(3i64, x[0])?;
+                    acc += yule_simon_lccdf(1i64, x[0])?;
                 }
                 Ok(acc)
             },
@@ -25902,13 +25902,13 @@ fn yule_simon_lccdf_signatures() {
     }
 
     {
-        let p = [2.5, 2.55, 2.6];
-        let v = try_value_and_grad(|x| yule_simon_lccdf(&[3i64; 3][..], &x[0..3]), &p);
+        let p = [0.5, 0.51, 0.52];
+        let v = try_value_and_grad(|x| yule_simon_lccdf(&[1i64; 3][..], &x[0..3]), &p);
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
                 for i in 0..3 {
-                    acc += yule_simon_lccdf(3i64, x[0 + i])?;
+                    acc += yule_simon_lccdf(1i64, x[0 + i])?;
                 }
                 Ok(acc)
             },
@@ -25925,13 +25925,13 @@ fn yule_simon_lcdf_signatures() {
     let mut failures = Vec::new();
 
     {
-        let p = [2.5];
-        let v = try_value_and_grad(|x| yule_simon_lcdf(3i64, x[0]), &p);
+        let p = [0.5];
+        let v = try_value_and_grad(|x| yule_simon_lcdf(1i64, x[0]), &p);
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
                 for _i in 0..1 {
-                    acc += yule_simon_lcdf(3i64, x[0])?;
+                    acc += yule_simon_lcdf(1i64, x[0])?;
                 }
                 Ok(acc)
             },
@@ -25941,13 +25941,13 @@ fn yule_simon_lcdf_signatures() {
     }
 
     {
-        let p = [2.5, 2.55, 2.6];
-        let v = try_value_and_grad(|x| yule_simon_lcdf(3i64, &x[0..3]), &p);
+        let p = [0.5, 0.51, 0.52];
+        let v = try_value_and_grad(|x| yule_simon_lcdf(1i64, &x[0..3]), &p);
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
                 for i in 0..3 {
-                    acc += yule_simon_lcdf(3i64, x[0 + i])?;
+                    acc += yule_simon_lcdf(1i64, x[0 + i])?;
                 }
                 Ok(acc)
             },
@@ -25957,13 +25957,13 @@ fn yule_simon_lcdf_signatures() {
     }
 
     {
-        let p = [2.5];
-        let v = try_value_and_grad(|x| yule_simon_lcdf(&[3i64; 3][..], x[0]), &p);
+        let p = [0.5];
+        let v = try_value_and_grad(|x| yule_simon_lcdf(&[1i64; 3][..], x[0]), &p);
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
                 for _i in 0..3 {
-                    acc += yule_simon_lcdf(3i64, x[0])?;
+                    acc += yule_simon_lcdf(1i64, x[0])?;
                 }
                 Ok(acc)
             },
@@ -25973,13 +25973,13 @@ fn yule_simon_lcdf_signatures() {
     }
 
     {
-        let p = [2.5, 2.55, 2.6];
-        let v = try_value_and_grad(|x| yule_simon_lcdf(&[3i64; 3][..], &x[0..3]), &p);
+        let p = [0.5, 0.51, 0.52];
+        let v = try_value_and_grad(|x| yule_simon_lcdf(&[1i64; 3][..], &x[0..3]), &p);
         let s = try_value_and_grad(
             |x| {
                 let mut acc = x[0] * 0.0;
                 for i in 0..3 {
-                    acc += yule_simon_lcdf(3i64, x[0 + i])?;
+                    acc += yule_simon_lcdf(1i64, x[0 + i])?;
                 }
                 Ok(acc)
             },
