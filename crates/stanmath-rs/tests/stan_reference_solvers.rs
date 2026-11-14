@@ -134,6 +134,27 @@ impl LaplaceLikelihood for Ll {
     }
 }
 
+/// The `map_rect` job, as a type for the threaded form.
+struct Job;
+
+impl MapRectJob for Job {
+    fn eval<S: Real>(&self, phi: &[S], t: &[S], xr: &[f64], xi: &[i64]) -> Result<Vec<S>> {
+        Ok(vec![
+            phi[0] * t[0] + xr[0],
+            phi[1] * t[1].exp() * xi[0] as f64,
+        ])
+    }
+}
+
+/// The `reduce_sum` partial sum `normal_lpdf(slice | mu, sigma)`, as a type for the threaded form.
+struct Part;
+
+impl PartialSum<f64> for Part {
+    fn eval<S: Real>(&self, s: &[f64], _: usize, _: usize, p: &[S]) -> Result<S> {
+        normal_lpdf(s, p[0], p[1])
+    }
+}
+
 fn wsum<'t>(e: impl IntoIterator<Item = Var<'t>>) -> Var<'t> {
     e.into_iter()
         .enumerate()
@@ -229,6 +250,16 @@ fn eval<'t>(name: &str, x: &[Var<'t>]) -> Result<Var<'t>> {
                 reduce_sum_static(part, &s, 2)
             }
         }
+        // The threaded forms are compared with the same Stan rows as the serial ones.
+        "map_rect_parallel" => map_rect_parallel(
+            Job,
+            &x[0..2],
+            &[x[2..4].to_vec(), x[4..6].to_vec()],
+            &[vec![0.5], vec![0.25]],
+            &[vec![2], vec![3]],
+        )
+        .map(wsum),
+        "reduce_sum_parallel" => reduce_sum_parallel(Part, &[0.1, 0.4, -0.3, 1.2, 0.8], 2, x),
         n if n.starts_with("laplace_marginal") => laplace(n, x),
         "integrate_1d" => integrate_1d(&Damped, Var::constant(0.0), x[0], &x[1..3], 1e-10),
         other => panic!("no dispatch for {other}"),
@@ -308,28 +339,39 @@ fn solvers_match_stan() {
             continue;
         }
         let f: Vec<&str> = line.split(',').collect();
-        match try_value_and_grad(|x| eval(f[0], x), &list(f[2])) {
-            Err(e) => failures.push(format!("{}: we reject: {e}", f[0])),
-            Ok(r) => {
-                let want: f64 = f[3].parse().unwrap();
-                let grad = list(f[4]);
-                if !close(f[0], r.value, want)
-                    || r.gradient.len() != grad.len()
-                    || r.gradient
-                        .iter()
-                        .zip(&grad)
-                        .any(|(a, b)| !close(f[0], *a, *b))
-                {
-                    failures.push(format!(
-                        "{}: ours {} {:?}, Stan {want} {grad:?}",
-                        f[0], r.value, r.gradient
-                    ));
-                }
-            }
+        let threaded = match f[0] {
+            "map_rect" => Some("map_rect_parallel"),
+            "reduce_sum" => Some("reduce_sum_parallel"),
+            _ => None,
+        };
+        for name in std::iter::once(f[0]).chain(threaded) {
+            check(name, &f, &mut failures);
         }
     }
     assert_eq!(count, 38);
     assert!(failures.is_empty(), "\n{}", failures.join("\n"));
+}
+
+fn check(name: &str, f: &[&str], failures: &mut Vec<String>) {
+    match try_value_and_grad(|x| eval(name, x), &list(f[2])) {
+        Err(e) => failures.push(format!("{name}: we reject: {e}")),
+        Ok(r) => {
+            let want: f64 = f[3].parse().unwrap();
+            let grad = list(f[4]);
+            if !close(f[0], r.value, want)
+                || r.gradient.len() != grad.len()
+                || r.gradient
+                    .iter()
+                    .zip(&grad)
+                    .any(|(a, b)| !close(f[0], *a, *b))
+            {
+                failures.push(format!(
+                    "{name}: ours {} {:?}, Stan {want} {grad:?}",
+                    r.value, r.gradient
+                ));
+            }
+        }
+    }
 }
 
 /// A `generate_laplace_options` row: `dimension,,weighted theta_init,tolerance;max_num_steps;

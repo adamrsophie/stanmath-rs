@@ -34,7 +34,7 @@ stanmath-rs does not claim compatibility for anything not marked **tested**.
 | custom reverse-mode functions (`reverse_pass_callback`) | `Tape::custom_op` | tested |
 | `var` over `fvar` (reverse over forward) | not provided | not supported |
 | `reduce_sum`, `reduce_sum_static`, `map_rect` | same names, compared with Stan Math | tested |
-| threaded `reduce_sum` and `map_rect` (TBB) | `reduce_sum_parallel`, `map_rect_parallel` | experimental |
+| threaded `reduce_sum` and `map_rect` (TBB) | `reduce_sum_parallel`, `map_rect_parallel`, compared with the same Stan Math values as the serial forms | tested |
 | `map_rect` over MPI | `map_rect_mpi` in `backends/stanmath-rs-mpi` (CI with OpenMPI) | experimental |
 | OpenCL | `backends/stanmath-rs-opencl`, Stan's OpenCL function list (CI with POCL) | experimental |
 
