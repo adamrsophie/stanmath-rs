@@ -369,6 +369,70 @@ int main() {
     var s = 0;
     for (int k = 0; k < l.size(); ++k) s += abs(l(k)) + l(k).real() * l(k).real();
     return s; });
+  // Constructors, accessors, and conversions: these check index and fill order conventions.
+  // An integer result is reduced the same way, as a constant.
+  auto iws = [](const std::vector<int>& r) {
+    double s = 0;
+    for (std::size_t k = 0; k < r.size(); ++k) s += (1.0 + 0.1 * k) * r[k];
+    return var(s); };
+  auto aws = [](const std::vector<std::vector<var>>& r) {
+    var s = 0;
+    int k = 0;
+    for (const auto& row : r)
+      for (const auto& x : row) s += (1.0 + 0.1 * k++) * x;
+    return s; };
+  U("append_array", (Pts{{0.3, -0.5, 1.2, 0.7}}), append_array(arr(v, 0, 2), arr(v, 2, 2)));
+  U("append_col", {cat({a, b})}, append_col(A, mat(v, 9, 3, 2)));
+  U("append_row", {cat({a, b})}, append_row(A, mat(v, 9, 2, 3)));
+  U("block", {a}, block(A, 2, 1, 2, 2));
+  U("col", {a}, col(A, 2));
+  U("row", {a}, row(A, 3));
+  U("sub_col", {a}, sub_col(A, 1, 2, 2));
+  U("sub_row", {a}, sub_row(A, 2, 1, 3));
+  U("head", {v4}, head(VEC(0, 4), 2));
+  U("tail", {v4}, tail(VEC(0, 4), 3));
+  U("segment", {v4}, segment(VEC(0, 4), 2, 2));
+  continuous("diag_matrix", {{0.5, 1.2, -0.7}}, [&](const Vars& v) { V d = VEC(0, 3); MV m = diag_matrix(d); return wsum(m); });
+  U("rep_matrix", (Pts{{0.6}}), rep_matrix(v[0], 2, 3));
+  U("rep_matrix_vector", (Pts{{0.5, 1.2, -0.7}}), rep_matrix(VEC(0, 3), 2));
+  U("rep_vector", (Pts{{0.6}}), rep_vector(v[0], 3));
+  U("rep_array", (Pts{{0.6}}), rep_array(v[0], 3));
+  U("to_array_1d", {a}, to_array_1d(A));
+  continuous("to_array_2d", {a}, [&](const Vars& v) { return aws(to_array_2d(A)); });
+  U("to_matrix", (Pts{{0.3, -0.5, 1.2, 0.7, 2.0, -1.1}}), to_matrix(arr(v, 0, 6), 2, 3));
+  U("to_matrix_row_major", (Pts{{0.3, -0.5, 1.2, 0.7, 2.0, -1.1}}), to_matrix(arr(v, 0, 6), 2, 3, 0));
+  U("to_vector", {a}, to_vector(A));
+  U("to_row_vector", {a}, to_row_vector(A));
+  continuous("to_complex", {{1.3, 0.7}}, [&](const Vars& v) {
+    CV c(1); c(0) = to_complex(v[0], v[1]); return cwsum(c); });
+  continuous("get_real", {{1.3, 0.7}}, [&](const Vars& v) { return get_real(std::complex<var>(v[0], v[1])); });
+  continuous("get_imag", {{1.3, 0.7}}, [&](const Vars& v) { return get_imag(std::complex<var>(v[0], v[1])); });
+  auto sparse = [](const Vars& v) {
+    MV m = MV::Zero(3, 3);
+    m(0, 0) = v[0]; m(0, 2) = v[1]; m(1, 1) = v[2]; m(2, 0) = v[3]; m(2, 2) = v[4];
+    return m; };
+  const std::vector<double> w5 = {1.2, -0.4, 0.8, 0.3, 1.5};
+  U("csr_extract_w", {w5}, csr_extract_w(sparse(v)));
+  continuous("csr_extract_v", {w5}, [&](const Vars& v) { return iws(csr_extract_v(sparse(v))); });
+  continuous("csr_extract_u", {w5}, [&](const Vars& v) { return iws(csr_extract_u(sparse(v))); });
+  continuous("identity_matrix", {{}}, [&](const Vars&) { return wsum(MV(identity_matrix(3).cast<var>())); });
+  continuous("linspaced_vector", {{}}, [&](const Vars&) { return wsum(MV(linspaced_vector(5, -1, 2).cast<var>())); });
+  continuous("linspaced_int_array", {{}}, [&](const Vars&) { return iws(linspaced_int_array(5, 1, 9)); });
+  continuous("one_hot_vector", {{}}, [&](const Vars&) { return wsum(MV(one_hot_vector(4, 3).cast<var>())); });
+  continuous("one_hot_int_array", {{}}, [&](const Vars&) { return iws(one_hot_int_array(4, 3)); });
+  continuous("uniform_simplex", {{}}, [&](const Vars&) { return wsum(MV(uniform_simplex(4).cast<var>())); });
+  continuous("dims", {a}, [&](const Vars& v) { return iws(dims(mat(v, 0, 3, 3))) + iws(dims(mat(v, 0, 2, 3))); });
+  continuous("num_elements", {a}, [&](const Vars& v) { return var(num_elements(mat(v, 0, 3, 2))); });
+  continuous("size", {v4}, [&](const Vars& v) { return var(stan::math::size(arr(v, 0, 4))); });
+  continuous("rows", {a}, [&](const Vars& v) { return var(rows(mat(v, 0, 3, 2))); });
+  continuous("cols", {a}, [&](const Vars& v) { return var(cols(mat(v, 0, 3, 2))); });
+  continuous("int_step", {{}}, [&](const Vars&) { return var(int_step(-0.5) + 10 * int_step(0.0) + 100 * int_step(2.0)); });
+  continuous("is_inf", {{}}, [&](const Vars&) {
+    return var(is_inf(1.0) + 10 * is_inf(INFINITY) + 100 * is_inf(-INFINITY) + 1000 * is_inf(NAN)); });
+  continuous("logical", {{}}, [&](const Vars&) {
+    return var(logical_eq(1.0, 1.0) + 2 * logical_neq(1.0, 2.0) + 4 * logical_gt(1.0, 2.0)
+               + 8 * logical_gte(2.0, 2.0) + 16 * logical_lte(3.0, 2.0) + 32 * logical_negation(0.0)
+               + 64 * logical_eq(NAN, NAN) + 128 * logical_neq(NAN, NAN)); });
   // Data only functions: the value is reduced like the others, with no gradient.
   continuous("quantile", {{}}, [&](const Vars&) {
     std::vector<double> d = {0.3, -0.5, 1.2, 0.7, 2.0, -1.1};

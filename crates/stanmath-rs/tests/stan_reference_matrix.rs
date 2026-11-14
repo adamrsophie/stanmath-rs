@@ -206,6 +206,53 @@ fn with_lp<'t, W: WSum<'t>>(x: &[Var<'t>], f: impl FnOnce(&mut Var<'t>) -> W) ->
 // stan: cov_matrix_jacobian(vector, int)
 // stan: cov_matrix_unconstrain(matrix)
 // stan: fma(real, real, real)
+// stan: append_array(array[] real, array[] real)
+// stan: append_col(matrix, matrix)
+// stan: append_row(matrix, matrix)
+// stan: block(matrix, int, int, int, int)
+// stan: col(matrix, int)
+// stan: row(matrix, int)
+// stan: sub_col(matrix, int, int, int)
+// stan: sub_row(matrix, int, int, int)
+// stan: head(vector, int)
+// stan: tail(vector, int)
+// stan: segment(vector, int, int)
+// stan: diag_matrix(vector)
+// stan: rep_matrix(real, int, int)
+// stan: rep_matrix(vector, int)
+// stan: rep_vector(real, int)
+// stan: rep_array(real, int)
+// stan: to_array_1d(matrix)
+// stan: to_array_2d(matrix)
+// stan: to_matrix(array[] real, int, int)
+// stan: to_matrix(array[] real, int, int, int)
+// stan: to_vector(matrix)
+// stan: to_row_vector(matrix)
+// stan: to_complex(real, real)
+// stan: get_real(complex)
+// stan: get_imag(complex)
+// stan: csr_extract_w(matrix)
+// stan: csr_extract_v(matrix)
+// stan: csr_extract_u(matrix)
+// stan: identity_matrix(int)
+// stan: linspaced_vector(int, real, real)
+// stan: linspaced_int_array(int, int, int)
+// stan: one_hot_vector(int, int)
+// stan: one_hot_int_array(int, int)
+// stan: uniform_simplex(int)
+// stan: dims(matrix)
+// stan: num_elements(matrix)
+// stan: size(array[] real)
+// stan: rows(matrix)
+// stan: cols(matrix)
+// stan: int_step(real)
+// stan: is_inf(real)
+// stan: logical_eq(real, real)
+// stan: logical_neq(real, real)
+// stan: logical_gt(real, real)
+// stan: logical_gte(real, real)
+// stan: logical_lte(real, real)
+// stan: logical_negation(int)
 // stan: polar(real, real)
 // stan: trace_dot(matrix, matrix)
 // stan: eigenvalues(matrix)
@@ -260,6 +307,27 @@ fn csr<'t>(x: &[Var<'t>]) -> CsrMatrix<Var<'t>> {
         [z, x[2], z],
         [x[3], z, x[4]],
     ]))
+}
+
+/// The 3 by 3 sparse matrix with nonzeros `x[0..5]` at (1,1), (1,3), (2,2), (3,1), (3,3).
+fn sparse<'t>(x: &[Var<'t>]) -> Matrix<Var<'t>> {
+    let z = Var::constant(0.0);
+    Matrix::from_rows(&[[x[0], z, x[1]], [z, x[2], z], [x[3], z, x[4]]])
+}
+
+fn one_based(v: Vec<usize>) -> Vec<usize> {
+    v.into_iter().map(|i| i + 1).collect()
+}
+
+/// An integer result reduced as `sum_k (1 + k / 10) r_k`, as a constant.
+fn iws<'t, I: Copy + TryInto<i32>>(r: &[I]) -> Var<'t> {
+    let v = |i: I| f64::from(i.try_into().unwrap_or(i32::MAX));
+    Var::constant(
+        r.iter()
+            .enumerate()
+            .map(|(k, &i)| v(i) * (1.0 + 0.1 * k as f64))
+            .sum(),
+    )
 }
 
 /// Four one based indices packed as decimal digits, first index lowest.
@@ -433,6 +501,68 @@ fn eval<'t>(name: &str, x: &[Var<'t>]) -> Result<Var<'t>> {
             .iter()
             .map(|l| l.abs() + l.re * l.re)
             .sum()),
+        "append_array" => append_array(&x[0..2], &x[2..4]).wsum(),
+        "append_col" => append_col(&a(), &b()).wsum(),
+        "append_row" => append_row(&a(), &mat(&x[9..], 2, 3)).wsum(),
+        "block" => block(&a(), 2, 1, 2, 2).wsum(),
+        "col" => col(&a(), 2).wsum(),
+        "row" => row(&a(), 3).wsum(),
+        "sub_col" => sub_col(&a(), 1, 2, 2).wsum(),
+        "sub_row" => sub_row(&a(), 2, 1, 3).wsum(),
+        "head" => head(x, 2).wsum(),
+        "tail" => tail(x, 3).wsum(),
+        "segment" => segment(x, 2, 2).wsum(),
+        "diag_matrix" => diag_matrix(x).wsum(),
+        "rep_matrix" => rep_matrix(x[0], 2, 3).wsum(),
+        "rep_matrix_vector" => rep_matrix_vector(x, 2).wsum(),
+        "rep_vector" => rep_vector(x[0], 3).wsum(),
+        "rep_array" => rep_array(x[0], 3).wsum(),
+        "to_array_1d" => to_array_1d(&a()).wsum(),
+        "to_array_2d" => to_array_2d(&a()).concat().wsum(),
+        "to_matrix" => to_matrix(x, 2, 3).wsum(),
+        "to_matrix_row_major" => to_matrix_row_major(x, 2, 3).wsum(),
+        "to_vector" => to_vector(a().as_slice()).wsum(),
+        "to_row_vector" => to_row_vector(a().as_slice()).wsum(),
+        "to_complex" => Ok(cwsum(&[to_complex(x[0], x[1])])),
+        "get_real" => Ok(get_real(Complex::new(x[0], x[1]))),
+        "get_imag" => Ok(get_imag(Complex::new(x[0], x[1]))),
+        "csr_extract_w" => csr_extract_w(&sparse(x)).wsum(),
+        // stanmath-rs's CSR indices are zero based; Stan's are one based.
+        "csr_extract_v" => Ok(iws(&one_based(csr_extract_v(&sparse(x))))),
+        "csr_extract_u" => Ok(iws(&one_based(csr_extract_u(&sparse(x))))),
+        "identity_matrix" => identity_matrix(3).wsum(),
+        "linspaced_vector" => linspaced_vector(5, -1.0, 2.0).wsum(),
+        "linspaced_int_array" => Ok(iws(&linspaced_int_array(5, 1, 9)?)),
+        "one_hot_vector" => one_hot_vector(4, 3).wsum(),
+        "one_hot_int_array" => Ok(iws(&one_hot_int_array(4, 3)?)),
+        "uniform_simplex" => uniform_simplex(4).wsum(),
+        "dims" => Ok(iws(&dims(&mat(x, 3, 3))) + iws(&dims(&mat(x, 2, 3)))),
+        "num_elements" => Ok(Var::constant(num_elements(&mat(x, 3, 2)) as f64)),
+        "size" => Ok(Var::constant(size(&x[0..4]) as f64)),
+        "rows" => Ok(Var::constant(rows(&mat(x, 3, 2)) as f64)),
+        "cols" => Ok(Var::constant(cols(&mat(x, 3, 2)) as f64)),
+        "int_step" => Ok(Var::constant(f64::from(
+            int_step(-0.5) + 10 * int_step(0.0) + 100 * int_step(2.0),
+        ))),
+        "is_inf" => {
+            let b = |v: f64| f64::from(u8::from(is_inf(v)));
+            Ok(Var::constant(
+                b(1.0) + 10.0 * b(f64::INFINITY) + 100.0 * b(-f64::INFINITY) + 1000.0 * b(f64::NAN),
+            ))
+        }
+        "logical" => {
+            let b = |v: bool| f64::from(u8::from(v));
+            Ok(Var::constant(
+                b(logical_eq(1.0, 1.0))
+                    + 2.0 * b(logical_neq(1.0, 2.0))
+                    + 4.0 * b(logical_gt(1.0, 2.0))
+                    + 8.0 * b(logical_gte(2.0, 2.0))
+                    + 16.0 * b(logical_lte(3.0, 2.0))
+                    + 32.0 * b(logical_negation(0_i64))
+                    + 64.0 * b(logical_eq(f64::NAN, f64::NAN))
+                    + 128.0 * b(logical_neq(f64::NAN, f64::NAN)),
+            ))
+        }
         other => panic!("no dispatch for {other}"),
     }
 }
@@ -478,6 +608,6 @@ fn matrix_functions_match_stan() {
             }
         }
     }
-    assert!(count > 125);
+    assert!(count > 170);
     assert!(failures.is_empty(), "\n{}", failures.join("\n"));
 }

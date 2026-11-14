@@ -260,7 +260,7 @@ stanmath-rs matches a 40 digit mpmath reference (`tools/reference/scalar.py`) to
 | `gamma_q`, d/d a | 1.7e-7 to 1.3e-5 | about 1e-15 |
 | chi-square and inverse chi-square CDFs, d/d nu | 4e-9 to 4e-6 | about 1e-15 |
 
-`crates/stanmath-rs/tests/stan_reference_matrix.rs` checks 131 cases of the matrix functions
+`crates/stanmath-rs/tests/stan_reference_matrix.rs` checks 174 cases of the matrix functions
 (decompositions, inverses, solves, products, reductions, `matrix_exp`, `svd_*`, `qr_*`, sorting and
 softmax) and every constraining transform's `_constrain`, `_jacobian`, and `_unconstrain` form
 against Stan to `1e-10`; a matrix result is reduced to a weighted sum of its entries, so the
@@ -272,21 +272,26 @@ does, which changes only its derivative with respect to the diagonal. The later 
 products, `diag_pre_multiply`, `diag_post_multiply`, `add_diag`, the CSR product and expansion,
 `fft`, `inv_fft`, `fft2`, `inv_fft2`, `polar`, the general `eigenvalues` (reduced by
 `sum |l| + re(l)^2`, which does not depend on their order), every Gaussian process kernel,
-`hypergeometric_3F2`, `hypergeometric_pFq`, `quantile`, `rank`, and `sort_indices_*`.
+`hypergeometric_3F2`, `hypergeometric_pFq`, `quantile`, `rank`, and `sort_indices_*`, and the
+constructors, accessors, and conversions whose index and fill order conventions matter (`append_*`,
+`block`, `row`, `col`, `sub_row`, `sub_col`, `head`, `tail`, `segment`, `diag_matrix`, `rep_*`,
+`to_array_1d`, `to_array_2d`, `to_matrix` in both fill orders, `to_vector`, `to_row_vector`,
+`to_complex`, `get_real`, `get_imag`, `csr_extract_*`, `identity_matrix`, `linspaced_*`,
+`one_hot_*`, `uniform_simplex`, `dims`, `size`, `num_elements`, `rows`, `cols`, `int_step`,
+`is_inf`, and the logical operators, NaN included). stanmath-rs's `csr_extract_v` and
+`csr_extract_u` are zero based where Stan's are one based; the test adds one.
 
 `crates/stanmath-rs/tests/stan_reference_solvers.rs` compares `integrate_ode_rk45`,
 `integrate_ode_adams`, `integrate_ode_bdf` (a Lotka Volterra system), `algebra_solver`,
 `algebra_solver_newton`, and `integrate_1d` with Stan in value and in the gradient with respect to
 every parameter, at tight tolerances on both sides, to `1e-7`.
 
-Of the 571 function names in the signature dump, 437 have at least one comparison with a value
+Of the 571 function names in the signature dump, 482 have at least one comparison with a value
 Stan Math computed. The rest are the 61 `_rng` functions, which cannot match Stan's draws (each
 scalar sampler is checked against its own CDF or moments in `tests/samplers.rs` and elsewhere);
-the constructors, accessors, and conversions (`rep_*`, `zeros_*`, `ones_*`, `one_hot_*`,
-`linspaced_*`, `identity_matrix`, `diag_matrix`, `uniform_simplex`, `block`, `row`, `col`,
-`sub_row`, `sub_col`, `head`, `tail`, `segment`, `append_*`, `dims`, `size`, `num_elements`,
-`rows`, `cols`, `to_*`, `get_real`, `get_imag`, `csr_extract*`, the logical operators, `is_inf`,
-`int_step`), checked against their definitions; the tuple forms `eigendecompose`,
+the other spellings of compared constructors (`zeros_*`, `ones_*`, the row vector and array forms
+of `linspaced_*`, `one_hot_*`, and `rep_*`, `to_vector_array`, `to_row_vector_array`, and the
+tuple `csr_extract`), checked against their definitions; the tuple forms `eigendecompose`,
 `eigendecompose_sym`, `svd`, `qr`, and `qr_thin`, whose parts are compared one by one; the
 eigenvectors and complex Schur factors, which are not unique and are checked by reconstruction;
 `integrate_ode` (the `rk45` solver at default tolerances), `map_rect`, and
