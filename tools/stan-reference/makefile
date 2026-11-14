@@ -14,4 +14,4 @@ include $(MATH)make/standalone
 
 # The ODE and Newton solvers link the SUNDIALS libraries bundled with Stan Math.
 SUNDIALS_LIB = $(wildcard $(MATH)lib/sundials_*/lib)
-stan_reference_solvers: LDLIBS += $(addprefix $(SUNDIALS_LIB)/libsundials_,cvodes.a kinsol.a nvecserial.a)
+stan_reference_solvers: LDLIBS += $(addprefix $(SUNDIALS_LIB)/libsundials_,cvodes.a idas.a kinsol.a nvecserial.a)
