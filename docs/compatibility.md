@@ -264,8 +264,10 @@ of the multivariate normal, Student t, Dirichlet, and ordered densities.
 Stan vectorizes scalar functions over containers; in Rust, `apply_scalar_unary` and
 `apply_scalar_binary` apply a scalar function over vectors, matrices, and arrays of any depth.
 `crates/stanmath-rs/tests/signatures_elementwise.rs`, written by `tools/reference/gen_elementwise.py`,
-calls every elementwise signature of 106 functions this way (2844 signatures up to three array
-levels, and a depth 8 check for the 3763 deeper ones, which share one recursive impl). `add`,
+calls every elementwise signature of 106 functions this way (6679 signatures, one test per
+function) and compares each result with the scalar function applied to every element. Literals
+branch in two up to three array levels; deeper levels repeat their element, so every array depth
+in the dump is called without an exponentially large literal. `add`,
 `subtract`, `multiply`, `elt_multiply`, and `elt_divide` are Rust's operators.
 
 The vectorized `_rng` signatures go through `apply_broadcast1` to `apply_broadcast4`, which apply a
@@ -276,19 +278,19 @@ equal the scalar sampler's, in order from the same seed.
 The bound transforms (`lower_bound`, `upper_bound`, `lower_upper_bound`, `offset_multiplier`, each
 `_constrain`, `_jacobian`, `_unconstrain`) apply over containers the same way, with
 `apply_scalar_ternary` when both bounds are containers. `tests/signatures_bounds.rs`, written by
-`tools/reference/gen_bounds.py`, calls 468 of their container signatures (252 Rust shapes; 684
-deeper array forms share the recursive impl) and requires the scalar transform of every element and,
+`tools/reference/gen_bounds.py`, calls all 1152 of their container signatures (576 Rust shapes, at
+every array depth) and requires the scalar transform of every element and,
 for `_jacobian`, the summed log Jacobian. `tests/signatures_qf.rs` covers the 256 broadcast forms of
 `student_t_qf` through `apply_broadcast4`.
 
-`tests/signatures_containers.rs`, written by `tools/reference/gen_containers.py`, calls 302
+`tests/signatures_containers.rs`, written by `tools/reference/gen_containers.py`, calls 541
 signatures of `dims`, `num_elements`, `size`, `rep_array`, `reverse`, `append_array`, `head`,
 `tail`, and `segment` over every element type, complex ones included, and checks the shape of each
-result (239 deeper array forms run the same generic code).
-`tests/signatures_complex.rs`, written by `tools/reference/gen_complex.py`, calls 84 signatures of
-`to_complex`, `get_real`, `get_imag`, and `conj` over complex containers (`ScalarContainer` now
-treats `Complex<T>` as a leaf) and checks each against the definition (111 deeper array forms share
-the recursive impl).
+result, at every array depth.
+`tests/signatures_complex.rs`, written by `tools/reference/gen_complex.py`, calls 356 signatures of
+`to_complex`, `get_real`, `get_imag`, and `conj`, and the complex forms of `abs`, `minus`, and
+`pow` (`ScalarContainer` treats `Complex<T>` as a leaf), at every array depth, and checks each
+against the definition.
 `tests/signatures_utilities.rs`, written by `tools/reference/gen_utilities.py`, calls 187
 signatures of `sum`, `prod`, `cumulative_sum`, `to_vector`, `to_row_vector`, `to_array_1d`,
 `to_array_2d`, `to_vector_array`, `to_row_vector_array`, `to_matrix`, `append_col`, `append_row`,
@@ -313,10 +315,9 @@ by a signature test (by a generator's ledger or a `// stan:` label), compared wi
 the reference CSVs, skipped only because its arrays nest deeper than the generators write calls
 for, or checked by name only. A function whose signatures differ only in spelling a vector
 (vector, row vector, or one dimensional real array) is one Rust call, so a reference comparison of
-that call counts for each spelling. Run against CmdStan 2.40.0 it reports 18993 called, 210
-compared with Stan values, 5088 deeper than the calls, none by name, and no unchecked line.
-The 5088 deeper lines are array forms nested past the depth the generators write calls for (the
-same nested map as the shallower forms); they are not called one by one.
+that call counts for each spelling. Run against CmdStan 2.40.0 it reports 24081 called, 210
+compared with Stan values, none deeper than the calls, none by name, and no unchecked line: every
+signature in the dump is called by a test.
 
 `tests/signatures_linalg_misc.rs` and `tests/signatures_distributions_misc.rs` call the last
 signatures no generator reached: products and quotients with a scalar, the vector forms of the
@@ -355,7 +356,7 @@ Wiener density differs from ours by about 2e-6; at precision 1e-8 the two agree 
 `tests/signatures_transforms.rs`, written by `tools/reference/gen_transforms.py`, calls the array
 forms of the structural transforms (`_constrain`, `_jacobian`, and `_unconstrain` of simplex,
 sum_to_zero, ordered, positive_ordered, unit_vector, the stochastic matrices, cov_matrix,
-corr_matrix, and the Cholesky factors) to three array levels. Stan's array forms apply the
+corr_matrix, and the Cholesky factors) at every array depth. Stan's array forms apply the
 transform to each element; in Rust they are an iterator map, and a `_jacobian` map adds each
 element's log Jacobian to one `lp`. `tests/signatures_multivariate.rs` labels the multivariate
 normal, Student t, Dirichlet, and ordered logistic and probit signatures it calls, and now also

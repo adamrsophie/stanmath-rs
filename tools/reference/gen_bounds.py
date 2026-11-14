@@ -7,8 +7,8 @@ offset_multiplier, each with _constrain, _jacobian, and _unconstrain).
 
 A container argument goes through apply_scalar_unary, apply_scalar_binary, or
 apply_scalar_ternary, with scalar bounds captured by the closure; a _jacobian call adds every
-element's log Jacobian to one lp. Stan types map to Rust as in gen_elementwise.py, and calls stop
-at three Vec levels (deeper arrays share the same recursive impl). Each call must equal the scalar
+element's log Jacobian to one lp. Stan types map to Rust as in gen_elementwise.py; literals branch
+in two up to three Vec levels and outer levels repeat their element (up()). Each call must equal the scalar
 transform of every element in order, and its lp the sum of theirs; the scalar transforms are
 compared with Stan Math by stan_reference_matrix.rs and the transforms tests.
 """
@@ -49,6 +49,8 @@ def value(ty, base):
         if t == "Matrix<f64>":
             return f"Matrix::from_column_major(2, 2, vec![{', '.join(nxt() for _ in range(4))}])"
         inner = t[4:-1]
+        if t.count("Vec<") > MAX_DEPTH:
+            return f"up({build(inner)})"
         return f"vec![{build(inner)}, {build(inner)}]"
 
     return build(ty)
@@ -72,21 +74,21 @@ def main():
             if any(r not in ("f64", ra[0]) for r in ra[1:]):
                 skipped += 1
                 continue
-            if ra[0].count("Vec<") > MAX_DEPTH:
-                deep += 1
-                ledger.record("deep", name, args)
-                continue
             shapes[(fam, kind, tuple(ra))] += 1
             ledger.record("called", name, args)
+        blocks = []
         for (fam, kind, ra), n in sorted(shapes.items()):
             total += n
-            body.append(call(name, fam, kind, ra))
-    out = HEADER.format(total=total, shapes=len(body), deep=deep, depth=MAX_DEPTH)
-    out += "#[test]\nfn bound_transform_signatures() {\n    let mut failures = Vec::new();\n"
-    out += "".join(body)
-    out += '    assert!(failures.is_empty(), "\\n{}", failures.join("\\n"));\n}\n'
+            blocks.append(call(name, fam, kind, ra))
+        body.append((name, blocks))
+    shapes = sum(len(b) for _, b in body)
+    out = HEADER.format(total=total, shapes=shapes)
+    for name, blocks in body:
+        out += f"#[test]\nfn {name}_signatures() {{\n    let mut failures = Vec::new();\n"
+        out += "".join(blocks)
+        out += '    assert!(failures.is_empty(), "\\n{}", failures.join("\\n"));\n}\n\n'
     open("crates/stanmath-rs/tests/signatures_bounds.rs", "w").write(out)
-    print(total, "signatures,", len(body), "Rust shapes;", deep, "deeper;", skipped, "scalar")
+    print(total, "signatures,", shapes, "Rust shapes;", skipped, "scalar")
 
 
 def call(name, fam, kind, ra):
@@ -104,11 +106,11 @@ def call(name, fam, kind, ra):
     f = f"|{closure_args}| eval({name}({params}{tail}))"
     refs = ", ".join(f"&{n}" for n in cont)
     if len(cont) == 1:
-        got = f"apply_scalar_unary({refs}, {f})"
+        got = f"un({refs}, &mut {f})"
     elif len(cont) == 2:
-        got = f"apply_scalar_binary({refs}, {f}).unwrap()"
+        got = f"bin({refs}, &mut {f}).unwrap()"
     else:
-        got = f"apply_scalar_ternary({refs}, {f}).unwrap()"
+        got = f"ter({refs}, &mut {f}).unwrap()"
     wargs = ", ".join(f"{n}s[i]" if n in cont else n for n in names)
     lines = "".join(lets)
     if lp:
@@ -130,8 +132,8 @@ HEADER = """//! Every container signature of the bound transforms in the Stan la
 //!
 //! Written by `tools/reference/gen_bounds.py` from the CmdStan 2.40.0 signature dump: {total} Stan
 //! signatures in {shapes} Rust shapes. Each call must equal the scalar transform of every element,
-//! and a `_jacobian` call's lp the sum of theirs. The other {deep} signatures nest arrays more than
-//! {depth} `Vec` levels deep and share the same recursive impl.
+//! and a `_jacobian` call's lp the sum of theirs. Literals branch in two up to three `Vec` levels;
+//! outer levels repeat their element (`up`), so every depth Stan has is called.
 #![allow(
     clippy::too_many_lines,
     clippy::unreadable_literal,
@@ -167,6 +169,34 @@ fn leaves<C: ScalarContainer<Scalar = f64>>(c: &C) -> Vec<f64> {{
     let mut out = Vec::new();
     apply_scalar_unary(c, |v| out.push(v));
     out
+}}
+
+/// The apply functions with trait objects, so each container type compiles once rather than once
+/// per closure.
+fn un<C: ScalarContainer>(x: &C, f: &mut dyn FnMut(C::Scalar) -> f64) -> C::Mapped<f64> {{
+    apply_scalar_unary(x, f)
+}}
+
+fn bin<C: ScalarContainer>(
+    a: &C,
+    b: &C,
+    f: &mut dyn FnMut(C::Scalar, C::Scalar) -> f64,
+) -> Result<C::Mapped<f64>> {{
+    apply_scalar_binary(a, b, f)
+}}
+
+fn ter<C: ScalarContainer>(
+    a: &C,
+    b: &C,
+    c: &C,
+    f: &mut dyn FnMut(C::Scalar, C::Scalar, C::Scalar) -> f64,
+) -> Result<C::Mapped<f64>> {{
+    apply_scalar_ternary(a, b, c, f)
+}}
+
+/// Two copies of `x`: one more array level.
+fn up<T: Clone>(x: T) -> Vec<T> {{
+    vec![x.clone(), x]
 }}
 
 fn close(a: f64, b: f64) -> bool {{

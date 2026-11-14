@@ -21,8 +21,8 @@ import ledger
 SCALAR = {"int", "real"}
 # Rust operators (+, -, *, /) or, for squared_distance, a reduction rather than an elementwise map.
 OPERATORS = {"add", "subtract", "multiply", "elt_multiply", "elt_divide", "squared_distance"}
-# Arrays nest through one recursive impl (Vec<C> for any container C), so calls stop at this many
-# Vec levels; deep_arrays() checks one function to the deepest level Stan has.
+# Literals branch in two up to this many Vec levels; outer levels repeat their element (up()), so
+# the deepest arrays stay small.
 MAX_DEPTH = 3
 # Real arguments for functions with an int argument, which the scalar Stan fixture lacks; their
 # int arguments are 2.
@@ -69,6 +69,8 @@ def value(ty, leaf, base, ints):
         if t == "Matrix<f64>":
             return f"Matrix::from_column_major(2, 2, vec![{', '.join(nxt() for _ in range(4))}])"
         inner = t[4:-1]
+        if t.count("Vec<") > MAX_DEPTH:
+            return f"up({build(inner)})"
         return f"vec![{build(inner)}, {build(inner)}]"
 
     return build(ty)
@@ -125,36 +127,30 @@ def main():
                 d = int_matrix_depth(a)
                 if d is None:
                     continue
-                if d > 1:
-                    deep[0] += 1
-                    ledger.record("deep", name, a)
-                    continue
                 ledger.record("called", name, a)
                 int_matrix.append((name, a, d))
                 continue
-            if max(x[0].count("Vec<") for x in ra) > MAX_DEPTH:
-                deep[0] += 1
-                ledger.record("deep", name, a)
-                continue
             calls.setdefault(tuple(x[0] for x in ra), []).append(a)
             ledger.record("called", name, a)
-        for nm, a, d in int_matrix:
-            if nm == name:
-                total += 1
-                body.append(call_int_matrix(name, a, d, is_int))
-        if not calls:
-            continue
-        names += 1
+        blocks = [call_int_matrix(name, a, d, is_int) for nm, a, d in int_matrix if nm == name]
+        total += len(blocks)
+        if calls:
+            names += 1
         for shape, stan in sorted(calls.items()):
             total += len(stan)
-            body.append(call(name, shape, is_int, reals))
-    out = HEADER.format(total=total, names=names, shapes=len(body), deep=deep[0], depth=MAX_DEPTH)
-    out += "#[test]\nfn elementwise_signatures() {\n    let mut failures = Vec::new();\n"
-    out += "".join(body)
-    out += '    assert!(failures.is_empty(), "\\n{}", failures.join("\\n"));\n}\n'
+            blocks.append(call(name, shape, is_int, reals))
+        if blocks:
+            body.append((name, blocks))
+    shapes = sum(len(b) for _, b in body)
+    out = HEADER.format(total=total, names=names, shapes=shapes, deep=deep[0], depth=MAX_DEPTH)
+    # One test per function keeps each function small enough to compile quickly.
+    for name, blocks in body:
+        out += f"#[test]\nfn {name.lower()}_signatures() {{\n    let mut failures = Vec::new();\n"
+        out += "".join(blocks)
+        out += '    assert!(failures.is_empty(), "\\n{}", failures.join("\\n"));\n}\n\n'
     out += DEEP
     open("crates/stanmath-rs/tests/signatures_elementwise.rs", "w").write(out)
-    print(total, "signatures,", names, "functions,", len(body), "Rust shapes;", deep[0], "deeper")
+    print(total, "signatures,", names, "functions,", shapes, "Rust shapes;", deep[0], "deeper")
 
 
 def int_matrix_depth(args):
@@ -188,12 +184,24 @@ def call_int_matrix(name, args, d, is_int):
     else:
         conv = "to_matrix_from_int_array_2d::<f64>(&a).unwrap()"
         pairs = "(0..2).flat_map(|j| (0..2).map(move |i| (i, j))).map(|(i, j)| (a[i][j], b[(i, j)]))"
+    if d > 1:
+        # Deeper arrays repeat the depth zero arrays (up); the conversion is the same map one level
+        # down, and the pairing by position is the one checked at depths zero and one.
+        for _ in range(d):
+            ints, mats = f"up({ints})", f"up({mats})"
+        inner = "to_matrix_from_int_array_2d::<f64>(m).unwrap()"
+        for k in range(d):
+            v = "a" if k == d - 1 else f"a{k}"
+            arg = "m" if k == 0 else f"a{k - 1}"
+            inner = f"{v}.iter().map(|{arg}| {inner}).collect::<Vec<_>>()"
+        conv = inner
+        pairs = "items(&ai).into_iter().zip(items(&b))"
     n_arg = "n as _" if is_int[p_int] else "n as f64"
     call_args = f"{n_arg}, v" if p_int == 0 else f"v, {n_arg}"
     return (
         f"    {{\n        let a = {ints};\n        let b = {mats};\n"
         f"        let ai = {conv};\n"
-        f"        let got = leaves(&apply_scalar_binary(&ai, &b, |n, v| eval({name}({call_args}))).unwrap());\n"
+        f"        let got = items(&bin(&ai, &b, &mut |n, v| eval({name}({call_args}))).unwrap());\n"
         f"        let want: Vec<f64> = {pairs}.map(|(n, v)| eval({name}({call_args}))).collect();\n"
         f"        compare(\"{label}\", got, want, &mut failures);\n    }}\n"
     )
@@ -222,32 +230,32 @@ def call(name, shape, is_int, reals):
         f = f"|v| eval({name}({arg(0, 'v', is_int)}))"
         return (
             f"    {{\n        let x: {shape[0]} = {lits[0]};\n"
-            f"        let got = apply_scalar_unary(&x, {f});\n"
-            f"        let want = apply_scalar_unary(&x, {f});\n"
-            f"        compare({label!r}, leaves(&got), leaves(&want), &mut failures);\n    }}\n"
+            f"        let got = un(&x, &mut {f});\n"
+            f"        let want: Vec<f64> = items(&x).into_iter().map({f}).collect();\n"
+            f"        compare({label!r}, items(&got), want, &mut failures);\n    }}\n"
         ).replace("'", '"')
     a_c = shape[0] not in ("f64", "i64")
     b_c = shape[1] not in ("f64", "i64")
     a_arg, b_arg = arg(0, "a", is_int), arg(1, "b", is_int)
     lines = [f"    {{\n        let a: {shape[0]} = {lits[0]};\n        let b: {shape[1]} = {lits[1]};\n"]
     if a_c and b_c and shape[0] == shape[1]:
-        lines.append(f"        let got = apply_scalar_binary(&a, &b, |a, b| eval({name}({a_arg}, {b_arg}))).unwrap();\n")
-        want = f"apply_scalar_binary(&a, &b, |a, b| eval({name}({a_arg}, {b_arg}))).unwrap()"
+        lines.append(f"        let got = bin(&a, &b, &mut |a, b| eval({name}({a_arg}, {b_arg}))).unwrap();\n")
+        want = "items(&a).into_iter().zip(items(&b))"
     elif a_c and b_c:
         # Containers of the same shape with int and real leaves: pair them by position.
-        lines.append(f"        let bl = leaves(&apply_scalar_unary(&b, |b| b as f64));\n        let mut i = 0;\n")
-        lines.append(f"        let got = apply_scalar_unary(&a, |a| {{ let b = bl[i]; i += 1; eval({name}({a_arg}, {b_arg})) }});\n")
-        want = None
+        lines.append(f"        let bl = items(&b);\n        let mut i = 0;\n")
+        lines.append(f"        let got = un(&a, &mut |a| {{ let b = bl[i]; i += 1; eval({name}({a_arg}, {b_arg})) }});\n")
+        want = "items(&a).into_iter().zip(bl)"
     elif a_c:
-        lines.append(f"        let got = apply_scalar_unary(&a, |a| eval({name}({a_arg}, {b_arg})));\n")
-        want = None
+        lines.append(f"        let got = un(&a, &mut |a| eval({name}({a_arg}, {b_arg})));\n")
+        want = "items(&a).into_iter().map(|a| (a, b))"
     else:
-        lines.append(f"        let got = apply_scalar_unary(&b, |b| eval({name}({a_arg}, {b_arg})));\n")
-        want = None
+        lines.append(f"        let got = un(&b, &mut |b| eval({name}({a_arg}, {b_arg})));\n")
+        want = "items(&b).into_iter().map(|b| (a, b))"
     lines.append(
-        f"        let n = leaves(&got).len();\n"
-        f"        compare({label!r}, leaves(&got), {'leaves(&' + want + ')' if want else 'leaves(&got)'}, &mut failures);\n"
-        f"        assert!(n > 0);\n    }}\n"
+        f"        let want: Vec<f64> = {want}.map(|(a, b)| eval({name}({a_arg}, {b_arg}))).collect();\n"
+        f"        assert!(!want.is_empty());\n"
+        f"        compare({label!r}, items(&got), want, &mut failures);\n    }}\n"
     )
     return "".join(lines).replace("'", '"')
 
@@ -263,10 +271,10 @@ fn deep_arrays() {
         x.push(2.0);
     }
     let got = apply_scalar_unary(&depth8, exp);
-    let want: Vec<f64> = leaves(&depth8).into_iter().map(f64::exp).collect();
-    assert_eq!(leaves(&got), want);
+    let want: Vec<f64> = items(&depth8).into_iter().map(f64::exp).collect();
+    assert_eq!(items(&got), want);
     let pairs = apply_scalar_binary(&depth8, &got, |a, b| pow(b, a)).unwrap();
-    assert_eq!(leaves(&pairs).len(), want.len());
+    assert_eq!(items(&pairs).len(), want.len());
 }
 """
 
@@ -276,8 +284,9 @@ HEADER = """//! Every vectorized form of a scalar function of one or two argumen
 //! Written by `tools/reference/gen_elementwise.py` from the CmdStan 2.40.0 signature dump: {total}
 //! Stan signatures of {names} functions in {shapes} Rust shapes. Each call must keep the container's
 //! shape and return the scalar function of every element; the scalar functions are compared with
-//! Stan Math by `stan_reference_scalar.rs`. The other {deep} signatures nest arrays more than {depth}
-//! `Vec` levels deep; they go through the same recursive impl, which `deep_arrays` checks to depth 8.
+//! Stan Math by `stan_reference_scalar.rs`. Arrays more than {depth} `Vec` levels deep repeat their
+//! element at the outer levels (`up`), so every depth Stan has is called with small literals; the
+//! other {deep} signatures pair int arrays with arrays of matrices.
 //! `add`, `subtract`, `multiply`, `elt_multiply`, and `elt_divide` are Rust's operators. An int
 //! array paired with matrices two levels shallower (`ldexp(matrix, array[,] int)`) goes through
 //! `to_matrix_from_int_array_2d`: Stan pairs element `[i, j]` with entry `(i, j)`.
@@ -328,10 +337,30 @@ fn eval(v: impl Eval) -> f64 {{
 }}
 
 /// The scalars of a container in order.
-fn leaves<C: ScalarContainer<Scalar = f64>>(c: &C) -> Vec<f64> {{
+fn items<C: ScalarContainer>(c: &C) -> Vec<C::Scalar> {{
     let mut out = Vec::new();
     apply_scalar_unary(c, |v| out.push(v));
     out
+}}
+
+/// `apply_scalar_unary` with a trait object, so each container type compiles once rather than
+/// once per closure.
+fn un<C: ScalarContainer>(x: &C, f: &mut dyn FnMut(C::Scalar) -> f64) -> C::Mapped<f64> {{
+    apply_scalar_unary(x, f)
+}}
+
+/// `apply_scalar_binary` with a trait object; see [`un`].
+fn bin<C: ScalarContainer>(
+    a: &C,
+    b: &C,
+    f: &mut dyn FnMut(C::Scalar, C::Scalar) -> f64,
+) -> Result<C::Mapped<f64>> {{
+    apply_scalar_binary(a, b, f)
+}}
+
+/// Two copies of `x`: one more array level.
+fn up<T: Clone>(x: T) -> Vec<T> {{
+    vec![x.clone(), x]
 }}
 
 fn compare(label: &str, got: Vec<f64>, want: Vec<f64>, failures: &mut Vec<String>) {{

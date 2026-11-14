@@ -9,7 +9,8 @@ Stan types map to Rust: real and int are f64 and i64, complex is Complex<f64>, v
 vectors are Vec, matrices are Matrix, and each array dimension adds a Vec; every container has two
 entries per dimension. Each call checks the result against the shape the generator expects:
 dims and num_elements of the value, the length of a repeated, appended, or sliced array, and that
-reverse reverses. Calls stop at three Vec levels; deeper arrays share the same generic code.
+reverse reverses. Literals branch in two up to three Vec levels; outer levels repeat their
+element (up()), so every depth Stan has is called.
 """
 
 import collections
@@ -57,6 +58,8 @@ def value(ty):
         if m:
             return f"Matrix::from_column_major(2, 2, vec![{', '.join(scalar(m.group(1)) for _ in range(4))}])"
         inner = t[4:-1]
+        if t.count("Vec<") > MAX_DEPTH:
+            return f"up({build(inner)})"
         return f"vec![{build(inner)}, {build(inner)}]"
 
     return build(ty)
@@ -75,10 +78,6 @@ def main():
             if r is None:
                 other += 1
                 continue
-            if r[0].count("Vec<") > MAX_DEPTH:
-                deep += 1
-                ledger.record("deep", name, args)
-                continue
             code = call(name, args, r)
             if code is None:
                 other += 1
@@ -86,12 +85,12 @@ def main():
             total += 1
             ledger.record("called", name, args)
             body.append(code)
-    out = HEADER.format(total=total, deep=deep)
+    out = HEADER.format(total=total)
     out += "#[test]\nfn container_signatures() {\n"
     out += "".join(body)
     out += "}\n"
     open("crates/stanmath-rs/tests/signatures_containers.rs", "w").write(out)
-    print(total, "signatures;", deep, "deeper;", other, "other")
+    print(total, "signatures;", other, "other")
 
 
 def call(name, args, r):
@@ -142,12 +141,22 @@ HEADER = """//! Every signature of the generic container functions of the Stan l
 //! over every element type, complex ones included.
 //!
 //! Written by `tools/reference/gen_containers.py` from the CmdStan 2.40.0 signature dump: {total}
-//! Stan signatures, each checked against the shape it must produce. The other {deep} signatures
-//! nest arrays more than three levels deep and run the same generic code.
-#![allow(clippy::too_many_lines, clippy::redundant_clone, clippy::clone_on_copy)]
+//! Stan signatures, each checked against the shape it must produce. Literals branch in two up to
+//! three `Vec` levels; outer levels repeat their element (`up`), so every depth Stan has is called.
+#![allow(
+    clippy::too_many_lines,
+    clippy::redundant_clone,
+    clippy::clone_on_copy,
+    clippy::type_complexity
+)]
 
 use stanmath_rs::autodiff::Complex;
 use stanmath_rs::prelude::*;
+
+/// Two copies of `x`: one more array level.
+fn up<T: Clone>(x: T) -> Vec<T> {{
+    vec![x.clone(), x]
+}}
 
 """
 

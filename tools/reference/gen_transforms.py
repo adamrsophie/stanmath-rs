@@ -9,7 +9,8 @@ cholesky_factor_cov; each with _constrain, _jacobian, and _unconstrain).
 Stan's array forms apply the transform to each element; in Rust they are an iterator map over the
 array (a _jacobian map adds every element's log Jacobian to one lp). Each call must keep the
 array's shape and equal the transform of every element in order, and its lp the sum of theirs.
-Calls stop at three array levels; deeper arrays are the same nested map. The single transforms
+Literals branch in two up to three array levels; outer levels repeat their element (up()), so
+every depth Stan has is called. The single transforms
 are compared with Stan Math by stan_reference_matrix.rs.
 """
 
@@ -64,24 +65,23 @@ def main():
         if not n or depth(args[0]) == 0:
             continue
         d = depth(args[0])
-        if d > MAX_DEPTH:
-            deep += 1
-            ledger.record("deep", m.group(1), args)
-            continue
         ledger.record("called", m.group(1), args)
         calls[(family(n.group(1), args), n.group(2), d)].append(m.group(1))
     body = [call(f, op, d) for (f, op, d) in sorted(calls)]
     total = sum(len(v) for v in calls.values())
-    out = HEADER.format(total=total, shapes=len(body), deep=deep, depth=MAX_DEPTH)
+    out = HEADER.format(total=total, shapes=len(body), depth=MAX_DEPTH)
     out += "#[test]\nfn transform_array_signatures() {\n    let mut failures = Vec::new();\n"
     out += "".join(body)
     out += '    assert!(failures.is_empty(), "\\n{}", failures.join("\\n"));\n}\n'
     open("crates/stanmath-rs/tests/signatures_transforms.rs", "w").write(out)
-    print(total, "signatures,", len(body), "Rust shapes;", deep, "deeper")
+    print(total, "signatures,", len(body), "Rust shapes")
 
 
 def nest(d, leaf):
-    """A nested vec! of depth d whose leaves are leaf(i) for i = 0, 1, ..."""
+    """A nested vec! of depth d whose leaves are leaf(i) for i = 0, 1, ...; levels past MAX_DEPTH
+    repeat their element (up), so the literal stays small."""
+    if d > MAX_DEPTH:
+        return f"up({nest(d - 1, leaf)})"
     k = [0]
 
     def build(level):
@@ -125,7 +125,7 @@ def call(fam, op, d):
     lines = [
         "    {\n",
         f"        let x = {nest(d, leaf)};\n",
-        f"        let flat_x: Vec<_> = vec![{', '.join(leaf(i) for i in range(2 ** d))}];\n",
+        f"        let flat_x: Vec<_> = (0..{2 ** max(0, d - MAX_DEPTH)}).flat_map(|_| vec![{', '.join(leaf(i) for i in range(2 ** min(d, MAX_DEPTH)))}]).collect();\n",
     ]
     if op == "jacobian":
         lines += [
@@ -159,11 +159,16 @@ HEADER = """//! Every array signature of the structural transforms in the Stan l
 //! in Rust they are an iterator map over the array, and a `_jacobian` map adds every element's log
 //! Jacobian to one `lp`. Each call must keep the array's shape and equal the transform of every
 //! element in order, and its `lp` the sum of theirs; the single transforms are compared with Stan
-//! Math by `stan_reference_matrix.rs`. The other {deep} signatures nest arrays more than {depth}
-//! deep and are the same nested map.
+//! Math by `stan_reference_matrix.rs`. Literals branch in two up to {depth} array levels; outer
+//! levels repeat their element (`up`), so every depth Stan has is called.
 #![allow(clippy::too_many_lines, clippy::unreadable_literal, clippy::redundant_closure, clippy::useless_vec)]
 
 use stanmath_rs::prelude::*;
+
+/// Two copies of `x`: one more array level.
+fn up<T: Clone>(x: T) -> Vec<T> {{
+    vec![x.clone(), x]
+}}
 
 """
 

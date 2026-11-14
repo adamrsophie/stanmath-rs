@@ -54,6 +54,8 @@ def value(ty, start):
             return scalar()
         if t.startswith("Matrix<"):
             return f"Matrix::from_column_major(2, 2, vec![{', '.join(scalar() for _ in range(4))}])"
+        if t.count("Vec<") > MAX_DEPTH:
+            return f"up({build(t[4:-1])})"
         return f"vec![{build(t[4:-1])}, {build(t[4:-1])}]"
 
     return build(ty)
@@ -65,20 +67,18 @@ def main():
         m = re.fullmatch(r"(to_complex|get_real|get_imag|conj|abs|minus|pow)\((.*)\) => (.*)", l)
         if m and (m.group(1) in ("to_complex", "get_real", "get_imag", "conj") or "complex" in m.group(2)):
             sigs[m.group(1)].append(m.group(2).split(", ") if m.group(2) else [])
-    body, total, deep = [], 0, 0
+    body, total = [], 0
     for name in sorted(sigs):
+        body.append(f"#[test]\nfn {name}_signatures() {{\n")
         for args in sigs[name]:
             ra = [rust(t) for t in args]
-            if any(r.count("Vec<") > MAX_DEPTH for r in ra):
-                deep += 1
-                ledger.record("deep", name, args)
-                continue
             total += 1
             ledger.record("called", name, args)
             body.append(call(name, args, ra))
-    out = HEADER.format(total=total, deep=deep) + "#[test]\nfn complex_signatures() {\n" + "".join(body) + "}\n"
+        body.append("}\n\n")
+    out = HEADER.format(total=total) + "".join(body)
     open("crates/stanmath-rs/tests/signatures_complex.rs", "w").write(out)
-    print(total, "signatures;", deep, "deeper")
+    print(total, "signatures")
 
 
 def as_f64(expr, ty):
@@ -98,14 +98,14 @@ def call(name, args, ra):
         ca, cb = a not in ("f64", "i64"), b not in ("f64", "i64")
         fa, fb = as_f64("x", a), as_f64("y", b)
         if ca and cb and a == b:
-            lines += f"        let got = leaves(&apply_scalar_binary(&a, &b, |x, y| to_complex({fa}, {fb})).unwrap());\n"
+            lines += f"        let got = leaves(&bin(&a, &b, &mut |x, y| to_complex({fa}, {fb})).unwrap());\n"
         elif ca and cb:
             lines += f"        let bl = leaves(&b);\n        let mut i = 0;\n"
-            lines += f"        let got = leaves(&apply_scalar_unary(&a, |x| {{ let y = bl[i]; i += 1; to_complex({fa}, {fb}) }}));\n"
+            lines += f"        let got = leaves(&un(&a, &mut |x| {{ let y = bl[i]; i += 1; to_complex({fa}, {fb}) }}));\n"
         elif ca:
-            lines += f"        let y = b;\n        let got = leaves(&apply_scalar_unary(&a, |x| to_complex({fa}, {fb})));\n"
+            lines += f"        let y = b;\n        let got = leaves(&un(&a, &mut |x| to_complex({fa}, {fb})));\n"
         elif cb:
-            lines += f"        let x = a;\n        let got = leaves(&apply_scalar_unary(&b, |y| to_complex({fa}, {fb})));\n"
+            lines += f"        let x = a;\n        let got = leaves(&un(&b, &mut |y| to_complex({fa}, {fb})));\n"
         else:
             lines += f"        let (x, y) = (a, b);\n        let got = vec![to_complex({fa}, {fb})];\n"
         al = "leaves(&a)" if ca else "vec![a; got.len()]"
@@ -120,11 +120,11 @@ def call(name, args, ra):
         ca, cb = a != "Complex<f64>", b != "Complex<f64>"
         if ca and cb:
             assert a == b, label
-            lines += "        let got = leaves(&apply_scalar_binary(&a, &b, |z, w| z.pow(w)).unwrap());\n"
+            lines += "        let got = leaves(&bin(&a, &b, &mut |z, w| z.pow(w)).unwrap());\n"
         elif ca:
-            lines += "        let got = leaves(&apply_scalar_unary(&a, |z| z.pow(b)));\n"
+            lines += "        let got = leaves(&un(&a, &mut |z| z.pow(b)));\n"
         elif cb:
-            lines += "        let got = leaves(&apply_scalar_unary(&b, |w| a.pow(w)));\n"
+            lines += "        let got = leaves(&un(&b, &mut |w| a.pow(w)));\n"
         else:
             lines += "        let got = vec![a.pow(b)];\n"
         al = "leaves(&a)" if ca else "vec![a; got.len()]"
@@ -136,7 +136,7 @@ def call(name, args, ra):
             "minus": "-z"}[name]
     f = {"abs": "|z: Complex<f64>| z.abs()", "minus": "|z: Complex<f64>| -z"}.get(name, name)
     return (f"    {{\n        let x: {x} = {value(x, 0)};\n"
-            f"        let got = leaves(&apply_scalar_unary(&x, {f}));\n"
+            f"        let got = leaves(&un(&x, &mut {f}));\n"
             f"        let want: Vec<_> = leaves(&x).into_iter().map(|z| {spec}).collect();\n"
             f"        assert_eq!(got, want, \"{label}\");\n    }}\n")
 
@@ -148,13 +148,15 @@ HEADER = """//! Every signature of `to_complex`, `get_real`, `get_imag`, and `co
 //! with Stan Math.
 //!
 //! Written by `tools/reference/gen_complex.py` from the CmdStan 2.40.0 signature dump: {total} Stan
-//! signatures, each checked against the definition or the scalar method at every element. The other {deep} signatures nest arrays more
-//! than three levels deep and share the same recursive impl.
+//! signatures, each checked against the definition or the scalar method at every element. Literals
+//! branch in two up to three `Vec` levels; outer levels repeat their element (`up`), so every depth
+//! Stan has is called.
 #![allow(
     clippy::too_many_lines,
     clippy::float_cmp,
     clippy::cast_precision_loss,
-    clippy::redundant_closure
+    clippy::redundant_closure,
+    clippy::type_complexity
 )]
 
 use stanmath_rs::autodiff::Complex;
@@ -164,6 +166,25 @@ fn leaves<C: ScalarContainer>(c: &C) -> Vec<C::Scalar> {{
     let mut out = Vec::new();
     apply_scalar_unary(c, |v| out.push(v));
     out
+}}
+
+/// The apply functions with trait objects, so each container type compiles once rather than once
+/// per closure.
+fn un<C: ScalarContainer, U>(x: &C, f: &mut dyn FnMut(C::Scalar) -> U) -> C::Mapped<U> {{
+    apply_scalar_unary(x, f)
+}}
+
+fn bin<C: ScalarContainer, U>(
+    a: &C,
+    b: &C,
+    f: &mut dyn FnMut(C::Scalar, C::Scalar) -> U,
+) -> Result<C::Mapped<U>> {{
+    apply_scalar_binary(a, b, f)
+}}
+
+/// Two copies of `x`: one more array level.
+fn up<T: Clone>(x: T) -> Vec<T> {{
+    vec![x.clone(), x]
 }}
 
 """
