@@ -8,7 +8,8 @@
 //   function,feature,draw;draw;...
 // with N draws, where feature numbers the output elements (column major for a matrix).
 
-#include <stan/math.hpp>
+// The Laplace functions live in the mixed mode header, as in stanc's models.
+#include <stan/math/mix.hpp>
 
 #include <boost/random/additive_combine.hpp>
 
@@ -52,6 +53,25 @@ VectorXd vec(std::initializer_list<double> x) {
   for (double e : x) v(k++) = e;
   return v;
 }
+
+// Laplace covariance gp_exp_quad_cov(x, alpha, rho) + 1e-8 I at x = [0, 0.5, 1.2].
+struct Kf {
+  template <typename T1, typename T2>
+  Eigen::Matrix<stan::return_type_t<T1, T2>, -1, -1> operator()(const T1& a, const T2& rho,
+                                                               std::ostream*) const {
+    std::vector<double> x = {0.0, 0.5, 1.2};
+    return stan::math::add_diag(stan::math::gp_exp_quad_cov(x, a, rho), 1e-8);
+  }
+};
+
+// Laplace likelihood: y ~ poisson_log(theta + eta).
+struct Ll {
+  template <typename T0, typename T1>
+  stan::return_type_t<T0, T1> operator()(const T0& theta, const std::vector<int>& y,
+                                         const T1& eta, std::ostream*) const {
+    return stan::math::poisson_log_lpmf(y, stan::math::add(theta, eta));
+  }
+};
 
 }  // namespace
 
@@ -139,5 +159,26 @@ int main() {
   MatrixXd gamma(2, 2);
   gamma << 0.7, 0.3, 0.4, 0.6;
   emit("hmm_latent_rng", [&] { return hmm_latent_rng(log_omegas, gamma, vec({0.6, 0.4}), rng); });
+  // Laplace latent samplers: phi = [1.2, 0.7], y_index one based.
+  const std::vector<int> yp = {1, 0, 3}, yb = {1, 0, 1}, idx = {1, 2, 3};
+  const VectorXd m3 = vec({0.3, 0.3, 0.3}), z3 = vec({0.0, 0.0, 0.0});
+  auto opts = generate_laplace_options(3);
+  auto kargs = std::make_tuple(1.2, 0.7);
+  emit("laplace_latent_rng", [&] {
+    return laplace_latent_rng(Ll(), std::forward_as_tuple(yp, 0.3), 1, Kf(), kargs, rng, nullptr); });
+  emit("laplace_latent_tol_rng", [&] {
+    return laplace_latent_tol_rng(Ll(), std::forward_as_tuple(yp, 0.3), 1, Kf(), kargs, opts, rng, nullptr); });
+  emit("laplace_latent_poisson_log_rng", [&] {
+    return laplace_latent_poisson_log_rng(yp, idx, m3, 1, Kf(), kargs, rng, nullptr); });
+  emit("laplace_latent_tol_poisson_log_rng", [&] {
+    return laplace_latent_tol_poisson_log_rng(yp, idx, m3, 1, Kf(), kargs, opts, rng, nullptr); });
+  emit("laplace_latent_bernoulli_logit_rng", [&] {
+    return laplace_latent_bernoulli_logit_rng(yb, idx, m3, 1, Kf(), kargs, rng, nullptr); });
+  emit("laplace_latent_tol_bernoulli_logit_rng", [&] {
+    return laplace_latent_tol_bernoulli_logit_rng(yb, idx, m3, 1, Kf(), kargs, opts, rng, nullptr); });
+  emit("laplace_latent_neg_binomial_2_log_rng", [&] {
+    return laplace_latent_neg_binomial_2_log_rng(yp, idx, 2.5, z3, 1, Kf(), kargs, rng, nullptr); });
+  emit("laplace_latent_tol_neg_binomial_2_log_rng", [&] {
+    return laplace_latent_tol_neg_binomial_2_log_rng(yp, idx, 2.5, z3, 1, Kf(), kargs, opts, rng, nullptr); });
   return 0;
 }

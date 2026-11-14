@@ -8,7 +8,8 @@
 //   function,ints,reals,value,gradient
 // as in stan_reference_extra.cpp.
 
-#include <stan/math.hpp>
+// The Laplace functions live in the mixed mode header, as in stanc's models.
+#include <stan/math/mix.hpp>
 
 #include <iomanip>
 #include <iostream>
@@ -108,6 +109,77 @@ struct Job {
   }
 };
 
+// The variadic forms take Eigen vectors and pass the parameters as trailing arguments.
+struct LvV {
+  template <typename T0, typename T1, typename T2>
+  Eigen::Matrix<stan::return_type_t<T1, T2>, -1, 1> operator()(const T0&, const T1& y,
+                                                              std::ostream*, const T2& th) const {
+    Eigen::Matrix<stan::return_type_t<T1, T2>, -1, 1> r(2);
+    r << th(0) * y(0) - th(1) * y(0) * y(1), -th(2) * y(1) + th(1) * y(0) * y(1);
+    return r;
+  }
+};
+
+struct SysV {
+  template <typename T0, typename T1>
+  Eigen::Matrix<stan::return_type_t<T0, T1>, -1, 1> operator()(
+      const Eigen::Matrix<T0, -1, 1>& x, std::ostream*, const Eigen::Matrix<T1, -1, 1>& th) const {
+    Eigen::Matrix<stan::return_type_t<T0, T1>, -1, 1> r(2);
+    r << x(0) * x(0) + x(1) - th(0), x(0) - x(1) * x(1) * x(1) + th(1);
+    return r;
+  }
+};
+
+// DAE residual: y0' + k y0 = 0, y1 - 2 y0 = 0, so y0 = c exp(-k t) and y1 = 2 y0.
+struct Res {
+  template <typename T0, typename T1, typename T2, typename T3>
+  Eigen::Matrix<stan::return_type_t<T1, T2, T3>, -1, 1> operator()(
+      const T0&, const Eigen::Matrix<T1, -1, 1>& y, const Eigen::Matrix<T2, -1, 1>& yp,
+      std::ostream*, const T3& k) const {
+    Eigen::Matrix<stan::return_type_t<T1, T2, T3>, -1, 1> r(2);
+    r << yp(0) + k * y(0), y(1) - 2 * y(0);
+    return r;
+  }
+};
+
+// reduce_sum partial sum: normal_lpdf(slice | mu, sigma).
+struct Part {
+  template <typename T1, typename T2>
+  stan::return_type_t<T1, T2> operator()(const std::vector<double>& s, int, int, std::ostream*,
+                                         const T1& mu, const T2& sigma) const {
+    return stan::math::normal_lpdf(s, mu, sigma);
+  }
+};
+
+// Laplace covariance: gp_exp_quad_cov(x, alpha, rho) at x = [0, 0.5, 1.2], plus 1e-8 on the
+// diagonal.
+struct Kf {
+  template <typename T1, typename T2>
+  Eigen::Matrix<stan::return_type_t<T1, T2>, -1, -1> operator()(const T1& a, const T2& rho,
+                                                               std::ostream*) const {
+    std::vector<double> x = {0.0, 0.5, 1.2};
+    return stan::math::add_diag(stan::math::gp_exp_quad_cov(x, a, rho), 1e-8);
+  }
+};
+
+// Laplace likelihood: y ~ poisson_log(theta + eta[1]).
+struct Ll {
+  template <typename T0, typename T1>
+  stan::return_type_t<T0, T1> operator()(const T0& theta,
+                                         const std::vector<int>& y, const T1& eta,
+                                         std::ostream*) const {
+    return stan::math::poisson_log_lpmf(y, stan::math::add(theta, eta));
+  }
+};
+
+var wsumv(const std::vector<Eigen::Matrix<var, -1, 1>>& r) {
+  var s = 0;
+  int k = 0;
+  for (const auto& row : r)
+    for (int i = 0; i < row.size(); ++i) s += (1.0 + 0.1 * k++) * row(i);
+  return s;
+}
+
 }  // namespace
 
 STAN_REGISTER_MAP_RECT(1, Job)
@@ -150,6 +222,70 @@ int main() {
     std::vector<std::vector<double>> jr = {{0.5}, {0.25}};
     std::vector<std::vector<int>> ji = {{2}, {3}};
     return wsum(map_rect<1, Job>(phi, jobs, jr, ji, nullptr)); });
+  // Variadic ODE solvers. The default tolerances (1e-6) agree to about 1e-4; the _tol forms and
+  // the adjoint solver run at 1e-10.
+  auto yv = [](const Vars& v) { Eigen::Matrix<var, -1, 1> r(2); r << v[0], v[1]; return r; };
+  auto tv = [](const Vars& v) { Eigen::Matrix<var, -1, 1> r(3); r << v[2], v[3], v[4]; return r; };
+  emit("ode_rk45", ode, [&](const Vars& v) { return wsumv(ode_rk45(LvV(), yv(v), 0.0, ts, nullptr, tv(v))); });
+  emit("ode_ckrk", ode, [&](const Vars& v) { return wsumv(ode_ckrk(LvV(), yv(v), 0.0, ts, nullptr, tv(v))); });
+  emit("ode_adams", ode, [&](const Vars& v) { return wsumv(ode_adams(LvV(), yv(v), 0.0, ts, nullptr, tv(v))); });
+  emit("ode_bdf", ode, [&](const Vars& v) { return wsumv(ode_bdf(LvV(), yv(v), 0.0, ts, nullptr, tv(v))); });
+  emit("ode_rk45_tol", ode, [&](const Vars& v) {
+    return wsumv(ode_rk45_tol(LvV(), yv(v), 0.0, ts, 1e-10, 1e-10, 1000000, nullptr, tv(v))); });
+  emit("ode_ckrk_tol", ode, [&](const Vars& v) {
+    return wsumv(ode_ckrk_tol(LvV(), yv(v), 0.0, ts, 1e-10, 1e-10, 1000000, nullptr, tv(v))); });
+  emit("ode_adams_tol", ode, [&](const Vars& v) {
+    return wsumv(ode_adams_tol(LvV(), yv(v), 0.0, ts, 1e-10, 1e-10, 1000000, nullptr, tv(v))); });
+  emit("ode_bdf_tol", ode, [&](const Vars& v) {
+    return wsumv(ode_bdf_tol(LvV(), yv(v), 0.0, ts, 1e-10, 1e-10, 1000000, nullptr, tv(v))); });
+  Eigen::VectorXd atol(2);
+  atol << 1e-10, 1e-10;
+  emit("ode_adjoint_tol_ctl", ode, [&](const Vars& v) {
+    return wsumv(ode_adjoint_tol_ctl(LvV(), yv(v), 0.0, ts, 1e-10, atol, 1e-10, atol, 1e-10, 1e-10,
+                                     1000000, 150, 1, 2, 2, nullptr, tv(v))); });
+  // DAE with consistent initial values y = [1, 2], y' = [-k, -2k]; the parameter is k.
+  auto dy = [](const Vars& v) { Eigen::Matrix<var, -1, 1> r(2); r << 1.0, 2.0; return r; };
+  auto dyp = [](const Vars& v) { Eigen::Matrix<var, -1, 1> r(2); r << -v[0], -2 * v[0]; return r; };
+  emit("dae", {0.7}, [&](const Vars& v) { return wsumv(dae(Res(), dy(v), dyp(v), 0.0, ts, nullptr, v[0])); });
+  emit("dae_tol", {0.7}, [&](const Vars& v) {
+    return wsumv(dae_tol(Res(), dy(v), dyp(v), 0.0, ts, 1e-10, 1e-10, 1000000, nullptr, v[0])); });
+  // Variadic algebraic solvers; the default tolerances agree to about 1e-6.
+  emit("solve_newton", {2.0, 0.5}, [&](const Vars& v) { return wsum(solve_newton(SysV(), guess, nullptr, theta(v))); });
+  emit("solve_powell", {2.0, 0.5}, [&](const Vars& v) { return wsum(solve_powell(SysV(), guess, nullptr, theta(v))); });
+  emit("solve_newton_tol", {2.0, 0.5}, [&](const Vars& v) {
+    return wsum(solve_newton_tol(SysV(), guess, 1e-12, 1e-12, 1000, nullptr, theta(v))); });
+  emit("solve_powell_tol", {2.0, 0.5}, [&](const Vars& v) {
+    return wsum(solve_powell_tol(SysV(), guess, 1e-12, 1e-12, 1000, nullptr, theta(v))); });
+  const std::vector<double> rs = {0.1, 0.4, -0.3, 1.2, 0.8};
+  emit("reduce_sum", {0.3, 1.4}, [&](const Vars& v) { return reduce_sum<Part>(rs, 2, nullptr, v[0], v[1]); });
+  emit("reduce_sum_static", {0.3, 1.4}, [&](const Vars& v) {
+    return reduce_sum_static<Part>(rs, 2, nullptr, v[0], v[1]); });
+  // Laplace marginals: phi = [alpha, rho] (and the offset or dispersion last), y_index one based.
+  const std::vector<int> yp = {1, 0, 3}, yb = {1, 0, 1}, idx = {1, 2, 3};
+  auto opts = generate_laplace_options(3);
+  auto mv = [](const var& c) { Eigen::Matrix<var, -1, 1> r(3); r << c, c, c; return r; };
+  emit("laplace_marginal_poisson_log_lpmf", {1.2, 0.7, 0.3}, [&](const Vars& v) {
+    return laplace_marginal_poisson_log_lpmf<false>(yp, idx, mv(v[2]), 1, Kf(), std::forward_as_tuple(v[0], v[1]), nullptr); });
+  emit("laplace_marginal_poisson_log_lupmf", {1.2, 0.7, 0.3}, [&](const Vars& v) {
+    return laplace_marginal_poisson_log_lpmf<true>(yp, idx, mv(v[2]), 1, Kf(), std::forward_as_tuple(v[0], v[1]), nullptr); });
+  emit("laplace_marginal_tol_poisson_log_lpmf", {1.2, 0.7, 0.3}, [&](const Vars& v) {
+    return laplace_marginal_tol_poisson_log_lpmf<false>(yp, idx, mv(v[2]), 1, Kf(), std::forward_as_tuple(v[0], v[1]), opts, nullptr); });
+  emit("laplace_marginal_bernoulli_logit_lpmf", {1.2, 0.7, 0.3}, [&](const Vars& v) {
+    return laplace_marginal_bernoulli_logit_lpmf<false>(yb, idx, mv(v[2]), 1, Kf(), std::forward_as_tuple(v[0], v[1]), nullptr); });
+  emit("laplace_marginal_bernoulli_logit_lupmf", {1.2, 0.7, 0.3}, [&](const Vars& v) {
+    return laplace_marginal_bernoulli_logit_lpmf<true>(yb, idx, mv(v[2]), 1, Kf(), std::forward_as_tuple(v[0], v[1]), nullptr); });
+  emit("laplace_marginal_tol_bernoulli_logit_lpmf", {1.2, 0.7, 0.3}, [&](const Vars& v) {
+    return laplace_marginal_tol_bernoulli_logit_lpmf<false>(yb, idx, mv(v[2]), 1, Kf(), std::forward_as_tuple(v[0], v[1]), opts, nullptr); });
+  emit("laplace_marginal_neg_binomial_2_log_lpmf", {1.2, 0.7, 2.5}, [&](const Vars& v) {
+    return laplace_marginal_neg_binomial_2_log_lpmf<false>(yp, idx, v[2], mv(0.0), 1, Kf(), std::forward_as_tuple(v[0], v[1]), nullptr); });
+  emit("laplace_marginal_neg_binomial_2_log_lupmf", {1.2, 0.7, 2.5}, [&](const Vars& v) {
+    return laplace_marginal_neg_binomial_2_log_lpmf<true>(yp, idx, v[2], mv(0.0), 1, Kf(), std::forward_as_tuple(v[0], v[1]), nullptr); });
+  emit("laplace_marginal_tol_neg_binomial_2_log_lpmf", {1.2, 0.7, 2.5}, [&](const Vars& v) {
+    return laplace_marginal_tol_neg_binomial_2_log_lpmf<false>(yp, idx, v[2], mv(0.0), 1, Kf(), std::forward_as_tuple(v[0], v[1]), opts, nullptr); });
+  emit("laplace_marginal", {1.2, 0.7, 0.3}, [&](const Vars& v) {
+    return laplace_marginal(Ll(), std::forward_as_tuple(yp, v[2]), 1, Kf(), std::forward_as_tuple(v[0], v[1]), nullptr); });
+  emit("laplace_marginal_tol", {1.2, 0.7, 0.3}, [&](const Vars& v) {
+    return laplace_marginal_tol(Ll(), std::forward_as_tuple(yp, v[2]), 1, Kf(), std::forward_as_tuple(v[0], v[1]), opts, nullptr); });
   // generate_laplace_options: each field of the tuple as its own row.
   Eigen::VectorXd t0(2);
   t0 << 1.5, 0.2;

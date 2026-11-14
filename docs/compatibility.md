@@ -27,13 +27,14 @@ stanmath-rs does not claim compatibility for anything not marked **tested**.
 | `hessian` | `hessian` (forward over reverse), `hessian_forward` | tested |
 | `hessian_times_vector` | `hessian_vector_product` | tested |
 | `gradient_dot_vector` | `directional_derivative`, `jvp` | tested |
-| `grad_hessian` (third order) | `Dual<Dual<Var>>` by hand; no driver | experimental |
+| `grad_hessian`, `grad_tr_mat_times_hessian`, `partial_derivative`, `finite_diff_grad_hessian` | same names | tested |
 | `finite_diff_gradient` | `finite_diff_gradient`, `check_gradient` | tested |
 | nested `start_nested` / `recover_memory_nested` | separate tapes; closures cannot capture other tapes | tested |
 | `operands_and_partials` | `Var::from_partials`, `NaryFn`, fused distribution kernels | tested |
 | custom reverse-mode functions (`reverse_pass_callback`) | `Tape::custom_op` | tested |
 | `var` over `fvar` (reverse over forward) | not provided | not supported |
-| `reduce_sum`, `map_rect` (TBB) | `reduce_sum`, `map_rect`, and threaded `reduce_sum_parallel`, `map_rect_parallel` | experimental |
+| `reduce_sum`, `reduce_sum_static`, `map_rect` | same names, compared with Stan Math | tested |
+| threaded `reduce_sum` and `map_rect` (TBB) | `reduce_sum_parallel`, `map_rect_parallel` | experimental |
 | `map_rect` over MPI | `map_rect_mpi` in `backends/stanmath-rs-mpi` (CI with OpenMPI) | experimental |
 | OpenCL | `backends/stanmath-rs-opencl`, Stan's OpenCL function list (CI with POCL) | experimental |
 
@@ -66,36 +67,12 @@ Log densities (`_lpdf` / `_lpmf`), log CDFs (`_lcdf`), log complementary CDFs (`
 random number generators (`_rng`) with Stan's parameterizations and argument checks. All
 arguments are vectorized. Each log density has a `propto` form; see below.
 
-| Distribution | lpdf / lpmf | lcdf / lccdf | rng | Status |
-| --- | --- | --- | --- | --- |
-| `normal` | yes | yes | yes | tested |
-| `std_normal` | yes | yes | no | tested |
-| `student_t` | yes | yes | yes | tested |
-| `cauchy` | yes | yes | yes | tested |
-| `logistic` | yes | yes | yes | tested |
-| `exponential` | yes | yes | yes | tested |
-| `gamma` (shape, rate) | yes | yes | yes | tested |
-| `inv_gamma` (shape, scale) | yes | yes | yes | tested |
-| `beta` | yes | yes | yes | tested |
-| `lognormal` | yes | yes | yes | tested |
-| `uniform` | yes | yes | yes | tested |
-| `weibull` (shape, scale) | yes | yes | yes | tested |
-| `bernoulli` | yes | yes | yes | tested |
-| `bernoulli_logit` | yes | no | yes | tested |
-| `binomial` | yes | yes | yes | tested |
-| `binomial_logit` | yes | no | no | tested |
-| `poisson` | yes | yes | yes | tested |
-| `poisson_log` | yes | no | yes | tested |
-| `neg_binomial_2` (mean, dispersion) | yes | yes | yes | tested |
-| `neg_binomial_2_log` | yes | no | no | tested |
-| `categorical` | yes | not in Stan | yes | tested |
-| `categorical_logit` | yes | not in Stan | no | tested |
-| `dirichlet` | yes | not in Stan | no | tested |
-| `multi_normal` (single vector) | yes | not in Stan | no | tested |
-| `multi_normal_cholesky` (single vector) | yes | not in Stan | no | tested |
-| `lkj_corr_cholesky` | yes | not in Stan | no | tested |
-| `lkj_corr`, `multi_normal_prec`, `multi_student_t`, `wishart`, `inv_wishart`, Gaussian processes | | | | planned |
-| remaining Stan distributions (`skew_normal`, `von_mises`, `wiener`, `beta_binomial`, `ordered_logistic`, ...) | | | | planned |
+Every distribution function in the Stan language is implemented: each `_lpdf`, `_lpmf`, `_lupdf`,
+`_lupmf`, `_cdf`, `_lcdf`, `_lccdf`, and `_rng` in the CmdStan 2.40.0 signature dump, with every
+vectorized overload, including the multivariate densities, the GLMs, the Gaussian dynamic linear
+model, the hidden Markov model functions, and the Wiener densities. Each density and CDF is
+compared with values and gradients from Stan Math, and each sampler with draws from Stan Math (see
+"Measured differences from Stan Math" below). Status: tested.
 
 ### `propto`
 
@@ -161,7 +138,7 @@ Deliberate differences:
 | `mdivide_left_spd`, `inverse_spd`, `log_determinant_spd` | same names | tested |
 | `quad_form`, `multiply_lower_tri_self_transpose` | same names | tested |
 | `add`, `subtract`, scalar multiplication | `add`, `subtract`, `scale` | tested |
-| general `mdivide_left`, `inverse`, `log_determinant` (LU), eigen and singular value decompositions, matrix exponential, sparse matrices | | planned |
+| every other matrix function in the Stan language: general `mdivide_left`, `inverse`, `log_determinant` (LU), eigen, Schur, QR, and singular value decompositions, `matrix_exp`, `matrix_power`, CSR sparse functions, FFTs, Gaussian process kernels, and the rest | same names | tested |
 
 ## Constraining transforms
 
@@ -174,8 +151,8 @@ All with `*_constrain`, `*_constrain_lp` (log Jacobian), and `*_free`.
 | `sum_to_zero` (vector), `simplex` (softmax of `sum_to_zero`) | tested |
 | `unit_vector` | tested |
 | `cholesky_factor_corr`, `cholesky_factor_cov`, `cov_matrix` | tested |
-| `corr_matrix` | planned (Stan orders its partial correlations differently from `cholesky_factor_corr`; a compatible implementation needs that order) |
-| `sum_to_zero` matrices, `stochastic_row` and `stochastic_column` matrices | planned |
+| `corr_matrix` (in Stan's order of partial correlations) | tested |
+| `sum_to_zero` matrices, `stochastic_row` and `stochastic_column` matrices | tested |
 
 ## Solvers
 
@@ -184,8 +161,10 @@ All with `*_constrain`, `*_constrain_lp` (log Jacobian), and `*_free`.
 | scalar root finding (`root_finder`) | `solve_root` (bracketed safeguarded Newton), derivatives exact to the order of the scalar type | tested |
 | `algebra_solver_newton` | `solve_system` (Newton), derivatives exact to the order of the scalar type | tested |
 | `integrate_1d` | `integrate` (tanh-sinh, finite and infinite limits), derivatives with respect to parameters | tested |
-| derivatives with respect to integration limits | | planned |
-| `algebra_solver_powell`, fixed point solvers | | planned |
+| derivatives of `integrate_1d` with respect to the integration limits | same function | tested |
+| `solve_newton`, `solve_powell`, their `_tol` forms, `algebra_solver` (Powell) | `solve_newton`, `solve_powell`, `solve_*_tol`, `algebra_solver` | tested |
+| fixed point iteration (internal to Stan Math, not in the Stan language) | `solve_fixed_point`, `solve_fixed_point_tol` | experimental |
+| `laplace_marginal*`, `laplace_latent*` | same names | tested |
 | `ode_rk45`, `ode_ckrk`, `ode_adams`, `ode_bdf`, adjoint ODE solvers, DAE solvers | Dormand and Prince, Cash and Karp, variable order Adams (orders 1 to 12, PECE), and Radau IIA; Stan uses CVODES for Adams and BDF, so results agree to the tolerance, not to rounding error. Derivatives are those of the numerical solution | tested |
 
 The LKJ difference above is a Stan Math gradient bug: at `eta = 1` Stan evaluates the normalizing
@@ -296,6 +275,23 @@ every parameter, at tight tolerances on both sides, to `1e-7`. It also compares 
 sensitivities agree to `1e-4`), `map_rect` over two jobs, and every field of both
 `generate_laplace_options` forms. Stan writes the default Laplace tolerance as the literal
 `1.49012e-08`; stanmath-rs uses the same literal rather than `sqrt(f64::EPSILON)`.
+
+`crates/stanmath-rs/tests/stan_reference_functionals.rs` compares the derivative drivers with Stan
+Math's C++ functionals (`gradient`, `hessian`, `grad_hessian`, `hessian_times_vector`,
+`gradient_dot_vector`, `grad_tr_mat_times_hessian`, `jacobian`, `derivative`,
+`partial_derivative`, `finite_diff_gradient`, `finite_diff_grad_hessian`): the automatic
+differentiation drivers agree to `1e-12`, and the finite difference drivers, whose stencils differ
+from Stan's, to `1e-6`.
+
+The variadic functions of the Stan language are not in the signature dump, so the same test
+compares each of them as Stan Math calls them: `ode_rk45`, `ode_ckrk`, `ode_adams`, `ode_bdf`
+(at the default tolerances, to `1e-4`), their `_tol` forms and `ode_adjoint_tol_ctl` (at `1e-10`,
+to `1e-7`), `dae` and `dae_tol`, `solve_newton` and `solve_powell` (default tolerances, to `1e-5`)
+and their `_tol` forms, `reduce_sum` and `reduce_sum_static`, and every Laplace marginal
+(`laplace_marginal`, `laplace_marginal_tol`, and the Poisson, Bernoulli, and negative binomial
+`_lpmf`, `_lupmf`, and `_tol` forms), in value and in the gradient with respect to every
+parameter. The eight `laplace_latent*_rng` samplers are compared with Stan's draws in
+`stan_reference_rng.rs`.
 
 `crates/stanmath-rs/tests/stan_reference_rng.rs` compares every one of the 61 `_rng` functions with
 draws from Stan Math (`tools/stan-reference/stan_reference_rng.cpp`). Stan's generator cannot be

@@ -1,4 +1,4 @@
-//! Every `_rng` function against draws from Stan Math.
+//! Every `_rng` function, and the variadic Laplace latent samplers, against draws from Stan Math.
 //!
 //! `tests/data/stan_reference_rng.csv` is written by `tools/stan-reference/stan_reference_rng.cpp`:
 //! 1000 draws from each Stan sampler, one line per output element (column major for a matrix).
@@ -132,8 +132,66 @@ fn draw(name: &str, rng: &mut StdRng) -> Vec<f64> {
             let gamma = m2([[0.7, 0.3], [0.4, 0.6]]);
             iv(hmm_latent_rng(&log_omegas, &gamma, &[0.6, 0.4], r).unwrap())
         }
+        n if n.starts_with("laplace_latent") => laplace(n, r),
         other => panic!("no sampler for {other}"),
     }
+}
+
+/// `gp_exp_quad_cov(x, alpha, rho)` at `x = [0, 0.5, 1.2]` plus `1e-8` on the diagonal.
+struct Kf;
+
+impl LaplaceCovariance for Kf {
+    fn covariance<S: Real>(&self, phi: &[S]) -> Result<Matrix<S>> {
+        const X: [f64; 3] = [0.0, 0.5, 1.2];
+        Ok(Matrix::from_fn(3, 3, |i, j| {
+            let d = X[i] - X[j];
+            let k = phi[0] * phi[0] * (-(S::from_f64(d * d) / (phi[1] * phi[1] * 2.0))).exp();
+            if i == j { k + 1e-8 } else { k }
+        }))
+    }
+}
+
+/// `y ~ poisson_log(theta + eta[0])` with `y = [1, 0, 3]`.
+struct Ll;
+
+impl LaplaceLikelihood for Ll {
+    fn log_likelihood<S: Real>(&self, theta: &[S], eta: &[S]) -> S {
+        let y = [1_i64, 0, 3];
+        let rate: Vec<S> = theta.iter().map(|&t| t + eta[0]).collect();
+        poisson_log_lpmf(&y[..], &rate[..]).unwrap()
+    }
+}
+
+/// The Laplace latent samplers at `phi = [1.2, 0.7]`; Stan's one based `y_index` `[1, 2, 3]` is
+/// `[0, 1, 2]` here.
+fn laplace(name: &str, r: &mut StdRng) -> Vec<f64> {
+    let (yp, yb, idx) = ([1_i64, 0, 3], [1_i64, 0, 1], [0_usize, 1, 2]);
+    let (phi, m, z) = ([1.2, 0.7], [0.3; 3], [0.0; 3]);
+    let o = generate_laplace_options(3);
+    match name {
+        "laplace_latent_rng" => laplace_latent_rng(&Ll, &[0.3], &Kf, &phi, r),
+        "laplace_latent_tol_rng" => laplace_latent_tol_rng(&Ll, &[0.3], &Kf, &phi, &o, r),
+        "laplace_latent_poisson_log_rng" => {
+            laplace_latent_poisson_log_rng(&yp, &idx, &m, &Kf, &phi, r)
+        }
+        "laplace_latent_tol_poisson_log_rng" => {
+            laplace_latent_tol_poisson_log_rng(&yp, &idx, &m, &Kf, &phi, &o, r)
+        }
+        "laplace_latent_bernoulli_logit_rng" => {
+            laplace_latent_bernoulli_logit_rng(&yb, &idx, &m, &Kf, &phi, r)
+        }
+        "laplace_latent_tol_bernoulli_logit_rng" => {
+            laplace_latent_tol_bernoulli_logit_rng(&yb, &idx, &m, &Kf, &phi, &o, r)
+        }
+        "laplace_latent_neg_binomial_2_log_rng" => {
+            laplace_latent_neg_binomial_2_log_rng(&yp, &idx, 2.5, &z, &Kf, &phi, r)
+        }
+        "laplace_latent_tol_neg_binomial_2_log_rng" => {
+            laplace_latent_tol_neg_binomial_2_log_rng(&yp, &idx, 2.5, &z, &Kf, &phi, &o, r)
+        }
+        other => panic!("no sampler for {other}"),
+    }
+    .unwrap()
 }
 
 #[test]
@@ -163,7 +221,7 @@ fn samplers_match_stan() {
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
-    assert_eq!(names.len(), 61);
+    assert_eq!(names.len(), 69);
 }
 
 // stan: normal_rng(real, real)
@@ -227,3 +285,12 @@ fn samplers_match_stan() {
 // stan: lkj_corr_cholesky_rng(int, real)
 // stan: bernoulli_logit_glm_rng(matrix, vector, vector)
 // stan: hmm_latent_rng(matrix, matrix, vector)
+// The variadic Laplace samplers are not in the signature dump:
+// variadic: laplace_latent_rng
+// variadic: laplace_latent_tol_rng
+// variadic: laplace_latent_poisson_log_rng
+// variadic: laplace_latent_tol_poisson_log_rng
+// variadic: laplace_latent_bernoulli_logit_rng
+// variadic: laplace_latent_tol_bernoulli_logit_rng
+// variadic: laplace_latent_neg_binomial_2_log_rng
+// variadic: laplace_latent_tol_neg_binomial_2_log_rng

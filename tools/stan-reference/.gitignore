@@ -10,3 +10,4 @@ stan_reference_complex
 stan_reference_scalar_extra
 stan_reference_solvers
 stan_reference_rng
+stan_reference_functionals
