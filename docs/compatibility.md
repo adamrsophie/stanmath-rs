@@ -35,8 +35,8 @@ stanmath-rs does not claim compatibility for anything not marked **tested**.
 | `var` over `fvar` (reverse over forward) | not provided | not supported |
 | `reduce_sum`, `reduce_sum_static`, `map_rect` | same names, compared with Stan Math | tested |
 | threaded `reduce_sum` and `map_rect` (TBB) | `reduce_sum_parallel`, `map_rect_parallel`, compared with the same Stan Math values as the serial forms | tested |
-| `map_rect` over MPI | `map_rect_mpi` in `backends/stanmath-rs-mpi` (CI with OpenMPI) | experimental |
-| OpenCL | `backends/stanmath-rs-opencl`, Stan's OpenCL function list (CI with POCL) | experimental |
+| `map_rect` over MPI | `map_rect_mpi` in `backends/stanmath-rs-mpi`, compared with Stan Math's `map_rect` value and gradient on 1 and 3 processes (CI with OpenMPI) | tested |
+| OpenCL | `backends/stanmath-rs-opencl`, Stan's OpenCL function list; the device `cholesky_decompose`, `multiply`, `mdivide_left_tri_low`, `mdivide_right_tri_low` and `gp_exp_quad_cov` compared with Stan Math values and gradients (CI with POCL) | tested |
 
 ## Scalar functions
 

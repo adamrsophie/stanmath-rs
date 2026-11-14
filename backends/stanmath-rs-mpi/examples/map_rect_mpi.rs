@@ -1,5 +1,7 @@
-//! Checks `map_rect_mpi` against `map_rect_parallel`. Run with any number of processes, for
-//! example `mpirun -n 3 target/debug/examples/map_rect_mpi`; it exits nonzero on a mismatch.
+//! Checks `map_rect_mpi` against `map_rect_parallel`, and against the `map_rect` value and gradient
+//! that Stan Math computed (`crates/stanmath-rs/tests/data/stan_reference_solvers.csv`). Run with
+//! any number of processes, for example `mpirun -n 3 target/debug/examples/map_rect_mpi`; it exits
+//! nonzero on a mismatch.
 
 use stanmath_rs_autodiff::{Real, grad};
 use stanmath_rs_core::{Error, Result};
@@ -18,6 +20,18 @@ impl MapRectJob for Job {
                     .map(|&x| phi[0] * x + theta[0] * (phi[1] * x).exp())
             })
             .collect())
+    }
+}
+
+/// The job of Stan's `map_rect` reference row: `[phi0 theta0 + x_r0, phi1 exp(theta1) x_i0]`.
+struct StanJob;
+
+impl MapRectJob for StanJob {
+    fn eval<S: Real>(&self, phi: &[S], t: &[S], x_r: &[f64], x_i: &[i64]) -> Result<Vec<S>> {
+        Ok(vec![
+            phi[0] * t[0] + x_r[0],
+            phi[1] * t[1].exp() * x_i[0] as f64,
+        ])
     }
 }
 
@@ -42,6 +56,7 @@ fn main() {
     let mut cluster = Cluster::init().expect("MPI init");
     let job = cluster.register(Job);
     let picky = cluster.register(Picky);
+    let stan_job = cluster.register(StanJob);
     if !cluster.is_root() {
         cluster.listen();
         return;
@@ -84,6 +99,46 @@ fn main() {
             failures.push(format!("round {round}: values {v_mpi:?} vs {v_par:?}"));
         }
     }
+    // Stan's row: map_rect,,point,value,gradient, with the output reduced as sum (1 + k / 10) r_k.
+    let row = include_str!("../../../crates/stanmath-rs/tests/data/stan_reference_solvers.csv")
+        .lines()
+        .find(|l| l.starts_with("map_rect,"))
+        .expect("the map_rect row");
+    let f: Vec<&str> = row.split(',').collect();
+    let list = |s: &str| -> Vec<f64> { s.split(';').map(|v| v.parse().unwrap()).collect() };
+    let (x, want, want_grad) = (list(f[2]), f[3].parse::<f64>().unwrap(), list(f[4]));
+    let r = stanmath_rs_autodiff::value_and_grad(
+        |v| {
+            let thetas = vec![v[2..4].to_vec(), v[4..6].to_vec()];
+            let out = map_rect_mpi(
+                &cluster,
+                &stan_job,
+                3,
+                &v[..2],
+                &thetas,
+                &[vec![0.5], vec![0.25]],
+                &[vec![2], vec![3]],
+            )
+            .unwrap();
+            out.iter()
+                .enumerate()
+                .map(|(k, &o)| o * (1.0 + 0.1 * k as f64))
+                .sum()
+        },
+        &x,
+    );
+    let close = |a: f64, b: f64| (a - b).abs() <= 1e-10 * b.abs().max(1.0);
+    if !close(r.value, want)
+        || r.gradient
+            .iter()
+            .zip(&want_grad)
+            .any(|(a, b)| !close(*a, *b))
+    {
+        failures.push(format!(
+            "Stan map_rect: ours {} {:?}, Stan {want} {want_grad:?}",
+            r.value, r.gradient
+        ));
+    }
     let no_data = vec![vec![]; 4];
     let no_ints = vec![vec![]; 4];
     let bad: Result<Vec<f64>> = map_rect_mpi(
@@ -114,7 +169,7 @@ fn main() {
     }
     if failures.is_empty() {
         println!(
-            "map_rect_mpi matches map_rect_parallel on {} processes",
+            "map_rect_mpi matches map_rect_parallel and Stan Math on {} processes",
             cluster.size()
         );
     } else {
