@@ -369,6 +369,42 @@ int main() {
     var s = 0;
     for (int k = 0; k < l.size(); ++k) s += abs(l(k)) + l(k).real() * l(k).real();
     return s; });
+  // Tuple forms: each part reduced and summed, with weights so a swapped part is caught.
+  continuous("qr", {a}, [&](const Vars& v) { auto r = qr(A); return wsum(std::get<0>(r)) + 2 * wsum(std::get<1>(r)); });
+  continuous("qr_thin", {a}, [&](const Vars& v) { auto r = qr_thin(A); return wsum(std::get<0>(r)) + 2 * wsum(std::get<1>(r)); });
+  continuous("svd", {a}, [&](const Vars& v) {
+    auto r = svd(A); return wsum(std::get<0>(r)) + 2 * wsum(std::get<1>(r)) + 3 * wsum(std::get<2>(r)); });
+  continuous("eigendecompose_sym", {s6}, [&](const Vars& v) {
+    auto r = eigendecompose_sym(sym(v, 0));
+    Eigen::MatrixXd d = Eigen::MatrixXd::Zero(3, 3);
+    d(0, 0) = 1; d(1, 1) = 2; d(2, 2) = 3;
+    const MV& e = std::get<0>(r);
+    return wsum(multiply(multiply(e, d), transpose(e))) + 2 * wsum(std::get<1>(r)); });
+  // Eigenvectors of a general matrix are not unique; the values part is reduced as eigenvalues.
+  continuous("eigendecompose", {{1.2, 0.5, -0.9, 0.3, 2.0, 0.6, 1.4, 0.1, 1.5}}, [&](const Vars& v) {
+    CV l = std::get<1>(eigendecompose(A));
+    var s = 0;
+    for (int k = 0; k < l.size(); ++k) s += abs(l(k)) + l(k).real() * l(k).real();
+    return s; });
+  // Eigenvectors are unique up to a complex scale per column and Eigen's are unit length, so the
+  // reduction sum_k |l_k| sum_i (1 + i / 10) |v_ik|^2 pairs each column with its eigenvalue and does
+  // not depend on the column order or phase.
+  auto evred = [](const CV& l, const CM& vec) {
+    var s = 0;
+    for (int k = 0; k < l.size(); ++k)
+      for (int i = 0; i < vec.rows(); ++i) s += abs(l(k)) * (1.0 + 0.1 * i) * norm(vec(i, k));
+    return s; };
+  const std::vector<double> g9 = {1.2, 0.5, -0.9, 0.3, 2.0, 0.6, 1.4, 0.1, 1.5};
+  continuous("eigenvectors", {g9}, [&](const Vars& v) { return evred(eigenvalues(A), eigenvectors(A)); });
+  // The diagonal of the Schur factor T holds the eigenvalues; it is reduced as eigenvalues. U and
+  // the strict upper triangle of T are not unique.
+  auto tdiag = [](const CM& tm) {
+    var s = 0;
+    for (int k = 0; k < tm.rows(); ++k) s += abs(tm(k, k)) + tm(k, k).real() * tm(k, k).real();
+    return s; };
+  continuous("complex_schur_decompose_t", {g9}, [&](const Vars& v) { return tdiag(complex_schur_decompose_t(A)); });
+  continuous("complex_schur_decompose", {g9}, [&](const Vars& v) {
+    return tdiag(std::get<1>(complex_schur_decompose(A))); });
   // Constructors, accessors, and conversions: these check index and fill order conventions.
   // An integer result is reduced the same way, as a constant.
   auto iws = [](const std::vector<int>& r) {
@@ -415,6 +451,30 @@ int main() {
   U("csr_extract_w", {w5}, csr_extract_w(sparse(v)));
   continuous("csr_extract_v", {w5}, [&](const Vars& v) { return iws(csr_extract_v(sparse(v))); });
   continuous("csr_extract_u", {w5}, [&](const Vars& v) { return iws(csr_extract_u(sparse(v))); });
+  auto dws = [](const std::vector<double>& r) {
+    double s = 0;
+    for (std::size_t k = 0; k < r.size(); ++k) s += (1.0 + 0.1 * k) * r[k];
+    return var(s); };
+  continuous("zeros_ones", {{}}, [&](const Vars&) {
+    return var(iws(zeros_int_array(3)) + 2 * iws(ones_int_array(3)))
+           + dws(zeros_array(2)) + wsum(MV(ones_vector(3).cast<var>()))
+           + 3 * wsum(MV(ones_row_vector(4).cast<var>())) + wsum(MV(zeros_row_vector(2).cast<var>()))
+           + 5 * dws(ones_array(2)) + 7 * wsum(MV(zeros_vector(2).cast<var>())); });
+  continuous("linspaced_array", {{}}, [&](const Vars&) { return dws(linspaced_array(5, -1, 2)); });
+  continuous("linspaced_row_vector", {{}}, [&](const Vars&) { return wsum(MV(linspaced_row_vector(5, -1, 2).cast<var>())); });
+  continuous("one_hot_array", {{}}, [&](const Vars&) { return dws(one_hot_array(4, 2)); });
+  continuous("one_hot_row_vector", {{}}, [&](const Vars&) { return wsum(MV(one_hot_row_vector(4, 2).cast<var>())); });
+  U("rep_row_vector", (Pts{{0.6}}), rep_row_vector(v[0], 3));
+  auto vas = [](const auto& arr) {
+    var s = 0; int k = 0;
+    for (const auto& c : arr)
+      for (int i = 0; i < c.size(); ++i) s += (1.0 + 0.1 * k++) * c(i);
+    return s; };
+  continuous("to_vector_array", {a}, [&](const Vars& v) { return vas(to_vector_array(A)); });
+  continuous("to_row_vector_array", {a}, [&](const Vars& v) { return vas(to_row_vector_array(A)); });
+  continuous("csr_extract", {w5}, [&](const Vars& v) {
+    auto r = csr_extract(sparse(v));
+    return wsum(std::get<0>(r)) + iws(std::get<1>(r)) + 2 * iws(std::get<2>(r)); });
   continuous("identity_matrix", {{}}, [&](const Vars&) { return wsum(MV(identity_matrix(3).cast<var>())); });
   continuous("linspaced_vector", {{}}, [&](const Vars&) { return wsum(MV(linspaced_vector(5, -1, 2).cast<var>())); });
   continuous("linspaced_int_array", {{}}, [&](const Vars&) { return iws(linspaced_int_array(5, 1, 9)); });
