@@ -266,3 +266,94 @@ fn laplace_options_match_stan_defaults() {
         (500, 1, 1000, true)
     );
 }
+
+/// `y[i] ~ neg_binomial_2_log(theta[g[i]] + m, phi[i])` with `eta = [m, phi...]`.
+struct NegBinPerObservation(Vec<i64>, Vec<usize>);
+
+impl LaplaceLikelihood for NegBinPerObservation {
+    fn log_likelihood<S: Real>(&self, theta: &[S], eta: &[S]) -> S {
+        let mut lp = S::zero();
+        for (i, (&count, &g)) in self.0.iter().zip(&self.1).enumerate() {
+            let (y, phi) = (count as f64, eta[1 + i]);
+            let lin = theta[g] + eta[0];
+            let log_mu_phi = (lin.exp() + phi).ln();
+            lp += lgamma(phi + y) - lgamma(phi) - lgamma(y + 1.0)
+                + phi * (phi.ln() - log_mu_phi)
+                + (lin - log_mu_phi) * y;
+        }
+        lp
+    }
+}
+
+#[test]
+fn neg_binomial_dispersion_per_observation() {
+    let y = vec![2i64, 0, 5, 1];
+    let index = [0usize, 1, 1, 2];
+    let (alpha, ell, m) = (0.9, 0.6, 0.3);
+    let phis = [1.5, 0.7, 3.0, 2.2];
+    let lik = NegBinPerObservation(y.clone(), index.to_vec());
+    // Values: one dispersion per observation against the user likelihood.
+    let builtin = laplace_marginal_neg_binomial_2_log_lpmf(
+        &y,
+        &index,
+        &phis[..],
+        &[m; 3],
+        &SqExp,
+        &[alpha, ell],
+    )
+    .unwrap();
+    let mut eta = vec![m];
+    eta.extend(phis);
+    let general = laplace_marginal(&lik, &eta, &SqExp, &[alpha, ell]).unwrap();
+    assert!(close(builtin, general, 1e-8), "{builtin} vs {general}");
+    // Gradients in the covariance parameters, the offset, and every dispersion.
+    let mut x = vec![alpha, ell, m];
+    x.extend(phis);
+    let gb = grad(
+        |p| {
+            laplace_marginal_neg_binomial_2_log_lpmf(
+                &y,
+                &index,
+                &p[3..],
+                &[p[2]; 3],
+                &SqExp,
+                &p[..2],
+            )
+            .unwrap()
+        },
+        &x,
+    );
+    let gg = grad(
+        |p| laplace_marginal(&lik, &p[2..], &SqExp, &p[..2]).unwrap(),
+        &x,
+    );
+    for (j, (a, b)) in gb.iter().zip(&gg).enumerate() {
+        assert!(close(*a, *b, 1e-7), "parameter {j}: {a} vs {b}");
+    }
+    // A vector of length one is the shared dispersion.
+    let one = laplace_marginal_neg_binomial_2_log_lpmf(
+        &y,
+        &index,
+        &[1.5][..],
+        &[m; 3],
+        &SqExp,
+        &[alpha, ell],
+    )
+    .unwrap();
+    let scalar =
+        laplace_marginal_neg_binomial_2_log_lpmf(&y, &index, 1.5, &[m; 3], &SqExp, &[alpha, ell])
+            .unwrap();
+    assert_eq!(one, scalar);
+    // Any other length is an error.
+    assert!(
+        laplace_marginal_neg_binomial_2_log_lpmf(
+            &y,
+            &index,
+            &phis[..2],
+            &[m; 3],
+            &SqExp,
+            &[alpha, ell]
+        )
+        .is_err()
+    );
+}

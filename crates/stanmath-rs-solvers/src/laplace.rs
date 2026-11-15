@@ -202,9 +202,45 @@ pub(crate) enum Family {
     BernoulliLogit,
 }
 
+/// The overdispersion of the negative binomial Laplace functions: one value shared by every
+/// observation, or one value per observation.
+///
+/// Stan Math declares the dispersion a vector but evaluates it only when it has a single
+/// element. Here a vector of length one is the shared case, and a vector with one element per
+/// observation gives observation `i` its own dispersion `eta[i]`, which is the same likelihood
+/// with the dispersions no longer tied.
+pub trait Dispersion<T> {
+    /// The dispersions, one shared value or one per observation.
+    fn dispersions(&self) -> Vec<T>;
+}
+
+impl<T: Real> Dispersion<T> for T {
+    fn dispersions(&self) -> Vec<T> {
+        vec![*self]
+    }
+}
+
+impl<T: Real> Dispersion<T> for &[T] {
+    fn dispersions(&self) -> Vec<T> {
+        self.to_vec()
+    }
+}
+
+impl<T: Real> Dispersion<T> for &Vec<T> {
+    fn dispersions(&self) -> Vec<T> {
+        self.to_vec()
+    }
+}
+
+impl<T: Real> Dispersion<T> for Vec<T> {
+    fn dispersions(&self) -> Vec<T> {
+        self.clone()
+    }
+}
+
 /// A built in likelihood. Observation `i` has linear predictor `theta[g] + m[g]` with
-/// `g = y_index[i]`. The parameters are `m`, followed by the overdispersion for the negative
-/// binomial.
+/// `g = y_index[i]`. The parameters are `m`, followed by the overdispersions for the negative
+/// binomial (one shared value, or one per observation).
 pub(crate) struct Builtin<'a> {
     family: Family,
     y: &'a [i64],
@@ -220,7 +256,7 @@ impl<'a> Builtin<'a> {
         y: &'a [i64],
         y_index: &'a [usize],
         m: &[S],
-        overdispersion: Option<S>,
+        overdispersion: Option<Vec<S>>,
     ) -> Result<(Self, Vec<S>)> {
         if y.len() != y_index.len() {
             return Err(Error::dimension(
@@ -258,8 +294,18 @@ impl<'a> Builtin<'a> {
             return Err(Error::parameter(function, "m", v.value(), "finite"));
         }
         let mut params = m.to_vec();
-        if let Some(phi) = overdispersion {
-            if !(phi.value() > 0.0 && phi.is_finite()) {
+        if let Some(phis) = overdispersion {
+            if phis.len() != 1 && phis.len() != y.len() {
+                return Err(Error::dimension(
+                    function,
+                    format!(
+                        "eta has {} elements, expected 1 or one per observation ({})",
+                        phis.len(),
+                        y.len()
+                    ),
+                ));
+            }
+            if let Some(phi) = phis.iter().find(|p| !(p.value() > 0.0 && p.is_finite())) {
                 return Err(Error::parameter(
                     function,
                     "eta",
@@ -267,7 +313,7 @@ impl<'a> Builtin<'a> {
                     "positive finite",
                 ));
             }
-            params.push(phi);
+            params.extend(phis);
         }
         Ok((
             Builtin {
@@ -288,7 +334,8 @@ impl Model for Builtin<'_> {
         let mut value = S::zero();
         let mut grad = vec![S::zero(); n];
         let mut w = vec![S::zero(); n];
-        for (&count, &g) in self.y.iter().zip(self.y_index) {
+        let shared = params.len() == n + 1;
+        for (i, (&count, &g)) in self.y.iter().zip(self.y_index).enumerate() {
             let eta = theta[g] + m[g];
             let y = count as f64;
             match self.family {
@@ -300,7 +347,7 @@ impl Model for Builtin<'_> {
                     w[g] += mu;
                 }
                 Family::NegBinomial2Log => {
-                    let phi = params[n];
+                    let phi = params[if shared { n } else { n + i }];
                     let mu = eta.exp();
                     let log_mu_phi = (mu + phi).ln();
                     value += lgamma(phi + y) - lgamma(phi)
@@ -810,17 +857,18 @@ pub fn laplace_marginal_tol_poisson_log_lpmf<T: Real, K: LaplaceCovariance>(
 }
 
 /// Laplace approximation of the marginal log probability of counts `y` with
-/// `y[i] ~ neg_binomial_2_log(theta[g] + m[g], eta)`, `g = y_index[i]`, and
+/// `y[i] ~ neg_binomial_2_log(theta[g] + m[g], eta[i])`, `g = y_index[i]`, and
 /// `theta ~ normal(0, K(phi))`. Stan's `laplace_marginal_neg_binomial_2_log_lpmf`, with default
-/// [`LaplaceOptions`].
+/// [`LaplaceOptions`]. The dispersion `eta` is one value shared by all observations or one per
+/// observation (see [`Dispersion`]); Stan Math evaluates only the shared form.
 ///
 /// # Errors
 ///
 /// See [`laplace_marginal_tol_neg_binomial_2_log_lpmf`].
-pub fn laplace_marginal_neg_binomial_2_log_lpmf<T: Real, K: LaplaceCovariance>(
+pub fn laplace_marginal_neg_binomial_2_log_lpmf<T: Real, D: Dispersion<T>, K: LaplaceCovariance>(
     y: &[i64],
     y_index: &[usize],
-    eta: T,
+    eta: D,
     m: &[T],
     covariance: &K,
     phi: &[T],
@@ -834,19 +882,31 @@ pub fn laplace_marginal_neg_binomial_2_log_lpmf<T: Real, K: LaplaceCovariance>(
 ///
 /// # Errors
 ///
-/// As [`laplace_marginal_tol_poisson_log_lpmf`], plus a parameter error unless `eta` is positive
-/// and finite.
-pub fn laplace_marginal_tol_neg_binomial_2_log_lpmf<T: Real, K: LaplaceCovariance>(
+/// As [`laplace_marginal_tol_poisson_log_lpmf`], plus a parameter error unless every dispersion is
+/// positive and finite, and a dimension error unless there is one dispersion or one per
+/// observation.
+pub fn laplace_marginal_tol_neg_binomial_2_log_lpmf<
+    T: Real,
+    D: Dispersion<T>,
+    K: LaplaceCovariance,
+>(
     y: &[i64],
     y_index: &[usize],
-    eta: T,
+    eta: D,
     m: &[T],
     covariance: &K,
     phi: &[T],
     options: &LaplaceOptions,
 ) -> Result<T> {
     const F: &str = "laplace_marginal_neg_binomial_2_log_lpmf";
-    let (model, params) = Builtin::new(F, Family::NegBinomial2Log, y, y_index, m, Some(eta))?;
+    let (model, params) = Builtin::new(
+        F,
+        Family::NegBinomial2Log,
+        y,
+        y_index,
+        m,
+        Some(eta.dispersions()),
+    )?;
     marginal(F, &model, &params, covariance, phi, options)
 }
 
@@ -959,10 +1019,14 @@ pub fn laplace_marginal_tol_bernoulli_logit_lupmf<T: Real, K: LaplaceCovariance>
 /// # Errors
 ///
 /// As [`laplace_marginal_neg_binomial_2_log_lpmf`].
-pub fn laplace_marginal_neg_binomial_2_log_lupmf<T: Real, K: LaplaceCovariance>(
+pub fn laplace_marginal_neg_binomial_2_log_lupmf<
+    T: Real,
+    D: Dispersion<T>,
+    K: LaplaceCovariance,
+>(
     y: &[i64],
     y_index: &[usize],
-    eta: T,
+    eta: D,
     m: &[T],
     covariance: &K,
     phi: &[T],
@@ -976,10 +1040,14 @@ pub fn laplace_marginal_neg_binomial_2_log_lupmf<T: Real, K: LaplaceCovariance>(
 /// # Errors
 ///
 /// As [`laplace_marginal_tol_neg_binomial_2_log_lpmf`].
-pub fn laplace_marginal_tol_neg_binomial_2_log_lupmf<T: Real, K: LaplaceCovariance>(
+pub fn laplace_marginal_tol_neg_binomial_2_log_lupmf<
+    T: Real,
+    D: Dispersion<T>,
+    K: LaplaceCovariance,
+>(
     y: &[i64],
     y_index: &[usize],
-    eta: T,
+    eta: D,
     m: &[T],
     covariance: &K,
     phi: &[T],

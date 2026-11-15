@@ -12,8 +12,8 @@ use rand_distr as rd;
 use stanmath_rs_core::Result;
 
 use crate::laplace::{
-    Builtin, Family, General, LaplaceCovariance, LaplaceLikelihood, LaplaceOptions, Model,
-    latent_gaussian,
+    Builtin, Dispersion, Family, General, LaplaceCovariance, LaplaceLikelihood, LaplaceOptions,
+    Model, latent_gaussian,
 };
 
 fn draw<M: Model, K: LaplaceCovariance, R: Rng + ?Sized>(
@@ -124,10 +124,14 @@ pub fn laplace_latent_tol_poisson_log_rng<K: LaplaceCovariance, R: Rng + ?Sized>
 /// # Errors
 ///
 /// As [`laplace_marginal_tol_neg_binomial_2_log_lpmf`](crate::laplace_marginal_tol_neg_binomial_2_log_lpmf).
-pub fn laplace_latent_neg_binomial_2_log_rng<K: LaplaceCovariance, R: Rng + ?Sized>(
+pub fn laplace_latent_neg_binomial_2_log_rng<
+    D: Dispersion<f64>,
+    K: LaplaceCovariance,
+    R: Rng + ?Sized,
+>(
     y: &[i64],
     y_index: &[usize],
-    eta: f64,
+    eta: D,
     m: &[f64],
     covariance: &K,
     phi: &[f64],
@@ -144,10 +148,14 @@ pub fn laplace_latent_neg_binomial_2_log_rng<K: LaplaceCovariance, R: Rng + ?Siz
 ///
 /// As [`laplace_marginal_tol_neg_binomial_2_log_lpmf`](crate::laplace_marginal_tol_neg_binomial_2_log_lpmf).
 #[allow(clippy::too_many_arguments)] // mirrors Stan's argument list
-pub fn laplace_latent_tol_neg_binomial_2_log_rng<K: LaplaceCovariance, R: Rng + ?Sized>(
+pub fn laplace_latent_tol_neg_binomial_2_log_rng<
+    D: Dispersion<f64>,
+    K: LaplaceCovariance,
+    R: Rng + ?Sized,
+>(
     y: &[i64],
     y_index: &[usize],
-    eta: f64,
+    eta: D,
     m: &[f64],
     covariance: &K,
     phi: &[f64],
@@ -155,7 +163,14 @@ pub fn laplace_latent_tol_neg_binomial_2_log_rng<K: LaplaceCovariance, R: Rng + 
     rng: &mut R,
 ) -> Result<Vec<f64>> {
     const F: &str = "laplace_latent_neg_binomial_2_log_rng";
-    let (model, params) = Builtin::new(F, Family::NegBinomial2Log, y, y_index, m, Some(eta))?;
+    let (model, params) = Builtin::new(
+        F,
+        Family::NegBinomial2Log,
+        y,
+        y_index,
+        m,
+        Some(eta.dispersions()),
+    )?;
     draw(F, &model, &params, covariance, phi, options, rng)
 }
 

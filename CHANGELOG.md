@@ -8,6 +8,8 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- `stanmath-rs-solvers`: the negative binomial Laplace functions take one dispersion per
+  observation as well as a shared one, through the `Dispersion` trait. Scalar calls are unchanged.
 - `stanmath-rs-core`: `Error` with distinct parameter and observation variants; column-major
   `Matrix<T>`; `f64` special functions (log domain helpers, gamma family, polygamma, beta, error
   functions, normal CDF, log CDF, and inverse).

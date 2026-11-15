@@ -61,7 +61,7 @@ pub use functors::{
 };
 pub use hcubature::{CubatureIntegrand, hcubature};
 pub use laplace::{
-    LaplaceCovariance, LaplaceLikelihood, LaplaceOptions, generate_laplace_options,
+    Dispersion, LaplaceCovariance, LaplaceLikelihood, LaplaceOptions, generate_laplace_options,
     generate_laplace_options_from, laplace_latent_solve, laplace_latent_solve_tol,
     laplace_marginal, laplace_marginal_bernoulli_logit_lpmf,
     laplace_marginal_bernoulli_logit_lupmf, laplace_marginal_neg_binomial_2_log_lpmf,
